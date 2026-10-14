@@ -115,6 +115,7 @@ namespace KingLastPiece
         public float fxScale = 1f, fxYaw, fxHeight = 0.9f;
         public bool fxFlip;            // upside-down = the arc sweeps the other way
         public bool fxGold;            // recolor the prefab to the King's gold
+        public bool dust;              // low dust burst around the impact (NamuFX smoke layers)
     }
 
     public struct MoveSeg
@@ -297,7 +298,8 @@ namespace KingLastPiece
                 {
                     start = 0.13f, end = 0.29f, range = 2.8f, arc = 220f, damage = 14f, poise = 14f, shake = 0.16f,
                     sweep = true, sweepFrom = 110f * side, sweepTo = -110f * side, slash = true,
-                    fx = SlashFxKind.SlashB, fxScale = 1.7f, fxFlip = side < 0f, fxGold = true,
+                    // Plays in place of the crown trail, at the height the crown sweeps through.
+                    fx = SlashFxKind.SlashB, fxScale = 1.7f, fxHeight = 1.2f, fxFlip = side > 0f, fxGold = true,
                 },
             },
             moves = new[] { new MoveSeg(0.04f, 0.3f, 1.0f) },
@@ -323,13 +325,12 @@ namespace KingLastPiece
                 {
                     start = 0.14f, end = 0.34f, shape = HitShape.Circle, range = 3.4f, damage = 9f, poise = 12f, shake = 0.25f,
                     slash = true, sweepFrom = 0f, sweepTo = 360f, sparkTrail = true,
-                    fx = SlashFxKind.SlashD, fxScale = 2.2f, fxHeight = 0.7f,
+                    fx = SlashFxKind.AoeA, fxScale = 1.6f, fxHeight = 0.9f, fxGold = true,
                 },
                 new HitWindow
                 {
                     start = 0.35f, end = 0.56f, shape = HitShape.Circle, range = 3.4f, damage = 9f, poise = 12f, shake = 0.3f,
-                    slash = true, sweepFrom = 0f, sweepTo = 360f, sparkTrail = true, kick = 0.35f,
-                    fx = SlashFxKind.SlashD, fxScale = 2.4f, fxHeight = 0.9f, fxYaw = 180f,
+                    sparkTrail = true, kick = 0.35f,
                 },
             },
             moves = new[] { new MoveSeg(0.1f, 0.56f, 0.8f, Ease.InOut) },
@@ -352,7 +353,7 @@ namespace KingLastPiece
                 {
                     start = 0.52f, end = 0.57f, shape = HitShape.Circle, range = 3.2f, damage = 20f, poise = 32f,
                     hitStop = 0.09f, shake = 0.45f, impact = true, kick = 0.6f,
-                    fx = SlashFxKind.AoeA, fxScale = 1.5f, fxHeight = 0.4f, fxGold = true,
+                    dust = true,
                 },
             },
             moves = new[] { new MoveSeg(0.14f, 0.52f, 1.6f, Ease.InOut) },
@@ -386,8 +387,8 @@ namespace KingLastPiece
             hits = new[]
             {
                 new HitWindow { start = 0.82f, end = 0.9f, shape = HitShape.Circle, range = 4.3f, damage = 46f, poise = 65f,
-                    hitStop = 0.12f, shake = 0.65f, impact = true, kick = 1f, slash = true, sweepFrom = 0f, sweepTo = 360f,
-                    fx = SlashFxKind.AoeA, fxScale = 2.1f, fxHeight = 0.4f, fxGold = true },
+                    hitStop = 0.12f, shake = 0.65f, impact = true, kick = 1f,
+                    dust = true },
             },
             moves = new[] { new MoveSeg(0.42f, 0.82f, 3.0f, Ease.InOut) },
         };

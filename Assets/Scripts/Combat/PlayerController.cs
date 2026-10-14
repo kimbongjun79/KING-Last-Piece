@@ -73,7 +73,7 @@ namespace KingLastPiece
         float stateTime, staminaDelay;
         AttackDef atk;
         int comboIndex;
-        bool hitStopUsed;
+        bool hitStopUsed, atkUsesSlashFx;
         bool healed;
         HashSet<EnemyBase>[] hitSets = new HashSet<EnemyBase>[0];
         bool[] windowStarted = new bool[0];
@@ -406,6 +406,7 @@ namespace KingLastPiece
                 atk = style.lights[comboIndex];
             }
             Consume(heavy ? atk.cost : atk.cost * LightCostScale);
+            atkUsesSlashFx = FxLibrary.Instance != null && System.Array.Exists(atk.hits, h => h.fx != SlashFxKind.None);
             hitStopUsed = false;
 
             if (hitSets.Length < atk.hits.Length)
@@ -558,7 +559,8 @@ namespace KingLastPiece
             ApplyPose(atk.pose.Eval(t));
 
             bool trail = t >= atk.FirstHit - 0.07f && t <= atk.LastHit + 0.03f;
-            crownTrail.emitting = trail;
+            // An authored slash replaces the crown trail for this attack.
+            crownTrail.emitting = trail && !atkUsesSlashFx;
             baseTrail.emitting = trail && atk.heavy;
 
             for (int i = 0; i < atk.hits.Length; i++)
@@ -575,6 +577,7 @@ namespace KingLastPiece
                         SlashFx.Spawn(FlatPos + transform.forward * w.forward, transform.forward, w.range * 0.82f,
                             w.sweepFrom, w.sweepTo, w.end - w.start, new Color(1f, 0.82f, 0.45f));
                     if (w.kick > 0f) Game.Rig.Kick(w.kick);
+                    if (w.dust) Vfx.Dust(FlatPos + transform.forward * w.forward, w.range);
                     if (w.impact)
                     {
                         Vector3 c = transform.position + transform.forward * w.forward;

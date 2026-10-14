@@ -63,7 +63,11 @@ namespace KingLastPiece
         /// works; <paramref name="tint"/> recolors every system's start color (keeping alpha).
         /// Returns false when the asset isn't available (callers fall back to the primitive crescent).
         /// </summary>
-        public static bool Slash(SlashFxKind kind, Vector3 pos, Quaternion rot, float scale, Color? tint = null)
+        public static bool Slash(SlashFxKind kind, Vector3 pos, Quaternion rot, float scale, Color? tint = null) =>
+            Slash(kind, pos, rot, scale, tint, null);
+
+        /// <param name="keep">When set, only particle systems whose (lower-case) name passes keep emitting.</param>
+        static bool Slash(SlashFxKind kind, Vector3 pos, Quaternion rot, float scale, Color? tint, System.Predicate<string> keep)
         {
             var lib = FxLibrary.Instance;
             if (lib == null) return false;
@@ -84,24 +88,53 @@ namespace KingLastPiece
             fx.transform.localScale = Vector3.one * scale;
             foreach (var ps in fx.GetComponentsInChildren<ParticleSystem>())
             {
+                string n = ps.name.ToLowerInvariant();
+                if (keep != null && !keep(n))
+                {
+                    var em = ps.emission;
+                    em.enabled = false;
+                    ps.Clear(false);
+                    continue;
+                }
                 var main = ps.main;
                 main.scalingMode = ParticleSystemScalingMode.Hierarchy;
-                string n = ps.name.ToLowerInvariant();
-                if (n.Contains("dust") || n.Contains("smoke"))
-                    Recolor(ps, new Color(0.55f, 0.5f, 0.45f));  // neutral dust, never "enemy red"
-                else if (tint.HasValue)
-                    Recolor(ps, tint.Value);
-            }
-            if (tint.HasValue)
-                foreach (var r in fx.GetComponentsInChildren<ParticleSystemRenderer>())
+                bool dust = n.Contains("dust") || n.Contains("smoke");
+                if (dust) Recolor(ps, DustColor);  // neutral dust, never "enemy red"
+                else if (tint.HasValue) Recolor(ps, tint.Value);
+                if (dust || tint.HasValue)
                 {
+                    var r = ps.GetComponent<ParticleSystemRenderer>();
                     var mats = r.sharedMaterials;
                     for (int i = 0; i < mats.Length; i++) mats[i] = VertexColored(mats[i]);
                     r.sharedMaterials = mats;
                     if (r.trailMaterial != null) r.trailMaterial = VertexColored(r.trailMaterial);
                 }
+            }
             Object.Destroy(fx, 2.2f);
             return true;
+        }
+
+        static readonly Color DustColor = new Color(0.55f, 0.5f, 0.45f);
+
+        /// <summary>
+        /// Low dust burst around a landing: only the smoke / dust layers of the NamuFX prefabs (no slashes),
+        /// spread in a ring so the cracks in the middle stay readable. Falls back to grey sparks.
+        /// </summary>
+        public static void Dust(Vector3 center, float radius)
+        {
+            center.y = 0.15f;
+            bool any = false;
+            System.Predicate<string> dustOnly = n => n.Contains("smoke") || n.Contains("dust");
+            int puffs = Mathf.Clamp(Mathf.RoundToInt(radius * 1.6f), 3, 7);
+            float offset = Random.value * 360f;
+            for (int i = 0; i < puffs; i++)
+            {
+                Vector3 d = Quaternion.Euler(0f, offset + i * 360f / puffs, 0f) * Vector3.forward;
+                var kind = i % 2 == 0 ? SlashFxKind.AoeA : SlashFxKind.SlashA;
+                any |= Slash(kind, center + d * radius * 0.6f, Quaternion.LookRotation(d), Mathf.Lerp(0.7f, 1.2f, radius / 4f), null, dustOnly);
+            }
+            if (!any) Effects.Shockwave(center, radius * 0.7f, new Color(0.22f, 0.2f, 0.18f), 0.45f);
+            Effects.Sparks(center, DustColor, Mathf.RoundToInt(6 + radius * 3f), 3.5f);
         }
 
         static readonly Dictionary<Material, Material> vertexColored = new Dictionary<Material, Material>();
@@ -157,7 +190,7 @@ namespace KingLastPiece
             switch (style)
             {
                 case VfxStyle.CrackedBoard:
-                    CrackDecalFx.Spawn(center, radius * 1.9f, strength);
+                    CrackDecalFx.Spawn(center, radius * 4.75f, strength);
                     Chips(center + Vector3.up * 0.05f, Vector3.zero, Mathf.RoundToInt(10 * strength), 4.5f * strength,
                         SquareColor(center), SquareColor(center) * 0.7f, 0.13f);
                     Effects.Sparks(center + Vector3.up * 0.1f, accent, Mathf.RoundToInt(6 * strength), 4f);
@@ -165,7 +198,8 @@ namespace KingLastPiece
                 case VfxStyle.BoardRipple:
                     BoardFx.Ripple(center, radius, strength);
                     SquareRingFx.Spawn(center, radius, accent, 0.5f);
-                    CrackDecalFx.Spawn(center, Mathf.Min(2.4f, radius * 0.8f), strength * 0.8f);
+                    // Deep projector: the squares lift up to ~0.4 while rippling and must keep showing the cracks.
+                    CrackDecalFx.Spawn(center, Mathf.Min(6f, radius * 2f), strength * 0.8f, 1.1f);
                     Confetti(center + Vector3.up * 0.1f, Vector3.zero, Mathf.RoundToInt(10 * strength), 4f * strength);
                     break;
                 default:
@@ -499,7 +533,7 @@ namespace KingLastPiece
     /// </summary>
     public class CrackDecalFx : MonoBehaviour
     {
-        const float Hold = 2.2f, Fade = 0.9f, Depth = 0.24f;
+        const float Hold = 2.2f, Fade = 0.9f, DefaultDepth = 0.24f;
         static readonly Dictionary<Texture2D, Material> materials = new Dictionary<Texture2D, Material>();
         static readonly int BaseMapId = Shader.PropertyToID("Base_Map");  // URP Decal shader graph property
 
@@ -507,7 +541,8 @@ namespace KingLastPiece
         float t;
 
         /// <param name="size">Width of the crack image on the board.</param>
-        public static void Spawn(Vector3 center, float size, float strength)
+        /// <param name="depth">Vertical reach of the projector (raise it when the board squares move).</param>
+        public static void Spawn(Vector3 center, float size, float strength, float depth = DefaultDepth)
         {
             var lib = FxLibrary.Instance;
             if (lib == null || lib.crackDecal == null || lib.crackTextures == null || lib.crackTextures.Length == 0)
@@ -529,7 +564,7 @@ namespace KingLastPiece
             var dp = go.AddComponent<UnityEngine.Rendering.Universal.DecalProjector>();
             dp.material = mat;
             float s = size * Mathf.Lerp(0.85f, 1.15f, Random.value);
-            dp.size = new Vector3(s, s, Depth);
+            dp.size = new Vector3(s, s, depth);
             dp.pivot = Vector3.zero;
             // Only the board's flat top: steep surfaces (piece sides) are skipped.
             dp.startAngleFade = 25f;
