@@ -10,13 +10,14 @@ namespace KingLastPiece
         protected override void Configure()
         {
             DisplayName = "Black Pawn";
-            SetHealth(42f);
+            SetHealth(100f);   // ~1.5 light-combo cycles (one cycle = 66)
             SetRadius(0.45f);
             moveSpeed = 2.6f;
-            maxPoise = 15f;
-            staggerDuration = 0.9f;
             strafeSign = Random.value < 0.5f ? -1f : 1f;
         }
+
+        protected override StaggerProfile CreateStaggerProfile() =>
+            StaggerProfile.Create(maxGauge: 26f, vulnerableDuration: 3f, launchForce: 7.5f, flinchDuration: 0.4f);
 
         protected override void Think(float dt)
         {
@@ -55,12 +56,14 @@ namespace KingLastPiece
         protected override void Configure()
         {
             DisplayName = "Black Knight";
-            SetHealth(75f);
+            SetHealth(265f);   // ~4 light-combo cycles
             SetRadius(0.5f);
             moveSpeed = 3f;
-            maxPoise = 30f;
             hopTimer = Random.Range(0.4f, 1f);
         }
+
+        protected override StaggerProfile CreateStaggerProfile() =>
+            StaggerProfile.Create(maxGauge: 60f, vulnerableDuration: 2.5f, launchForce: 6.5f, flinchDuration: 0.35f);
 
         protected override void Think(float dt)
         {
@@ -120,11 +123,13 @@ namespace KingLastPiece
         protected override void Configure()
         {
             DisplayName = "Black Bishop";
-            SetHealth(85f);
+            SetHealth(265f);   // ~4 light-combo cycles
             SetRadius(0.45f);
             moveSpeed = 3.4f;
-            maxPoise = 30f;
         }
+
+        protected override StaggerProfile CreateStaggerProfile() =>
+            StaggerProfile.Create(maxGauge: 60f, vulnerableDuration: 2.5f, launchForce: 6.5f, flinchDuration: 0.35f);
 
         protected override void Think(float dt)
         {
@@ -158,13 +163,13 @@ namespace KingLastPiece
         protected override void Configure()
         {
             DisplayName = "Black Rook";
-            SetHealth(150f);
+            SetHealth(380f);   // tougher than knight/bishop (~5.8 cycles)
             SetRadius(0.55f);
             moveSpeed = 2.8f;
-            maxPoise = 60f;
-            hyperArmor = true;
-            staggerDuration = 1.3f;
         }
+
+        protected override StaggerProfile CreateStaggerProfile() =>
+            StaggerProfile.Create(maxGauge: 110f, vulnerableDuration: 2f, launchForce: 4.8f, flinchDuration: 0.3f);
 
         protected override void Think(float dt)
         {
@@ -213,7 +218,7 @@ namespace KingLastPiece
         {
             DisplayName = "The Black Queen";
             IsBoss = true;
-            SetHealth(620f);
+            SetHealth(700f);
             SetRadius(0.75f);
             SetModelScale(1.35f);
             moveSpeed = 3.2f;

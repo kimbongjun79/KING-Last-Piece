@@ -8,7 +8,7 @@ namespace KingLastPiece
     /// </summary>
     public abstract class EnemyBase : Actor
     {
-        protected enum EState { Spawning, Move, Windup, Attack, Recover, Stagger, Grabbed, Launched, Dead }
+        protected enum EState { Spawning, Move, Windup, Attack, Recover, Stagger, Airborne, Getup, Grabbed, Launched, Dead }
         protected enum AtkKind { Lunge, Dash, Leap, Slam }
 
         protected struct AttackPlan
@@ -48,7 +48,7 @@ namespace KingLastPiece
             }
         }
         public bool IgnoresCollision =>
-            IsDead || state == EState.Spawning || state == EState.Grabbed || state == EState.Launched ||
+            IsDead || state == EState.Spawning || state == EState.Grabbed || state == EState.Launched || state == EState.Airborne ||
             (state == EState.Attack && (plan.kind == AtkKind.Leap || plan.kind == AtkKind.Dash));
 
         protected EState state;
@@ -65,7 +65,12 @@ namespace KingLastPiece
         Vector3 atkStart;
         bool atkHit, landed;
         float poiseRegenTimer, hopPhase, modelY, squash = 1f;
-        Quaternion modelTilt = Quaternion.identity;
+        Quaternion modelTilt = Quaternion.identity, vulnWobble = Quaternion.identity;
+        StaggerController stagger;
+        float currentStagger, airHeight, airVy, vulnFxTimer;
+        int airHits;
+        float modelHeight = 1.5f;
+        Vector3 flinchPush, airKnock;
         Vector3 fallAxis;
         static readonly Color WindupGlow = new Color(1.6f, 0.12f, 0.04f);
 
@@ -74,7 +79,19 @@ namespace KingLastPiece
             Type = type;
             model = modelRoot;
             Configure();
+            if (!IsBoss)
+            {
+                stagger = gameObject.AddComponent<StaggerController>();
+                stagger.Profile = CreateStaggerProfile();
+            }
             modelBaseScale = model.localScale;
+            var rends = model.GetComponentsInChildren<Renderer>();
+            if (rends.Length > 0)
+            {
+                var b = rends[0].bounds;
+                foreach (var r in rends) b.Encapsulate(r.bounds);
+                modelHeight = b.size.y;
+            }
             InitActor(MaxHealth);
             poise = maxPoise;
             state = EState.Spawning;
@@ -90,6 +107,18 @@ namespace KingLastPiece
 
         /// <summary>Called when an attack's recovery ends. Return true if another attack was started (combo).</summary>
         protected virtual bool ContinueCombo() => false;
+
+        /// <summary>Stagger tuning for regular enemies (bosses don't use the stagger system).</summary>
+        protected virtual StaggerProfile CreateStaggerProfile() => StaggerProfile.Create(40f, 2.5f, 7f, 0.35f);
+
+        public bool IsVulnerable => stagger != null && stagger.Vulnerable;
+        public bool IsAirborne => state == EState.Airborne;
+        /// <summary>One-letter state code for lab timelines.</summary>
+        public char StateCode => state switch
+        {
+            EState.Move => 'm', EState.Windup => 'w', EState.Attack => 'a', EState.Recover => 'r',
+            EState.Stagger => 's', EState.Airborne => 'U', EState.Getup => 'g', EState.Dead => 'x', _ => '.',
+        };
 
         protected void SetHealth(float hp) => MaxHealth = hp;
         protected void SetRadius(float r) => Radius = r;
@@ -109,8 +138,14 @@ namespace KingLastPiece
             modelY = 0f;
             squash = 1f;
             modelTilt = Quaternion.identity;
+            vulnWobble = Quaternion.identity;
 
-            if (poiseRegenTimer > 0f) poiseRegenTimer -= dt;
+            if (stagger != null)
+            {
+                stagger.Tick(dt, state == EState.Airborne || state == EState.Getup);
+                if (stagger.Vulnerable && state != EState.Airborne) AnimateVulnerable(dt);
+            }
+            else if (poiseRegenTimer > 0f) poiseRegenTimer -= dt;
             else poise = Mathf.Min(maxPoise, poise + maxPoise * 0.5f * dt);
 
             switch (state)
@@ -134,12 +169,20 @@ namespace KingLastPiece
                     UpdateLaunched(dt);
                     break;
                 case EState.Stagger:
-                    modelTilt = Quaternion.Euler(-20f * Mathf.Sin(Mathf.Clamp01(stateTime / staggerDuration) * Mathf.PI), 0f, 0f);
-                    if (stateTime >= staggerDuration)
+                    transform.position += flinchPush * dt;
+                    flinchPush = Vector3.Lerp(flinchPush, Vector3.zero, 1f - Mathf.Exp(-10f * dt));
+                    modelTilt = Quaternion.Euler(-20f * Mathf.Sin(Mathf.Clamp01(stateTime / currentStagger) * Mathf.PI), 0f, 0f);
+                    if (stateTime >= currentStagger)
                     {
                         Enter(EState.Move);
                         cooldown = Mathf.Max(cooldown, 0.5f);
                     }
+                    break;
+                case EState.Airborne:
+                    UpdateAirborne(dt);
+                    break;
+                case EState.Getup:
+                    UpdateGetup();
                     break;
             }
 
@@ -150,7 +193,7 @@ namespace KingLastPiece
             }
 
             model.localPosition = new Vector3(0f, modelY, 0f);
-            model.localRotation = modelTilt;
+            model.localRotation = modelTilt * vulnWobble;
             model.localScale = new Vector3(modelBaseScale.x / Mathf.Sqrt(squash), modelBaseScale.y * squash, modelBaseScale.z / Mathf.Sqrt(squash));
             ClampToBoard();
         }
@@ -441,8 +484,8 @@ namespace KingLastPiece
                 modelY = 0f;
                 Effects.Shockwave(FlatPos, 2f, new Color(1f, 0.6f, 0.25f), 0.45f);
                 Game.Rig.Shake(0.4f);
-                poise = 0f;
-                Enter(EState.Stagger);
+                // Crash down and lie on the board before getting up (damage only, no stagger reaction).
+                Enter(EState.Getup);
                 if (TakeHit(launchDamage, 0f, transform.position - launchVelocity)) Game.ReportDamage(this, launchDamage);
             }
         }
@@ -457,9 +500,6 @@ namespace KingLastPiece
             LastHitTime = Time.time;
             Flash(new Color(1.6f, 1.5f, 1.3f), 0.09f);
 
-            poise -= poiseDamage;
-            poiseRegenTimer = 2f;
-
             if (Health <= 0f)
             {
                 Health = 0f;
@@ -467,13 +507,28 @@ namespace KingLastPiece
                 return true;
             }
 
+            // Being swung, thrown or getting up: damage only, no reaction.
+            if (state == EState.Grabbed || state == EState.Launched || state == EState.Getup) return true;
+
+            if (stagger != null)
+            {
+                // Super armor from wind-up through the end of the hit; recovery is unarmored (punish window).
+                bool superArmor = state == EState.Windup || state == EState.Attack;
+                var reaction = stagger.OnHit(poiseDamage, superArmor, state == EState.Airborne);
+                if (stagger.JustBecameVulnerable) VulnerableBurst();
+                if (reaction == StaggerController.Reaction.Launch) LaunchUp(source);
+                else if (reaction == StaggerController.Reaction.Flinch) Flinch(source, stagger.Profile.flinchDuration);
+                return true;
+            }
+
+            // Bosses: classic poise (separate from the stagger system).
+            poise -= poiseDamage;
+            poiseRegenTimer = 2f;
             bool armored = hyperArmor && (state == EState.Attack || state == EState.Windup);
             if (poise <= 0f && !armored)
             {
                 poise = maxPoise;
-                ClearTelegraph();
-                SetGlow(Color.black);
-                Enter(EState.Stagger);
+                Flinch(source, staggerDuration);
                 Effects.Sparks(transform.position + Vector3.up * 1.5f, new Color(1f, 0.9f, 0.4f), 8, 3f);
             }
             else if (state == EState.Move)
@@ -482,6 +537,105 @@ namespace KingLastPiece
                 if (away.sqrMagnitude > 0.001f) transform.position += away.normalized * 0.25f;
             }
             return true;
+        }
+
+        // ---------------------------------------------------------------- stagger reactions
+
+        static readonly Color VulnerableColor = new Color(1f, 0.85f, 0.25f);
+        const float AirGravity = 22f, AirLiftFalloff = 0.6f, GetupLie = 0.45f, GetupRise = 0.4f;
+
+        /// <summary>Cancels whatever the piece was doing (attack, telegraph, glow) — frees its attack token too.</summary>
+        void CancelAction()
+        {
+            ClearTelegraph();
+            SetGlow(Color.black);
+        }
+
+        void Flinch(Vector3 source, float duration)
+        {
+            CancelAction();
+            currentStagger = duration;
+            Vector3 away = FlatPos - new Vector3(source.x, 0f, source.z);
+            flinchPush = away.sqrMagnitude > 0.001f ? away.normalized * 2.5f : Vector3.zero;
+            Enter(EState.Stagger);
+        }
+
+        /// <summary>Knock the piece into the air. Each further air hit lifts less (no infinite juggles).</summary>
+        void LaunchUp(Vector3 source)
+        {
+            CancelAction();
+            bool alreadyAirborne = state == EState.Airborne;
+            if (!alreadyAirborne)
+            {
+                airHits = 0;
+                airHeight = 0f;
+            }
+            float lift = stagger.Profile.launchForce * Mathf.Pow(AirLiftFalloff, airHits);
+            airHits++;
+            airVy = Mathf.Max(lift, alreadyAirborne ? airVy : 0f);
+            Vector3 away = FlatPos - new Vector3(source.x, 0f, source.z);
+            airKnock = away.sqrMagnitude > 0.001f ? away.normalized * (alreadyAirborne ? 1.2f : 2.2f) : Vector3.zero;
+            Enter(EState.Airborne);
+            Effects.Sparks(transform.position + Vector3.up * (airHeight + 1f), VulnerableColor, 10, 5f);
+            if (!alreadyAirborne) Effects.Shockwave(FlatPos, 1.2f, VulnerableColor, 0.3f);
+        }
+
+        void UpdateAirborne(float dt)
+        {
+            airHeight += airVy * dt;
+            airVy -= AirGravity * dt;
+            transform.position += airKnock * dt;
+            airKnock = Vector3.Lerp(airKnock, Vector3.zero, 1f - Mathf.Exp(-2f * dt));
+            modelY = Mathf.Max(0f, airHeight);
+            // Tumble backwards while in the air.
+            modelTilt = Quaternion.Euler(Mathf.Clamp(-25f - 40f * airHits + airVy * 4f, -110f, 0f), 0f, 0f);
+
+            if (airHeight <= 0f && airVy < 0f)
+            {
+                modelY = 0f;
+                Effects.Shockwave(FlatPos, 1.4f, new Color(0.7f, 0.65f, 0.55f), 0.35f);
+                Effects.Sparks(transform.position + Vector3.up * 0.2f, new Color(0.6f, 0.55f, 0.5f), 8, 3f);
+                Enter(EState.Getup);
+            }
+        }
+
+        /// <summary>Lie on the board, then stand back up. Getting up resets the gauge.</summary>
+        void UpdateGetup()
+        {
+            float t = stateTime;
+            float lie = t < GetupLie ? 1f : 1f - PoseTrack.Curve(Ease.InOut, (t - GetupLie) / GetupRise);
+            modelTilt = Quaternion.Euler(-85f * lie, 0f, 0f);
+            if (t >= GetupLie + GetupRise)
+            {
+                stagger?.ResetGauge();
+                airHits = 0;
+                Enter(EState.Move);
+                cooldown = Mathf.Max(cooldown, 0.6f);
+            }
+        }
+
+        /// <summary>The gauge just filled: hidden gauge, so make Vulnerable obvious with a burst.</summary>
+        void VulnerableBurst()
+        {
+            Flash(VulnerableColor * 2.2f, 0.18f);
+            Effects.Shockwave(FlatPos, 1.6f, VulnerableColor, 0.35f);
+            Effects.Sparks(transform.position + Vector3.up * 2f, VulnerableColor, 16, 4f);
+            Game.Rig.Shake(0.15f);
+        }
+
+        /// <summary>While Vulnerable: dizzy wobble and golden sparks circling the head.</summary>
+        void AnimateVulnerable(float dt)
+        {
+            float w = Time.time * 9f;
+            vulnWobble = Quaternion.Euler(Mathf.Sin(w) * 7f, 0f, Mathf.Cos(w) * 7f);
+            vulnFxTimer -= dt;
+            if (vulnFxTimer <= 0f)
+            {
+                vulnFxTimer = 0.12f;
+                float a = Time.time * 6f;
+                Vector3 head = transform.position + Vector3.up * (modelHeight + 0.25f);
+                Effects.Sparks(head + new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a)) * 0.45f, VulnerableColor, 1, 0.6f);
+            }
         }
 
         void Die(Vector3 source)

@@ -116,11 +116,12 @@ namespace KingLastPiece
                 { PieceType.Pawn, ("Models/Black_Chess_Pawn_v03", 1.35f, 0f) },
                 { PieceType.Knight, ("Models/Black_Chess_Knight_v03", 1.75f, 0f) },
                 { PieceType.Bishop, ("Models/Black_Chess_Bishop_v03", 1.95f, 0f) },
+                { PieceType.Rook, ("Models/Black_Chess_Rook_v03", 1.75f, 0f) },
                 { PieceType.Queen, ("Models/Black_Chess_Queen_v03", 2.5f, 0f) },
                 { PieceType.King, ("Models/White_Chess_King_v02", 2.1f, 0f) },
             };
 
-        /// <summary>Black piece: the designed FBX when there is one (Rook has none), otherwise primitives.</summary>
+        /// <summary>Black piece: the designed FBX when there is one, otherwise primitives.</summary>
         public static Transform BuildEnemy(PieceType type, Transform parent)
         {
             if (Designed.TryGetValue(type, out var d))

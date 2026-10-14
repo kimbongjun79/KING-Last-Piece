@@ -281,6 +281,9 @@ namespace KingLastPiece
 
         // ---------------------------------------------------------------- lock-on
 
+        /// <summary>Lock onto a specific piece (used by the Attack Lab automation).</summary>
+        public void LockOn(EnemyBase target) => LockTarget = target;
+
         void ToggleLock()
         {
             if (LockTarget != null) { LockTarget = null; return; }

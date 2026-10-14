@@ -61,18 +61,29 @@ namespace KingLastPiece
             public (PieceType type, string square)[] pieces;
         }
 
+        // Ten rounds. Pieces enter on their real starting squares; difficulty ramps up to the Queen.
         static readonly WaveDef[] Waves =
         {
             new WaveDef { name = "I. The Opening", pieces = new[] {
-                (PieceType.Pawn, "d7"), (PieceType.Pawn, "e7"), (PieceType.Pawn, "f7") } },
-            new WaveDef { name = "II. Knight's Gambit", pieces = new[] {
+                (PieceType.Pawn, "d7"), (PieceType.Pawn, "e7") } },
+            new WaveDef { name = "II. Pawn Storm", pieces = new[] {
+                (PieceType.Pawn, "c7"), (PieceType.Pawn, "d7"), (PieceType.Pawn, "e7"), (PieceType.Pawn, "f7") } },
+            new WaveDef { name = "III. Knight's Gambit", pieces = new[] {
                 (PieceType.Knight, "g8"), (PieceType.Pawn, "c7"), (PieceType.Pawn, "f7") } },
-            new WaveDef { name = "III. The Long Diagonal", pieces = new[] {
-                (PieceType.Bishop, "c8"), (PieceType.Knight, "b8"), (PieceType.Pawn, "d7"), (PieceType.Pawn, "e7") } },
-            new WaveDef { name = "IV. Castle Walls", pieces = new[] {
-                (PieceType.Rook, "a8"), (PieceType.Bishop, "f8"), (PieceType.Pawn, "c7"), (PieceType.Pawn, "g7") } },
-            new WaveDef { name = "V. The Black Queen", pieces = new[] {
-                (PieceType.Queen, "d8") } },
+            new WaveDef { name = "IV. The Long Diagonal", pieces = new[] {
+                (PieceType.Bishop, "c8"), (PieceType.Pawn, "d7"), (PieceType.Pawn, "e7") } },
+            new WaveDef { name = "V. Castle Walls", pieces = new[] {
+                (PieceType.Rook, "a8"), (PieceType.Pawn, "c7"), (PieceType.Pawn, "f7") } },
+            new WaveDef { name = "VI. Twin Cavalry", pieces = new[] {
+                (PieceType.Knight, "b8"), (PieceType.Knight, "g8"), (PieceType.Pawn, "e7") } },
+            new WaveDef { name = "VII. Fianchetto", pieces = new[] {
+                (PieceType.Bishop, "c8"), (PieceType.Bishop, "f8"), (PieceType.Pawn, "b7"), (PieceType.Pawn, "g7") } },
+            new WaveDef { name = "VIII. Rook Lift", pieces = new[] {
+                (PieceType.Rook, "a8"), (PieceType.Knight, "g8"), (PieceType.Bishop, "f8") } },
+            new WaveDef { name = "IX. The Black Army", pieces = new[] {
+                (PieceType.Rook, "a8"), (PieceType.Rook, "h8"), (PieceType.Knight, "b8"), (PieceType.Pawn, "d7"), (PieceType.Pawn, "e7") } },
+            new WaveDef { name = "X. The Black Queen", pieces = new[] {
+                (PieceType.Queen, "d8"), (PieceType.Pawn, "c7"), (PieceType.Pawn, "e7") } },
         };
 
         public static Vector3 SquareToWorld(string sq)

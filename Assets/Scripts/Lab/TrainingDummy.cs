@@ -11,9 +11,10 @@ namespace KingLastPiece
             SetHealth(160f);
             SetRadius(0.45f);
             moveSpeed = 0f;
-            maxPoise = 30f;
-            staggerDuration = 0.8f;
         }
+
+        protected override StaggerProfile CreateStaggerProfile() =>
+            StaggerProfile.Create(maxGauge: 45f, vulnerableDuration: 3f, launchForce: 7f, flinchDuration: 0.35f);
 
         protected override void Think(float dt)
         {

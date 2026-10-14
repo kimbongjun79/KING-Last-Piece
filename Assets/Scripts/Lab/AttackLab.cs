@@ -206,6 +206,67 @@ namespace KingLastPiece
             Destroy(sheet);
         }
 
+        /// <summary>
+        /// Stagger system check: hold light attack on a real pawn and log its state every 6 frames
+        /// (m move, w/a attack, r recover, s flinch, U airborne, g get-up, x dead; uppercase-V marks Vulnerable).
+        /// Captures a 5×2 sheet of the sequence.
+        /// </summary>
+        IEnumerator StaggerScenario(string dir, StringBuilder stats)
+        {
+            var hud = game.GetComponent<Hud>();
+            if (hud != null) hud.enabled = false;
+            game.ClearEnemies();
+            var player = game.Player;
+            player.ResetForWave(PlayerStart, 0f);
+            var pawn = game.SpawnEnemy(PieceType.Pawn, PlayerStart + new Vector3(0f, 0f, 1.8f));
+            game.Rig.OverridePosition = PlayerStart + new Vector3(4.5f, 2.6f, 1.2f);
+            game.Rig.OverrideLookAt = PlayerStart + new Vector3(0f, 1.2f, 2.2f);
+            for (int f = 0; f < 50; f++) yield return null;
+            player.LockOn(pawn);
+
+            var timeline = new StringBuilder();
+            const int cols = 5, rows = 2, frames = 300;
+            Texture2D sheet = null;
+            int tileW = 0, tileH = 0, shot = 0;
+            float startHp = pawn.Health;
+            int launches = 0;
+            bool wasAir = false;
+            for (int f = 0; f < frames && pawn != null; f++)
+            {
+                player.Press(PlayerController.Buffered.Light);  // like holding LMB
+                yield return null;
+                if (pawn == null) break;
+                if (pawn.IsAirborne && !wasAir) launches++;
+                wasAir = pawn.IsAirborne;
+                if (f % 6 == 0) timeline.Append(pawn.IsAirborne ? 'U' : pawn.IsVulnerable ? 'V' : pawn.StateCode);
+                if (f % 30 == 15 && shot < cols * rows)
+                {
+                    yield return new WaitForEndOfFrame();
+                    var tex = ScreenCapture.CaptureScreenshotAsTexture();
+                    if (sheet == null)
+                    {
+                        tileW = tex.width;
+                        tileH = tex.height;
+                        sheet = new Texture2D(tileW * cols, tileH * rows, TextureFormat.RGB24, false);
+                    }
+                    int c = shot % cols, r = shot / cols;
+                    if (tex.width == tileW && tex.height == tileH)
+                        sheet.SetPixels32(c * tileW, (rows - 1 - r) * tileH, tileW, tileH, tex.GetPixels32());
+                    Destroy(tex);
+                    shot++;
+                }
+                if (pawn.IsDead) break;
+            }
+
+            stats.AppendLine($"Stagger\tpawn_hp={startHp:0}\tlaunches={launches}\tdead={(pawn == null || pawn.IsDead)}\ttimeline={timeline}");
+            if (sheet != null)
+            {
+                sheet.Apply();
+                File.WriteAllBytes(Path.Combine(dir, "9_Stagger_System.png"), sheet.EncodeToPNG());
+                Destroy(sheet);
+            }
+        }
+
         static string GetArg(string name)
         {
             var args = System.Environment.GetCommandLineArgs();
@@ -309,6 +370,7 @@ namespace KingLastPiece
 
             yield return JustDodgeScenario(dir, stats);
             yield return PieceLineup(dir);
+            yield return StaggerScenario(dir, stats);
 
             File.WriteAllText(Path.Combine(dir, "stats.tsv"), stats.ToString());
             Application.Quit();

@@ -64,6 +64,7 @@ namespace KingLastPiece
             DrawJustDodge(g);
             DrawBanner(g);
             DrawPopups(g);
+            if (g.CurrentMode == GameManager.Mode.Game) DrawRound(g);
             DrawControlsHint();
             if (g.CurrentMode == GameManager.Mode.Lab) DrawLabPanel();
 
@@ -161,6 +162,12 @@ namespace KingLastPiece
             var r = new Rect(0, Screen.height * 0.22f, Screen.width, 60 * scale);
             Fill(new Rect(0, r.y - 10 * scale, Screen.width, r.height + 20 * scale), new Color(0, 0, 0, 0.45f * a));
             Text(r, g.Banner.ToUpperInvariant(), mid, new Color(Gold.r, Gold.g, Gold.b, a));
+        }
+
+        void DrawRound(GameManager g)
+        {
+            var r = new Rect(0, 18 * scale, Screen.width, 30 * scale);
+            Text(r, $"ROUND {g.WaveIndex + 1} / {g.WaveCount}", small, new Color(0.9f, 0.85f, 0.7f, 0.85f));
         }
 
         void DrawPopups(GameManager g)

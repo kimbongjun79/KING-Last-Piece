@@ -20,7 +20,7 @@
 | 락온 | 대상 고정 카메라 + 스트레이프 이동 |
 | 회복 아이템 | Royal Flask 3개, 사용 중 이동 느려지고 피격 시 낭비 |
 | 텔레그래프 | 적 공격 전 붉은 발광 + 바닥 위험 범위 표시 |
-| 강인도/경직 | 적의 poise를 깎으면 경직 → 반격 찬스 |
+| 경직 시스템 | 일반 적: 피격 시 경직 + 숨겨진 게이지 누적 → 가득 차면 **취약**(금빛 연출) → 다음 타격에 **띄우기**·행동 취소 → 공중 추가타(상승량 감소) → 착지·기상. 공격 중에는 슈퍼아머. 보스는 별도 체간(poise) |
 | 사망 | **CHECKMATE** 화면, 현재 웨이브부터 재도전 |
 | 웨이브 사이 휴식 | 플라스크 리필 + 체력 일부 회복 (모닥불 대체) |
 
@@ -61,25 +61,56 @@ Lab 조작: `1`–`6` 스타일 전환 · `C` 허수아비 리셋 · `G` 공격�
 
 자동 검증 결과는 [`Docs/AttackLab/7_Perfect_Dodge_Royal_Throw.png`](Docs/AttackLab/7_Perfect_Dodge_Royal_Throw.png) (룩의 돌진을 저스트 회피 → 붙잡아 휘두르기 → 투척).
 
+## 경직 시스템 (일반 적, 보스 제외)
+
+| 상태 | 피격 반응 | 게이지 |
+| --- | --- | --- |
+| 일반 | 경직 모션(뒤로 밀림) | 누적 |
+| 공격 중 (선딜~판정 끝, 슈퍼아머) | 무반응, 공격 지속 | 누적 |
+| 취약 | 띄우기 + 행동 취소 | 정지 |
+| 공중 | 추가 띄우기 (타격마다 상승량 ×0.6) | 정지 |
+
+- 공격마다 HP 피해와 경직 피해가 분리되어 있습니다 (`HitWindow.damage` / `HitWindow.poise`).
+- 적별 설정은 `StaggerProfile` (ScriptableObject — `Create ▸ KING ▸ Stagger Profile`로 에셋 생성 가능): 최대 게이지, 감소 지연, 초당 감소량, 취약 지속시간, 띄우는 힘, 경직 시간.
+- 후딜(Recover)에는 아머가 없어 반격 타이밍이 됩니다. 행동이 취소되면 텔레그래프가 꺼지고 공격 토큰이 반납됩니다.
+- 착지 → 기상 → 게이지 0 / 취약 시간 초과 → 게이지 0 / 맞지 않으면 게이지 자연 감소.
+- 게이지는 숨기고, 취약 진입은 금빛 플래시·충격파, 취약 중에는 머리 위 금빛 불꽃 + 휘청임으로 표시합니다.
+- 보스(퀸)는 컴포넌트를 붙이지 않고 기존 체간(poise) 방식을 씁니다.
+
+| 적 | 최대 게이지 | 취약 시간 | 띄우는 힘 |
+| --- | --- | --- | --- |
+| Pawn | 26 | 3.0s | 7.5 |
+| Knight / Bishop | 60 | 2.5s | 6.5 |
+| Rook | 110 | 2.0s | 4.8 |
+
+자동 검증: [`Docs/AttackLab/9_Stagger_System.png`](Docs/AttackLab/9_Stagger_System.png) — 폰에게 콤보를 넣으면 경직 → 취약 → 띄우기·공중 추가타 → 기상 → 처치 (약 3초).
+
 ## 흑색 기물 (적)
 
-폰·나이트·비숍·퀸은 `Resources/Models`의 디자인 모델을 사용합니다(텍스처 유지). 룩은 모델 에셋이 없어 프리미티브로 만듭니다. [모델 캡처](Docs/AttackLab/8_Piece_Models.png)
+모든 기물이 `Resources/Models`의 디자인 모델을 사용합니다(텍스처 유지). [모델 캡처](Docs/AttackLab/8_Piece_Models.png)
 
 체스 이동 규칙을 공격 패턴으로 옮겼습니다.
 
-- **Pawn** – 느리게 접근해 전방 찌르기
-- **Knight** – L자 홉으로 거리 조절 후, 킹의 위치로 도약 내려찍기 (원형 범위)
-- **Bishop** – 킹의 대각선 위로 미끄러져 정렬한 뒤 보드 끝까지 대각선 돌진
-- **Rook** – 같은 랭크/파일로 정렬해 직선 돌진, 근접 시 내려찍기, 공격 중 슈퍼아머
-- **The Black Queen (보스)** – 연속 돌진, 도약, 광역 "Check" 내려찍기. 체력 50% 이하에서 폰 소환 + 공격 가속
+- **Pawn** (HP 100 ≈ 약공격 1.5사이클) – 느리게 접근해 전방 찌르기
+- **Knight** (HP 265 ≈ 4사이클) – L자 홉으로 거리 조절 후, 킹의 위치로 도약 내려찍기 (원형 범위)
+- **Bishop** (HP 265 ≈ 4사이클) – 킹의 대각선 위로 미끄러져 정렬한 뒤 보드 끝까지 대각선 돌진
+- **Rook** (HP 380) – 같은 랭크/파일로 정렬해 직선 돌진, 근접 시 내려찍기
+- **The Black Queen (보스, HP 700)** – 연속 돌진, 도약, 광역 "Check" 내려찍기. 체력 50% 이하에서 폰 소환 + 공격 가속
 
-## 웨이브
+## 라운드 (10)
 
-1. The Opening — 폰 ×3
-2. Knight's Gambit — 나이트 + 폰 ×2
-3. The Long Diagonal — 비숍 + 나이트 + 폰 ×2
-4. Castle Walls — 룩 + 비숍 + 폰 ×2
-5. **The Black Queen** — 보스전
+> 약공격 4타 1사이클 = 66 피해 기준으로 체력을 정했습니다.
+
+1. The Opening — 폰 ×2
+2. Pawn Storm — 폰 ×4
+3. Knight's Gambit — 나이트 + 폰 ×2
+4. The Long Diagonal — 비숍 + 폰 ×2
+5. Castle Walls — 룩 + 폰 ×2
+6. Twin Cavalry — 나이트 ×2 + 폰
+7. Fianchetto — 비숍 ×2 + 폰 ×2
+8. Rook Lift — 룩 + 나이트 + 비숍
+9. The Black Army — 룩 ×2 + 나이트 + 폰 ×2
+10. **The Black Queen** — 퀸 + 폰 ×2 (보스전, 체력 50% 이하에서 폰 추가 소환)
 
 기물은 실제 체스 초기 배치 칸(d7, g8, a8 …)에서 등장하고, 킹은 e1에서 시작합니다.
 
@@ -120,7 +151,9 @@ Assets/
       Actor.cs             체력 + 피격 플래시/발광 공통
       PlayerController.cs  킹: 이동·몸통 공격·구르기·회복·락온
       AttackStyles.cs      몸통 포즈(BodyPose)·히트 윈도우·6가지 공격 스타일 정의
-      EnemyBase.cs         적 상태머신 (윈드업→공격→후딜, 경직, 사망)
+      EnemyBase.cs         적 상태머신 (윈드업→공격→후딜, 경직·띄우기·기상, 잡기·투척, 사망)
+      StaggerProfile.cs    적별 경직 설정 (ScriptableObject)
+      StaggerController.cs 경직 게이지 / 취약 판정 (보스 제외)
       Enemies.cs           Pawn / Knight / Bishop / Rook / Queen AI
     Lab/
       AttackLab.cs         테스트 씬 컨트롤러 + 자동 캡처(-autoshot)
