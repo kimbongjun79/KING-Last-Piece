@@ -239,7 +239,7 @@ namespace KingLastPiece
         void DrawControlsHint()
         {
             var r = new Rect(20 * scale, Screen.height - 40 * scale, Screen.width, 30 * scale);
-            Text(r, "WASD Move   Mouse Look   LMB Light (hold)   RMB Heavy   Space Roll (x3)   Q Lock-on   R Flask   Esc Pause",
+            Text(r, "WASD Move   Shift Sprint   Mouse Look   LMB Light (hold)   RMB Heavy   Space Roll (x3)   Q Lock-on   R Flask   Esc Pause",
                 new GUIStyle(label) { fontSize = Mathf.RoundToInt(15 * scale), fontStyle = FontStyle.Normal },
                 new Color(1f, 1f, 1f, 0.45f));
         }
@@ -254,7 +254,7 @@ namespace KingLastPiece
                 "Every white piece has fallen. Only the King remains on the board.", small, new Color(0.8f, 0.78f, 0.72f));
 
             string controls =
-                "WASD / Left Stick — Move        Mouse / Right Stick — Camera\n" +
+                "WASD / Left Stick — Move        Shift / L3 — Sprint        Mouse / Right Stick — Camera\n" +
                 "LMB / R1 — Light attack        RMB / R2 — Heavy attack\n" +
                 "Space / B — Roll (3 charges)        Q / R3 — Lock-on        R / X — Royal Flask\n" +
                 "Roll right before a hit → slow motion → LMB: Royal Throw";

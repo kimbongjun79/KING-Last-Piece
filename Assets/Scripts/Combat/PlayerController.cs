@@ -16,6 +16,9 @@ namespace KingLastPiece
         public const float MaxStamina = 100f;
         public const int MaxFlasks = 3;
         const float MoveSpeed = 5.2f, LockedMoveSpeed = 4.3f;
+        const float SprintSpeed = 8.2f, SprintDrain = 14f, SprintRecoverAt = 20f;
+        /// <summary>Light (combo) attacks cost only this fraction of their listed stamina.</summary>
+        const float LightCostScale = 0.35f;
         const float DodgeDuration = 0.5f, IFrameStart = 0.03f, IFrameEnd = 0.36f, DodgeCancelAt = 0.4f;
 
         // Dodge charges replace stamina for rolling: a short burst of rolls, refilled quickly.
@@ -29,7 +32,8 @@ namespace KingLastPiece
 
         // Royal Throw (counter after a perfect dodge): approach, swing the piece around twice, hurl it.
         const float CounterApproach = 0.12f, CounterRelease = 0.74f, CounterDuration = 1.0f;
-        const float SwingRadius = 1.8f, ThrowDamage = 55f, LandingDamage = 20f, SwingHitDamage = 25f;
+        // All of the throw damage lands on impact, so the piece always gets to fly first.
+        const float SwingRadius = 1.8f, ThrowLandingDamage = 75f, SwingHitDamage = 25f;
         const float HealDuration = 1.1f, HealAt = 0.6f, HealAmount = 45f;
         const float StaminaRegen = 45f, StaminaDelay = 0.5f;
         const float BufferWindow = 0.4f, LockRange = 20f;
@@ -48,6 +52,7 @@ namespace KingLastPiece
         /// <summary>A perfect dodge happened and the dodged piece can still be grabbed (shown as a prompt).</summary>
         public bool CounterReady => Game != null && Game.SlowMoActive && justTarget != null && justTarget.CanBeGrabbed;
         public bool IsCountering => state == State.Counter;
+        public bool IsSprinting { get; private set; }
         public bool IsDodging => state == State.Dodge;
         public bool IsAttacking => state == State.Attack;
         public bool IsIdle => state == State.Normal;
@@ -71,7 +76,8 @@ namespace KingLastPiece
         Buffered buffer;
         float bufferTimer, bobPhase;
         float prevMove;
-        float dodgeRecharge;
+        float dodgeRecharge, sprintBlend;
+        bool sprintExhausted;
         bool justThisDodge;
         EnemyBase justTarget, counterTarget;
         Vector3 counterFrom, counterTo;
@@ -190,6 +196,7 @@ namespace KingLastPiece
                 case State.Counter: UpdateCounter(dt); break;
             }
 
+            if (state != State.Normal) IsSprinting = false;
             if (state != State.Attack && state != State.Counter) crownTrail.emitting = baseTrail.emitting = false;
             ClampToBoard();
         }
@@ -317,20 +324,35 @@ namespace KingLastPiece
             if (TryAct()) return;
 
             Vector3 dir = InputDirection();
-            float speed = LockTarget != null ? LockedMoveSpeed : MoveSpeed;
+            float m = dir.magnitude;
+            // Sprint: hold Shift / L3 while moving. Drains stamina; stops when it runs out.
+            IsSprinting = GameInput.SprintHeld && m > 0.3f && Stamina > 0f && (!sprintExhausted || Stamina > SprintRecoverAt);
+            if (IsSprinting)
+            {
+                sprintExhausted = false;
+                if (!InfiniteStamina) Stamina = Mathf.Max(0f, Stamina - SprintDrain * dt);
+                staminaDelay = StaminaDelay * 0.5f;
+                if (Stamina <= 0f) sprintExhausted = true;
+            }
+
+            float speed = IsSprinting ? SprintSpeed : LockTarget != null ? LockedMoveSpeed : MoveSpeed;
             transform.position += dir * (speed * dt);
 
-            if (LockTarget != null) FaceTowards(LockTarget.FlatPos - FlatPos, 900f);
-            else if (dir.sqrMagnitude > 0.01f) FaceTowards(dir, 720f);
+            // Sprinting breaks the lock-on facing, like souls games.
+            if (LockTarget != null && !IsSprinting) FaceTowards(LockTarget.FlatPos - FlatPos, 900f);
+            else if (dir.sqrMagnitude > 0.01f) FaceTowards(dir, IsSprinting ? 900f : 720f);
 
-            // Chess-piece hop while walking, leaning into the movement.
-            float m = dir.magnitude;
+            // Chess-piece hop while walking, leaning into the movement (bigger, faster hops when sprinting).
+            float run = IsSprinting ? 1f : 0f;
+            sprintBlend = Mathf.Lerp(sprintBlend, run, 1f - Mathf.Exp(-8f * dt));
             prevMove = Mathf.Lerp(prevMove, m, 1f - Mathf.Exp(-10f * dt));
-            bobPhase += dt * 10f * m;
-            float hop = m > 0.05f ? Mathf.Abs(Mathf.Sin(bobPhase)) * 0.12f : 0f;
+            bobPhase += dt * Mathf.Lerp(10f, 15f, sprintBlend) * m;
+            float hop = m > 0.05f ? Mathf.Abs(Mathf.Sin(bobPhase)) * Mathf.Lerp(0.12f, 0.22f, sprintBlend) : 0f;
             float heading = 0f;
             if (m > 0.05f) heading = Vector3.SignedAngle(transform.forward, dir, Vector3.up);
-            ApplyPose(BodyPose.P(tilt: 7f * prevMove, heading: heading, lift: hop));
+            ApplyPose(BodyPose.P(tilt: Mathf.Lerp(7f, 18f, sprintBlend) * prevMove, heading: heading, lift: hop));
+            if (IsSprinting && Random.value < 0.25f)
+                Effects.Sparks(FlatPos + Vector3.up * 0.05f, new Color(0.6f, 0.55f, 0.5f), 1, 2f);
         }
 
         void StartAttack(bool heavy)
@@ -343,7 +365,7 @@ namespace KingLastPiece
                 comboIndex = chain ? (comboIndex + 1) % style.lights.Length : 0;
                 atk = style.lights[comboIndex];
             }
-            Consume(atk.cost);
+            Consume(heavy ? atk.cost : atk.cost * LightCostScale);
             hitStopUsed = false;
 
             if (hitSets.Length < atk.hits.Length)
@@ -652,8 +674,7 @@ namespace KingLastPiece
                     ThrowCount++;
                     Vector3 dir = counterTarget.FlatPos - FlatPos;
                     Game.EndSlowMo();
-                    if (counterTarget.TakeHit(ThrowDamage, 0f, transform.position)) Game.ReportDamage(counterTarget, ThrowDamage);
-                    if (!counterTarget.IsDead) counterTarget.Launch(dir, 17f, 7f, LandingDamage);
+                    counterTarget.Launch(dir, 17f, 7f, ThrowLandingDamage);
                     Game.HitStop(0.12f);
                     Game.Rig.Kick(1f);
                     Game.Rig.Shake(0.5f);

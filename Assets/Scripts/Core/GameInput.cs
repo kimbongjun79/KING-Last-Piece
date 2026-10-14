@@ -70,6 +70,11 @@ namespace KingLastPiece
             (Keyboard.current != null && Keyboard.current.kKey.wasPressedThisFrame) ||
             (Gamepad.current != null && Gamepad.current.rightTrigger.wasPressedThisFrame);
 
+        /// <summary>Sprint button held (Shift / L3).</summary>
+        public static bool SprintHeld =>
+            (Keyboard.current != null && (Keyboard.current.leftShiftKey.isPressed || Keyboard.current.rightShiftKey.isPressed)) ||
+            (Gamepad.current != null && Gamepad.current.leftStickButton.isPressed);
+
         public static bool Dodge =>
             (Keyboard.current != null && Keyboard.current.spaceKey.wasPressedThisFrame) ||
             (Gamepad.current != null && Gamepad.current.buttonEast.wasPressedThisFrame);
