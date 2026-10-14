@@ -19,10 +19,8 @@ namespace KingLastPiece
         const float SprintSpeed = 8.2f, SprintDrain = 14f, SprintRecoverAt = 20f;
         /// <summary>Light (combo) attacks cost only this fraction of their listed stamina.</summary>
         const float LightCostScale = 0.35f;
-        // Soft auto-targeting: nearby piece within this range/angle of the aim gets faced when an attack starts.
-        // Close pieces get a wide cone (helps when they slip to the side); farther ones need to be roughly aimed at.
-        const float SoftTargetMinRange = 2.5f, SoftTargetMaxRange = 4.5f, SoftTargetCloseRange = 3f;
-        const float SoftTargetCloseAngle = 120f, SoftTargetFarAngle = 60f;
+        // Auto-aim: only pieces within this range (scaled by the attack's reach) are considered.
+        const float AssistMinRange = 2.5f, AssistMaxRange = 4.5f;
         const float DodgeDuration = 0.5f, IFrameStart = 0.03f, IFrameEnd = 0.36f, DodgeCancelAt = 0.4f;
 
         // Dodge charges replace stamina for rolling: a short burst of rolls, refilled quickly.
@@ -58,6 +56,7 @@ namespace KingLastPiece
         public bool IsCountering => state == State.Counter;
         public bool IsSprinting { get; private set; }
         public Vector3 LastDodgeDirection { get; private set; }
+        bool InputEnabled { get; set; } = true;
         public bool IsDodging => state == State.Dodge;
         public bool IsAttacking => state == State.Attack;
         public bool IsIdle => state == State.Normal;
@@ -84,7 +83,9 @@ namespace KingLastPiece
         float dodgeRecharge, sprintBlend;
         bool sprintExhausted;
         bool justThisDodge;
-        EnemyBase justTarget, counterTarget, softTarget;
+        EnemyBase justTarget, counterTarget;
+        readonly List<EnemyBase> assistNearby = new List<EnemyBase>();
+        readonly List<Vector3> assistCandidates = new List<Vector3>();
         Vector3 counterFrom, counterTo;
         float counterAngle0;
         bool counterReleased;
@@ -156,6 +157,22 @@ namespace KingLastPiece
             Flash(new Color(1f, 0.8f, 0.3f) * 1.5f, 0.4f);
         }
 
+        /// <summary>Between rounds: warp back to the starting square (with a little sparkle at both ends).</summary>
+        public void ReturnToStart(Vector3 pos, float yaw)
+        {
+            var gold = new Color(1f, 0.85f, 0.45f);
+            Effects.Sparks(transform.position + Vector3.up, gold, 14, 3f);
+            transform.SetPositionAndRotation(new Vector3(pos.x, 0f, pos.z), Quaternion.Euler(0f, yaw, 0f));
+            if (!IsDead) Enter(State.Normal);
+            ApplyPose(default);
+            crownTrail.emitting = baseTrail.emitting = false;
+            crownTrail.Clear();
+            baseTrail.Clear();
+            LockTarget = null;
+            Effects.Shockwave(FlatPos, 1.4f, gold, 0.4f);
+            Effects.Sparks(transform.position + Vector3.up, gold, 14, 3f);
+        }
+
         public void RefillForLab()
         {
             Health = MaxHealth;
@@ -181,10 +198,15 @@ namespace KingLastPiece
                 ApplyPose(BodyPose.P(tilt: -90f * p + 6f * Mathf.Sin(Mathf.Clamp01(stateTime / 0.9f) * Mathf.PI)));
                 return;
             }
-            if (Game == null || Game.State != GameManager.GameState.Playing) return;
+            if (Game == null) return;
+            // After a round is cleared the King finishes whatever he was doing (input ignored) instead of freezing.
+            bool roundOver = Game.State == GameManager.GameState.WaveClear;
+            if (Game.State != GameManager.GameState.Playing && !roundOver) return;
+            InputEnabled = !roundOver;
 
             dt = DeltaTime;
-            ReadInput(dt);
+            if (InputEnabled) ReadInput(dt);
+            else { buffer = Buffered.None; LockTarget = null; }
             stateTime += dt;
             UpdateStamina(dt);
             UpdateDodgeCharges(dt);
@@ -279,6 +301,7 @@ namespace KingLastPiece
 
         Vector3 InputDirection()
         {
+            if (!InputEnabled) return Vector3.zero;
             Vector2 mi = GameInput.Move;
             var rig = Game.Rig;
             return rig.FlatRight * mi.x + rig.FlatForward * mi.y;
@@ -390,52 +413,98 @@ namespace KingLastPiece
             Enter(State.Attack);
 
             Vector3 dir = InputDirection();
-            // Soft auto-targeting (no visuals): without a lock-on, turn toward a nearby piece in the aimed direction.
-            softTarget = LockTarget == null ? FindSoftTarget(dir.sqrMagnitude > 0.01f ? dir : transform.forward, atk.Reach) : null;
-            var aim = AimTarget;
-            if (aim != null) dir = aim.FlatPos - FlatPos;
+            // Auto-aim (no visuals): with pieces close by, face the direction that hits the most of them —
+            // regardless of where the player is moving. Far away it does nothing.
+            if (LockTarget != null) dir = LockTarget.FlatPos - FlatPos;
+            else if (TryFindAssistDirection(dir.sqrMagnitude > 0.01f ? dir : transform.forward, out var best)) dir = best;
             if (dir.sqrMagnitude > 0.01f) transform.rotation = Quaternion.LookRotation(new Vector3(dir.x, 0f, dir.z));
         }
 
-        /// <summary>Lock-on target, or the soft auto-target picked when the attack started.</summary>
-        EnemyBase AimTarget => LockTarget != null ? LockTarget : softTarget != null && !softTarget.IsDead ? softTarget : null;
-
         /// <summary>
-        /// Nearest piece within reach that is roughly where the player is aiming (stick/keys, or facing when idle).
-        /// Distance matters most; the angle only breaks ties, so close enemies win even slightly off-axis.
+        /// Picks the facing that makes the current attack hit the most pieces in assist range.
+        /// Candidates: toward each nearby piece, between every pair of them, and the player's own aim
+        /// (which only breaks ties). Returns false when nothing is close enough to assist.
         /// </summary>
-        EnemyBase FindSoftTarget(Vector3 aimDir, float reach)
+        bool TryFindAssistDirection(Vector3 preferred, out Vector3 best)
         {
-            float maxDist = Mathf.Clamp(reach + 0.8f, SoftTargetMinRange, SoftTargetMaxRange);
-            EnemyBase best = null;
-            float bestScore = float.MaxValue;
+            best = Vector3.zero;
+            float range = Mathf.Clamp(atk.Reach + 0.6f, AssistMinRange, AssistMaxRange);
+            assistNearby.Clear();
+            foreach (var e in Game.Enemies)
+                if (e != null && !e.IsDead && e.Targetable && (e.FlatPos - FlatPos).magnitude <= range + e.Radius)
+                    assistNearby.Add(e);
+            if (assistNearby.Count == 0) return false;
+
+            assistCandidates.Clear();
+            preferred.y = 0f;
+            assistCandidates.Add(preferred.normalized);
+            for (int i = 0; i < assistNearby.Count; i++)
+            {
+                Vector3 a = (assistNearby[i].FlatPos - FlatPos).normalized;
+                assistCandidates.Add(a);
+                for (int j = i + 1; j < assistNearby.Count; j++)
+                {
+                    Vector3 mid = a + (assistNearby[j].FlatPos - FlatPos).normalized;
+                    if (mid.sqrMagnitude > 0.01f) assistCandidates.Add(mid.normalized);
+                }
+            }
+
+            int bestHits = 0;
+            float bestScore = float.MinValue;
+            foreach (var c in assistCandidates)
+            {
+                if (c.sqrMagnitude < 0.01f) continue;
+                int hits = 0;
+                foreach (var e in Game.Enemies)
+                    if (e != null && !e.IsDead && e.Targetable && atk.WouldHit(FlatPos, c, e.FlatPos, e.Radius)) hits++;
+                float score = hits * 1000f - Vector3.Angle(c, preferred);
+                if (score > bestScore) { bestScore = score; bestHits = hits; best = c; }
+            }
+
+            if (bestHits == 0)
+            {
+                // Close but out of this attack's reach: still turn to the nearest piece.
+                EnemyBase nearest = null;
+                float nd = float.MaxValue;
+                foreach (var e in assistNearby)
+                {
+                    float d = (e.FlatPos - FlatPos).magnitude;
+                    if (d < nd) { nd = d; nearest = e; }
+                }
+                best = (nearest.FlatPos - FlatPos).normalized;
+            }
+            return true;
+        }
+
+        /// <summary>A piece right in front of the King stops the attack's forward lunge.</summary>
+        bool LungeBlocked()
+        {
             foreach (var e in Game.Enemies)
             {
-                if (e == null || e.IsDead || !e.Targetable) continue;
+                if (e == null || e.IsDead || e.IgnoresCollision) continue;
                 Vector3 to = e.FlatPos - FlatPos;
-                float d = to.magnitude;
-                if (d > maxDist + e.Radius) continue;
-                float angle = d > 0.01f ? Vector3.Angle(aimDir, to) : 0f;
-                if (angle > (d <= SoftTargetCloseRange ? SoftTargetCloseAngle : SoftTargetFarAngle)) continue;
-                float score = d + angle * 0.02f;
-                if (score < bestScore) { bestScore = score; best = e; }
+                if (to.magnitude < Radius + e.Radius + 0.3f && Vector3.Angle(transform.forward, to) < 50f) return true;
             }
-            return best;
+            return false;
         }
 
         void UpdateAttack(float dt)
         {
             float t = stateTime, prevT = t - dt;
 
-            var aim = AimTarget;
-            if (t < atk.FirstHit && aim != null) FaceTowards(aim.FlatPos - FlatPos, 540f);
+            // Keep tracking the best direction during the wind-up (enemies move).
+            if (t < atk.FirstHit)
+            {
+                if (LockTarget != null) FaceTowards(LockTarget.FlatPos - FlatPos, 540f);
+                else if (TryFindAssistDirection(transform.forward, out var best)) FaceTowards(best, 720f);
+            }
 
             // Dodge can cancel the attack at any time except during its first active hit frames.
             bool inActive = t >= atk.FirstHit && t <= atk.hits[0].end;
             if (buffer == Buffered.Dodge && !inActive && TryAct()) return;
 
             // Root motion from move segments.
-            bool blocked = aim != null && (aim.FlatPos - FlatPos).magnitude < Radius + aim.Radius + 0.3f;
+            bool blocked = LungeBlocked();
             if (!blocked)
             {
                 foreach (var m in atk.moves)

@@ -330,26 +330,41 @@ namespace KingLastPiece
             }
             player.GodMode = true;
 
-            // Auto-target: dummy on the right (90°), dummy behind (180°); King faces +Z, no lock, no input.
+            // Auto-aim. King at PlayerStart facing +Z, no lock-on, no input.
+            // 1) Cluster of three to the front-right vs. one closer piece to the left: should face the cluster.
             game.ClearEnemies();
             player.ResetForWave(PlayerStart, 0f);
-            var side = game.SpawnCustom<TrainingDummy>(PieceType.Pawn, PlayerStart + new Vector3(2.2f, 0f, 0f));
+            var cluster = new[] { 50f, 72f, 94f };
+            foreach (var a in cluster)
+                game.SpawnCustom<TrainingDummy>(PieceType.Pawn, PlayerStart + Quaternion.Euler(0f, a, 0f) * Vector3.forward * 2.2f);
+            game.SpawnCustom<TrainingDummy>(PieceType.Pawn, PlayerStart + Quaternion.Euler(0f, -70f, 0f) * Vector3.forward * 1.7f);
             for (int f = 0; f < 50; f++) yield return null;
             int before = game.DamageEvents;
             player.Press(PlayerController.Buffered.Light);
-            for (int f = 0; f < 6; f++) yield return null;
-            float sideAngle = Vector3.Angle(player.transform.forward, side.FlatPos - player.FlatPos);
-            for (int f = 0; f < 34; f++) yield return null;
-            int sideHits = game.DamageEvents - before;
+            for (int f = 0; f < 8; f++) yield return null;
+            float facing = Vector3.SignedAngle(Vector3.forward, player.transform.forward, Vector3.up);
+            for (int f = 0; f < 32; f++) yield return null;
+            int clusterHits = game.DamageEvents - before;
 
+            // 2) A single close piece directly behind: close enemies are always faced.
             game.ClearEnemies();
             player.ResetForWave(PlayerStart, 0f);
             var behind = game.SpawnCustom<TrainingDummy>(PieceType.Pawn, PlayerStart + new Vector3(0f, 0f, -2.2f));
             for (int f = 0; f < 50; f++) yield return null;
             player.Press(PlayerController.Buffered.Light);
-            for (int f = 0; f < 6; f++) yield return null;
+            for (int f = 0; f < 8; f++) yield return null;
             float behindAngle = Vector3.Angle(player.transform.forward, behind.FlatPos - player.FlatPos);
-            stats.AppendLine($"AutoTarget\tside_facing_angle={sideAngle:0}\tside_hits={sideHits}\tbehind_facing_angle={behindAngle:0}");
+
+            // 3) A far piece (6 units, to the side): no assist.
+            game.ClearEnemies();
+            player.ResetForWave(PlayerStart, 0f);
+            var far = game.SpawnCustom<TrainingDummy>(PieceType.Pawn, PlayerStart + new Vector3(6f, 0f, 0f));
+            for (int f = 0; f < 50; f++) yield return null;
+            player.Press(PlayerController.Buffered.Light);
+            for (int f = 0; f < 8; f++) yield return null;
+            float farAngle = Vector3.Angle(player.transform.forward, far.FlatPos - player.FlatPos);
+            stats.AppendLine($"AutoAim\tcluster_facing={facing:0}deg(cluster 50-94, lone -70)\tcluster_hits={clusterHits}" +
+                             $"\tbehind_facing_err={behindAngle:0}\tfar_facing_err={farAngle:0}(should stay ~90)");
 
             // Dodge cancel: during a light wind-up, and right after the heavy's first hit (long before its old cancel point).
             game.ClearEnemies();

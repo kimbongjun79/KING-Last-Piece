@@ -150,6 +150,32 @@ namespace KingLastPiece
             }
         }
 
+        /// <summary>
+        /// Would this attack, started at <paramref name="origin"/> facing <paramref name="dir"/>, reach a piece at
+        /// <paramref name="target"/>? Uses every hit window's shape plus the root motion before it ends.
+        /// </summary>
+        public bool WouldHit(Vector3 origin, Vector3 dir, Vector3 target, float targetRadius)
+        {
+            origin.y = 0f;
+            target.y = 0f;
+            dir.y = 0f;
+            dir.Normalize();
+            foreach (var h in hits)
+            {
+                float moved = 0f;
+                foreach (var m in moves)
+                    if (m.start < h.end) moved += m.distance * Mathf.Clamp01((h.end - m.start) / (m.end - m.start));
+                Vector3 center = origin + dir * (moved + h.forward);
+                Vector3 to = target - center;
+                float d = to.magnitude;
+                if (d > h.range + targetRadius) continue;
+                if (h.shape == HitShape.Circle || d < 0.4f) return true;
+                float half = h.sweep ? Mathf.Max(Mathf.Abs(h.sweepFrom), Mathf.Abs(h.sweepTo)) : h.arc * 0.5f;
+                if (Vector3.Angle(dir, to) <= half) return true;
+            }
+            return false;
+        }
+
         public float Coverage
         {
             get

@@ -1,33 +1,33 @@
 style	attack	startup	active_end	duration	cancel	reach	coverage	damage	dummies_hit
 Royal Spin	Spin	0.14	0.30	0.55	0.40	2.8	360	12	5
 Royal Spin	Spin	0.14	0.30	0.55	0.40	2.8	360	12	3
-Royal Spin	Rising Spin	0.42	0.85	1.15	0.90	4.2	360	34	11
+Royal Spin	Rising Spin	0.42	0.85	1.15	0.90	4.2	360	34	9
 Royal Spin	COMBO_DPS	30.3
 Crown Smash	Crown Smash	0.24	0.34	0.60	0.42	3.4	70	16	1
 Crown Smash	Crown Smash	0.24	0.34	0.60	0.42	3.4	70	16	1
-Crown Smash	Royal Topple	0.60	0.68	1.30	1.05	4.8	360	38	3
+Crown Smash	Royal Topple	0.60	0.68	1.30	1.05	4.8	360	38	2
 Crown Smash	COMBO_DPS	38.1
-Pendulum	Pendulum R→L	0.15	0.30	0.55	0.38	3.0	180	13	3
+Pendulum	Pendulum R→L	0.15	0.30	0.55	0.38	3.0	180	13	4
 Pendulum	Pendulum L→R	0.15	0.30	0.55	0.38	3.0	180	13	3
 Pendulum	Grand Sweep	0.48	0.68	1.10	0.85	4.1	240	32	5
 Pendulum	COMBO_DPS	34.2
 Royal Stomp	Stomp	0.40	0.46	0.65	0.48	3.5	360	14	3
-Royal Stomp	Stomp	0.40	0.46	0.65	0.48	3.5	360	14	3
+Royal Stomp	Stomp	0.40	0.46	0.65	0.48	3.5	360	14	2
 Royal Stomp	Meteor Flip	0.82	0.90	1.30	1.05	6.0	360	40	5
 Royal Stomp	COMBO_DPS	29.2
 Royal Charge	Ram	0.17	0.40	0.60	0.45	4.8	360	13	1
-Royal Charge	Ram	0.17	0.40	0.60	0.45	4.8	360	13	1
+Royal Charge	Ram	0.17	0.40	0.60	0.45	4.8	360	13	3
 Royal Charge	Rocket Ram	0.56	0.90	1.20	1.00	8.2	360	34	1
 Royal Charge	COMBO_DPS	28.9
 Royal Ensemble	Royal Whip R→L	0.13	0.29	0.56	0.36	4.4	220	14	3
-Royal Ensemble	Royal Whip L→R	0.13	0.29	0.56	0.36	4.4	220	14	3
-Royal Ensemble	Royal Cyclone	0.14	0.56	0.86	0.60	4.2	360	18	10
-Royal Ensemble	Royal Meteor	0.52	0.57	0.88	0.68	4.8	360	20	3
+Royal Ensemble	Royal Whip L→R	0.13	0.29	0.56	0.36	4.4	220	14	2
+Royal Ensemble	Royal Cyclone	0.14	0.56	0.86	0.60	4.2	360	18	11
+Royal Ensemble	Royal Meteor	0.52	0.57	0.88	0.68	4.8	360	20	5
 Royal Ensemble	Checkmate Topple	0.62	0.80	1.35	1.08	8.5	360	52	6
 Royal Ensemble	COMBO_DPS	33.0
 JustDodge	perfect=True	just_count=1	throws=1	damage_events=1	rook_dead=False
-Stagger	pawn_hp=100	launches=1	dead=True	timeline=mmmsssVVVUUUUUUUUVVVVVVVVVsssx
+Stagger	pawn_hp=100	launches=1	dead=True	timeline=mmssssVVVUUUUUUUUVVVVVVVVVmmmx
 AutoDodge	Bishop	dashing=True	roll_vs_attack_angle=90	damage_taken=0
 AutoDodge	Rook	dashing=True	roll_vs_attack_angle=90	damage_taken=0
-AutoTarget	side_facing_angle=0	side_hits=1	behind_facing_angle=180
+AutoAim	cluster_facing=61deg(cluster 50-94, lone -70)	cluster_hits=3	behind_facing_err=0	far_facing_err=96(should stay ~90)
 DodgeCancel	during_light_windup=True	after_heavy_hit=True	at=0.73s_vs_old_cancel=1.08s
