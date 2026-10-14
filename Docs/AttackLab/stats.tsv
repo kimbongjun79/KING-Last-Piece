@@ -19,8 +19,8 @@ Royal Charge	Ram	0.17	0.40	0.60	0.45	4.8	360	13	1
 Royal Charge	Ram	0.17	0.40	0.60	0.45	4.8	360	13	1
 Royal Charge	Rocket Ram	0.56	0.90	1.20	1.00	8.2	360	34	1
 Royal Charge	COMBO_DPS	28.9
-Royal Ensemble	Pendulum R→L	0.15	0.30	0.55	0.38	3.0	180	13	3
-Royal Ensemble	Pendulum L→R	0.15	0.30	0.55	0.38	3.0	180	13	3
-Royal Ensemble	Spin Finisher	0.14	0.30	0.62	0.45	2.8	360	18	3
-Royal Ensemble	Royal Topple	0.60	0.68	1.30	1.05	4.8	360	38	3
-Royal Ensemble	COMBO_DPS	36.5
+Royal Ensemble	Royal Whip R→L	0.13	0.29	0.56	0.36	4.5	260	14	5
+Royal Ensemble	Royal Whip L→R	0.13	0.29	0.56	0.36	4.5	260	14	5
+Royal Ensemble	Royal Cyclone	0.13	0.52	0.80	0.58	4.6	360	26	8
+Royal Ensemble	Checkmate Topple	0.62	0.80	1.35	1.08	8.5	360	52	6
+Royal Ensemble	COMBO_DPS	41.5

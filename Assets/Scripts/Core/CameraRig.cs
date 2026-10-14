@@ -13,7 +13,7 @@ namespace KingLastPiece
         public Vector3 FlatRight => Quaternion.Euler(0f, yaw, 0f) * Vector3.right;
 
         PlayerController player;
-        float yaw, pitch = 22f, shake;
+        float yaw, pitch = 22f, shake, kick, baseFov = -1f;
         Vector3 focus;
 
         public void Init(Camera cam, PlayerController p)
@@ -31,6 +31,9 @@ namespace KingLastPiece
         }
 
         public void Shake(float amount) => shake = Mathf.Max(shake, amount);
+
+        /// <summary>Brief zoom-in punch for big impacts (0..1).</summary>
+        public void Kick(float amount) => kick = Mathf.Max(kick, amount);
 
         /// <summary>Fixed camera used by automated captures.</summary>
         public bool UseOverride { get; set; }
@@ -83,6 +86,9 @@ namespace KingLastPiece
             }
 
             shake = Mathf.MoveTowards(shake, 0f, dt * 1.6f);
+            if (baseFov < 0f) baseFov = Cam.fieldOfView;
+            kick = Mathf.MoveTowards(kick, 0f, dt * 3.5f);
+            Cam.fieldOfView = baseFov - 9f * kick * kick;
             Vector3 offset = shake > 0f ? Random.insideUnitSphere * (shake * 0.35f) : Vector3.zero;
             transform.SetPositionAndRotation(pos + offset, rot);
         }

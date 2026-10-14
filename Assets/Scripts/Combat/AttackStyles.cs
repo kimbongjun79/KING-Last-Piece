@@ -107,6 +107,8 @@ namespace KingLastPiece
         public bool impact;            // ground impact: shockwave + shake even on whiff
         public bool sweep;             // Arc only: hits land progressively from sweepFrom to sweepTo (degrees, + = right)
         public float sweepFrom, sweepTo;
+        public bool slash;             // draw a ground crescent along the sweep (shows the real reach)
+        public float kick;             // camera zoom punch on window start
     }
 
     public struct MoveSeg
@@ -191,8 +193,6 @@ namespace KingLastPiece
         static AttackStyle[] Build()
         {
             var spinLight = SpinLight(12f, 10f, 0.55f);
-            var spinFinisher = SpinLight(18f, 28f, 0.62f);
-            spinFinisher.name = "Spin Finisher";
             var pendA = PendulumLight(1f);
             var pendB = PendulumLight(-1f);
             var toppleHeavy = ToppleHeavy();
@@ -232,11 +232,74 @@ namespace KingLastPiece
                 new AttackStyle
                 {
                     name = "Royal Ensemble", koName = "왕의 연무",
-                    description = "Pendulum left-right into a spin finisher; heavy is the Crown Smash topple.",
-                    lights = new[] { pendA, pendB, spinFinisher }, heavy = toppleHeavy,
+                    description = "Deep whip swings with ground slashes into a leaping 720° finisher; heavy is a leaping topple with an aftershock.",
+                    lights = new[] { EnsembleSwing(1f), EnsembleSwing(-1f), EnsembleFinisher() }, heavy = EnsembleTopple(),
                 },
             };
         }
+
+        // ---------------------------------------------------------------- royal ensemble (chosen style)
+        // Tuned to be more dynamic than the candidates it's built from: deeper leans with a hop,
+        // follow-through overshoot, ground slashes that show the wider reach, and leaping finishers.
+
+        static AttackDef EnsembleSwing(float side) => new AttackDef
+        {
+            name = side > 0f ? "Royal Whip R→L" : "Royal Whip L→R", duration = 0.56f, cancelAt = 0.36f, cost = 13f,
+            pose = new PoseTrack()
+                .Key(0f, P(heading: 110f * side))
+                .Key(0.11f, P(tilt: 24f, heading: 128f * side, spin: 45f * side, squash: -0.14f), Ease.Out)
+                .Key(0.29f, P(tilt: 64f, heading: -122f * side, spin: -75f * side, lift: 0.28f, squash: 0.08f), Ease.InOut)
+                .Key(0.37f, P(tilt: 52f, heading: -140f * side, spin: -90f * side, lift: 0.05f), Ease.Out)
+                .Key(0.56f, P(heading: -140f * side), Ease.OutBack),
+            hits = new[]
+            {
+                new HitWindow
+                {
+                    start = 0.13f, end = 0.29f, range = 3.3f, arc = 260f, damage = 14f, poise = 14f, shake = 0.16f,
+                    sweep = true, sweepFrom = 125f * side, sweepTo = -125f * side, slash = true,
+                },
+            },
+            moves = new[] { new MoveSeg(0.04f, 0.3f, 1.2f) },
+        };
+
+        static AttackDef EnsembleFinisher() => new AttackDef
+        {
+            name = "Royal Cyclone", duration = 0.8f, cancelAt = 0.58f, cost = 16f,
+            pose = new PoseTrack()
+                .Key(0f, P())
+                .Key(0.12f, P(tilt: 12f, heading: -70f, spin: -70f, squash: -0.2f), Ease.Out)
+                .Key(0.4f, P(tilt: 40f, heading: 560f, spin: 560f, lift: 1.1f, squash: 0.12f), Ease.Linear)
+                .Key(0.48f, P(tilt: 14f, heading: 720f, spin: 720f, squash: -0.25f), Ease.In)
+                .Key(0.8f, P(heading: 720f, spin: 720f), Ease.OutBack),
+            hits = new[]
+            {
+                new HitWindow { start = 0.13f, end = 0.4f, shape = HitShape.Circle, range = 3.4f, damage = 14f, poise = 16f, shake = 0.15f },
+                new HitWindow { start = 0.48f, end = 0.52f, shape = HitShape.Circle, range = 3.2f, damage = 12f, poise = 26f,
+                    hitStop = 0.08f, shake = 0.35f, impact = true, kick = 0.5f },
+            },
+            moves = new[] { new MoveSeg(0.1f, 0.45f, 1.4f, Ease.InOut) },
+        };
+
+        static AttackDef EnsembleTopple() => new AttackDef
+        {
+            name = "Checkmate Topple", duration = 1.35f, cancelAt = 1.08f, cost = 30f, heavy = true,
+            pose = new PoseTrack()
+                .Key(0f, P())
+                .Key(0.38f, P(tilt: -32f, squash: -0.28f), Ease.Out)
+                .Key(0.54f, P(tilt: 24f, lift: 1.5f, squash: 0.14f), Ease.Out)
+                .Key(0.66f, P(tilt: 92f, squash: -0.05f), Ease.In)
+                .Key(0.86f, P(tilt: 89f), Ease.Linear)
+                .Key(1.02f, P(tilt: -20f, lift: 0.35f), Ease.Out)
+                .Key(1.35f, P(), Ease.OutBack),
+            hits = new[]
+            {
+                new HitWindow { start = 0.62f, end = 0.7f, shape = HitShape.Circle, forward = 2.3f, range = 2.7f, damage = 42f, poise = 60f,
+                    hitStop = 0.12f, shake = 0.6f, impact = true, kick = 1f },
+                new HitWindow { start = 0.76f, end = 0.8f, shape = HitShape.Circle, forward = 2.3f, range = 3.8f, damage = 10f, poise = 20f,
+                    hitStop = 0.04f, shake = 0.3f, impact = true },
+            },
+            moves = new[] { new MoveSeg(0.36f, 0.66f, 2.4f, Ease.InOut) },
+        };
 
         // ---------------------------------------------------------------- spin
 

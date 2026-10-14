@@ -33,6 +33,8 @@ namespace KingLastPiece
         public float StateTime => stateTime;
         /// <summary>For automated tests: ignore damage.</summary>
         public bool GodMode { get; set; }
+        /// <summary>Attack Lab: actions cost no stamina.</summary>
+        public bool InfiniteStamina { get; set; }
 
         State state;
         float stateTime, staminaDelay;
@@ -194,7 +196,7 @@ namespace KingLastPiece
         void Consume(float cost)
         {
             buffer = Buffered.None;
-            Stamina = Mathf.Max(0f, Stamina - cost);
+            if (!InfiniteStamina) Stamina = Mathf.Max(0f, Stamina - cost);
             staminaDelay = StaminaDelay;
         }
 
@@ -335,6 +337,10 @@ namespace KingLastPiece
                 if (!windowStarted[i])
                 {
                     windowStarted[i] = true;
+                    if (w.slash && w.sweep)
+                        SlashFx.Spawn(FlatPos + transform.forward * w.forward, transform.forward, w.range * 0.82f,
+                            w.sweepFrom, w.sweepTo, w.end - w.start, new Color(1f, 0.82f, 0.45f));
+                    if (w.kick > 0f) Game.Rig.Kick(w.kick);
                     if (w.impact)
                     {
                         Vector3 c = transform.position + transform.forward * w.forward;

@@ -177,7 +177,7 @@ namespace KingLastPiece
             Fill(new Rect(x, y, w, h), new Color(0f, 0f, 0f, 0.6f));
             x += 14 * scale;
             y += 10 * scale;
-            Text(new Rect(x, y, w, line), "ATTACK LAB  —  1-6 style · C reset · G pawns", label, Gold);
+            Text(new Rect(x, y, w, line), "ATTACK LAB  —  1-6 style · C reset · G pawns · Stamina ∞", label, Gold);
             y += line * 1.3f;
             for (int i = 0; i < styles.Length; i++)
             {

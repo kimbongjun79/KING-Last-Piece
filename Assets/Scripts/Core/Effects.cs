@@ -75,3 +75,73 @@ namespace KingLastPiece
         }
     }
 }
+
+namespace KingLastPiece
+{
+    /// <summary>
+    /// Glowing crescent drawn on the ground that follows a body sweep, so the full hit range reads visually.
+    /// Segments appear progressively from <see cref="from"/> to <see cref="to"/> (degrees relative to forward, + = right).
+    /// </summary>
+    public class SlashFx : MonoBehaviour
+    {
+        public Vector3 center, forward;
+        public float radius, from, to, sweepTime, life = 0.28f;
+        public Color color;
+        const int Segments = 18;
+        float t;
+        int spawned;
+        Material mat;
+
+        public static void Spawn(Vector3 center, Vector3 forward, float radius, float from, float to, float sweepTime, Color color)
+        {
+            var fx = new GameObject("SlashFx").AddComponent<SlashFx>();
+            fx.center = new Vector3(center.x, 0f, center.z);
+            fx.forward = new Vector3(forward.x, 0f, forward.z).normalized;
+            fx.radius = radius;
+            fx.from = from;
+            fx.to = to;
+            fx.sweepTime = Mathf.Max(0.01f, sweepTime);
+            fx.color = color;
+        }
+
+        void Start() => mat = MaterialLib.Emissive(color, 3.5f);
+
+        void Update()
+        {
+            t += Time.deltaTime;
+            int target = Mathf.Min(Segments, Mathf.CeilToInt(t / sweepTime * Segments));
+            float step = (to - from) / Segments;
+            float chord = Mathf.Abs(step) * Mathf.Deg2Rad * radius * 1.15f;
+            for (; spawned < target; spawned++)
+            {
+                float a = from + step * (spawned + 0.5f);
+                Vector3 dir = Quaternion.Euler(0f, a, 0f) * forward;
+                // Thicker in the middle of the arc, tapered at both ends; long axis along the tangent.
+                float k = Mathf.Sin((spawned + 0.5f) / Segments * Mathf.PI);
+                PieceFactory.Part(PrimitiveType.Cube, transform, center + dir * radius + Vector3.up * 0.04f,
+                        new Vector3(0.12f + 0.22f * k, 0.03f, chord), mat,
+                        (Quaternion.LookRotation(dir) * Quaternion.Euler(0f, 90f, 0f)).eulerAngles)
+                    .gameObject.AddComponent<FadeSink>().life = life;
+            }
+            if (spawned >= Segments && transform.childCount == 0) Destroy(gameObject);
+        }
+    }
+
+    /// <summary>Shrinks a piece of opaque VFX to nothing, then destroys it.</summary>
+    public class FadeSink : MonoBehaviour
+    {
+        public float life = 0.3f;
+        float t;
+        Vector3 start;
+
+        void Start() => start = transform.localScale;
+
+        void Update()
+        {
+            t += Time.deltaTime;
+            float p = Mathf.Clamp01(t / life);
+            transform.localScale = new Vector3(start.x * (1f - p), start.y, start.z * (1f - p * 0.5f));
+            if (p >= 1f) Destroy(gameObject);
+        }
+    }
+}

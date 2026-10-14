@@ -51,6 +51,7 @@ namespace KingLastPiece
 
         void Start()
         {
+            game.Player.InfiniteStamina = true;
             SelectStyle(StyleIndex);
             ResetLab();
 
