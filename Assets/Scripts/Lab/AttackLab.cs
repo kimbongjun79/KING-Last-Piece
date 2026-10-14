@@ -138,7 +138,7 @@ namespace KingLastPiece
                 Texture2D sheet = null;
                 int tileW = 0, tileH = 0;
                 const int cols = 5;
-                int lightRows = Mathf.Clamp(style.lights.Length, 2, 3);
+                int lightRows = Mathf.Clamp(style.lights.Length, 2, 4);
                 int rows = lightRows + 1;
 
                 for (int row = 0; row < rows; row++)

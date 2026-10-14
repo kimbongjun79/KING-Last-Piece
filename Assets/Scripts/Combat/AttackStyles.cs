@@ -232,8 +232,8 @@ namespace KingLastPiece
                 new AttackStyle
                 {
                     name = "Royal Ensemble", koName = "왕의 연무",
-                    description = "Deep whip swings with ground slashes into a leaping 720° finisher; heavy is a leaping topple with an aftershock.",
-                    lights = new[] { EnsembleSwing(1f), EnsembleSwing(-1f), EnsembleFinisher() }, heavy = EnsembleTopple(),
+                    description = "Whip R→L, whip L→R, 360° cyclone, then an air somersault slam; heavy is a leaping topple with an aftershock.",
+                    lights = new[] { EnsembleSwing(1f), EnsembleSwing(-1f), EnsembleCyclone(), EnsembleMeteor() }, heavy = EnsembleTopple(),
                 },
             };
         }
@@ -255,29 +255,53 @@ namespace KingLastPiece
             {
                 new HitWindow
                 {
-                    start = 0.13f, end = 0.29f, range = 3.3f, arc = 260f, damage = 14f, poise = 14f, shake = 0.16f,
-                    sweep = true, sweepFrom = 125f * side, sweepTo = -125f * side, slash = true,
+                    start = 0.13f, end = 0.29f, range = 2.8f, arc = 220f, damage = 14f, poise = 14f, shake = 0.16f,
+                    sweep = true, sweepFrom = 110f * side, sweepTo = -110f * side, slash = true,
                 },
             },
-            moves = new[] { new MoveSeg(0.04f, 0.3f, 1.2f) },
+            moves = new[] { new MoveSeg(0.04f, 0.3f, 1.0f) },
         };
 
-        static AttackDef EnsembleFinisher() => new AttackDef
+        /// <summary>3rd hit: a big grounded spin that hits everything around the King.</summary>
+        static AttackDef EnsembleCyclone() => new AttackDef
         {
-            name = "Royal Cyclone", duration = 0.8f, cancelAt = 0.58f, cost = 16f,
+            name = "Royal Cyclone", duration = 0.72f, cancelAt = 0.48f, cost = 15f,
             pose = new PoseTrack()
                 .Key(0f, P())
-                .Key(0.12f, P(tilt: 12f, heading: -70f, spin: -70f, squash: -0.2f), Ease.Out)
-                .Key(0.4f, P(tilt: 40f, heading: 560f, spin: 560f, lift: 1.1f, squash: 0.12f), Ease.Linear)
-                .Key(0.48f, P(tilt: 14f, heading: 720f, spin: 720f, squash: -0.25f), Ease.In)
-                .Key(0.8f, P(heading: 720f, spin: 720f), Ease.OutBack),
+                .Key(0.12f, P(tilt: 16f, heading: -80f, spin: -80f, squash: -0.18f), Ease.Out)
+                .Key(0.42f, P(tilt: 50f, heading: 650f, spin: 650f, lift: 0.3f, squash: 0.06f), Ease.Linear)
+                .Key(0.72f, P(heading: 720f, spin: 720f), Ease.OutBack),
             hits = new[]
             {
-                new HitWindow { start = 0.13f, end = 0.4f, shape = HitShape.Circle, range = 3.4f, damage = 14f, poise = 16f, shake = 0.15f },
-                new HitWindow { start = 0.48f, end = 0.52f, shape = HitShape.Circle, range = 3.2f, damage = 12f, poise = 26f,
-                    hitStop = 0.08f, shake = 0.35f, impact = true, kick = 0.5f },
+                new HitWindow
+                {
+                    start = 0.14f, end = 0.42f, shape = HitShape.Circle, range = 3.4f, damage = 15f, poise = 18f, shake = 0.2f,
+                    slash = true, sweepFrom = 0f, sweepTo = 360f,
+                },
             },
-            moves = new[] { new MoveSeg(0.1f, 0.45f, 1.4f, Ease.InOut) },
+            moves = new[] { new MoveSeg(0.1f, 0.42f, 0.6f, Ease.InOut) },
+        };
+
+        /// <summary>4th hit: leaps, somersaults once in the air and slams down with a shockwave.</summary>
+        static AttackDef EnsembleMeteor() => new AttackDef
+        {
+            name = "Royal Meteor", duration = 0.88f, cancelAt = 0.68f, cost = 17f,
+            pose = new PoseTrack()
+                .Key(0f, P())
+                .Key(0.14f, P(squash: -0.26f), Ease.Out)
+                .Key(0.38f, P(flip: 180f, lift: 2.1f, squash: 0.1f), Ease.Out)
+                .Key(0.52f, P(flip: 360f), Ease.In)
+                .Key(0.6f, P(flip: 360f, squash: -0.3f), Ease.Out)
+                .Key(0.88f, P(flip: 360f), Ease.OutBack),
+            hits = new[]
+            {
+                new HitWindow
+                {
+                    start = 0.52f, end = 0.57f, shape = HitShape.Circle, range = 3.2f, damage = 20f, poise = 32f,
+                    hitStop = 0.09f, shake = 0.45f, impact = true, kick = 0.6f,
+                },
+            },
+            moves = new[] { new MoveSeg(0.14f, 0.52f, 1.6f, Ease.InOut) },
         };
 
         static AttackDef EnsembleTopple() => new AttackDef
