@@ -108,6 +108,9 @@ namespace KingLastPiece
 
             crownTrail = CreateTrail(new Vector3(0f, ModelHeight - CenterHeight - 0.05f, 0f), 0.42f, new Color(1f, 0.78f, 0.35f) * 3.5f);
             baseTrail = CreateTrail(new Vector3(0f, -CenterHeight + 0.15f, 0f), 0.22f, new Color(1f, 0.85f, 0.6f) * 1.5f);
+            // The white crown/base trails are retired (authored slashes replace them); the crown transform is still
+            // used as an effect anchor, so only the rendering is switched off.
+            crownTrail.enabled = baseTrail.enabled = false;
 
             Radius = 0.45f;
         }
@@ -557,6 +560,12 @@ namespace KingLastPiece
             }
 
             ApplyPose(atk.pose.Eval(t));
+
+            if (atk.cues != null)
+                foreach (var cue in atk.cues)
+                    if (prevT < cue.time && t >= cue.time)
+                        Vfx.Slash(cue.kind, transform.position + Vector3.up * cue.height, transform.rotation * Quaternion.Euler(0f, cue.yaw, cue.roll),
+                            cue.scale, cue.gold ? Vfx.Gold : (Color?)null, cue.mirror);
 
             bool trail = t >= atk.FirstHit - 0.07f && t <= atk.LastHit + 0.03f;
             // An authored slash replaces the crown trail for this attack.

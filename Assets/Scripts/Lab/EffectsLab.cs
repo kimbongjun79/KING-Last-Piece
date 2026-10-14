@@ -186,7 +186,7 @@ namespace KingLastPiece
                 i => (Station(i) + new Vector3(3.5f, 4f, -6.5f), Station(i) + new Vector3(0f, 0.6f, 1f)));
 
             // E6: top-down whip check — King faces +Z (up in the image), dummy ahead; row 0 = hit 1, row 1 = hit 2.
-            yield return CalibrateSlashYaw(Path.Combine(dir, "slash_calibration.tsv"));
+            yield return SlamSideView(Path.Combine(dir, "E7_Slam_SideView.png"));
             yield return WhipTopDown(Path.Combine(dir, "E6_Whip_TopDown.png"));
 
             // E5: NamuFX slash prefabs as authored (identity rotation, at chest height) — rows = prefabs.
@@ -262,6 +262,66 @@ namespace KingLastPiece
             }
             Vfx.SlashYawFix = keep;
             File.WriteAllText(path, sb.ToString());
+            for (int i = 0; i < dummies.Length; i++) SpawnDummy(i);
+        }
+
+        /// <summary>Side view (King faces screen-right): row 0 = RMB Meteor Stomp, row 1 = combo hit 4 (Royal Meteor).</summary>
+        IEnumerator SlamSideView(string path)
+        {
+            var player = game.Player;
+            Vector3 start = Station(1) - new Vector3(0f, 0f, 1.5f);
+            game.Rig.OverridePosition = start + new Vector3(9f, 2.2f, 1.6f);
+            game.Rig.OverrideLookAt = start + new Vector3(0f, 1.4f, 1.6f);
+            const int rows = 2, cols = 6;
+            Texture2D sheet = null;
+            int tileW = 0, tileH = 0;
+            for (int row = 0; row < rows; row++)
+            {
+                game.ClearEnemies();
+                player.ResetForWave(start, 0f);
+                for (int f = 0; f < 70; f++) yield return null;
+                float cueTime;
+                if (row == 0)
+                {
+                    player.Press(PlayerController.Buffered.Heavy);
+                    yield return null;
+                    cueTime = 0.64f;
+                }
+                else
+                {
+                    // Chain the light combo up to hit 4.
+                    player.Press(PlayerController.Buffered.Light);
+                    yield return null;
+                    for (int hit = 1; hit < 4; hit++)
+                    {
+                        var cur = player.CurrentAttack;
+                        while (cur != null && player.StateTime < cur.cancelAt) yield return null;
+                        player.Press(PlayerController.Buffered.Light);
+                        yield return null;
+                    }
+                    cueTime = 0.4f;
+                }
+                for (int c = 0; c < cols; c++)
+                {
+                    float at = cueTime - 0.02f + c * 0.06f;
+                    while (player.CurrentAttack != null && player.StateTime < at) yield return null;
+                    yield return new WaitForEndOfFrame();
+                    var tex = ScreenCapture.CaptureScreenshotAsTexture();
+                    if (sheet == null)
+                    {
+                        tileW = tex.width;
+                        tileH = tex.height;
+                        sheet = new Texture2D(tileW * cols, tileH * rows, TextureFormat.RGB24, false);
+                    }
+                    if (tex.width == tileW && tex.height == tileH)
+                        sheet.SetPixels32(c * tileW, (rows - 1 - row) * tileH, tileW, tileH, tex.GetPixels32());
+                    Destroy(tex);
+                }
+                for (int f = 0; f < 60; f++) yield return null;
+            }
+            sheet.Apply();
+            File.WriteAllBytes(path, sheet.EncodeToPNG());
+            Destroy(sheet);
             for (int i = 0; i < dummies.Length; i++) SpawnDummy(i);
         }
 

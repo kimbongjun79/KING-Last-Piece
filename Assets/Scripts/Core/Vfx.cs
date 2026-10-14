@@ -7,7 +7,7 @@ namespace KingLastPiece
     public enum VfxStyle { Classic, CrackedBoard, BoardRipple }
 
     /// <summary>Authored slash prefabs (NamuFX Simple Stylized Slash vol2) registered in <see cref="FxLibrary"/>.</summary>
-    public enum SlashFxKind { None, SlashA, SlashB, SlashC, SlashD, Ink, Water, AoeA }
+    public enum SlashFxKind { None, SlashA, SlashB, SlashC, SlashD, Ink, Water, AoeA, SlashBVertical }
 
     /// <summary>
     /// Gameplay-facing effect events. Gameplay calls these (never raw sparks/shockwaves for hits and slams),
@@ -83,6 +83,7 @@ namespace KingLastPiece
                 SlashFxKind.Ink => lib.slashInk,
                 SlashFxKind.Water => lib.slashWater,
                 SlashFxKind.AoeA => lib.slashAoeA,
+                SlashFxKind.SlashBVertical => lib.slashB,
                 _ => null,
             };
             if (prefab == null) return false;
@@ -102,6 +103,12 @@ namespace KingLastPiece
                 else s.x = -s.x;
             }
             fx.transform.localScale = s;
+            if (kind == SlashFxKind.SlashBVertical)
+            {
+                // Same as NamuFX's "Slash_B_vertical Variant": the slash layers are stood up on their side.
+                foreach (var t in fx.GetComponentsInChildren<Transform>())
+                    if (t.name == "slash_add" || t.name == "slash_alp") t.localRotation = Quaternion.Euler(0f, 90f, -68.41f);
+            }
             foreach (var ps in fx.GetComponentsInChildren<ParticleSystem>())
             {
                 string n = ps.name.ToLowerInvariant();

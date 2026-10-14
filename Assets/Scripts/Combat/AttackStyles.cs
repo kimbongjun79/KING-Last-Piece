@@ -118,6 +118,16 @@ namespace KingLastPiece
         public bool dust;              // low dust burst around the impact (NamuFX smoke layers)
     }
 
+    /// <summary>An authored effect played at a fixed time into an attack, aligned with the King's facing.</summary>
+    public struct FxCue
+    {
+        public float time;
+        public SlashFxKind kind;
+        public float scale, height, yaw;
+        public float roll;         // about the facing axis: 180 turns a bottom-to-top sweep into top-to-bottom
+        public bool gold, mirror;
+    }
+
     public struct MoveSeg
     {
         public float start, end, distance;
@@ -136,6 +146,8 @@ namespace KingLastPiece
         public PoseTrack pose;
         public HitWindow[] hits;
         public MoveSeg[] moves;
+        /// <summary>Timed effects that don't belong to a hit window (e.g. a slash during a slam's descent).</summary>
+        public FxCue[] cues;
 
         public float FirstHit => hits.Length > 0 ? hits[0].start : 0f;
         public float LastHit => hits.Length > 0 ? hits[hits.Length - 1].end : 0f;
@@ -358,6 +370,8 @@ namespace KingLastPiece
                 },
             },
             moves = new[] { new MoveSeg(0.14f, 0.52f, 1.6f, Ease.InOut) },
+            // Top-to-bottom slash while the King somersaults down onto the board.
+            cues = new[] { new FxCue { time = 0.4f, kind = SlashFxKind.SlashBVertical, scale = 1.6f, height = 1.4f, roll = 180f, gold = true } },
         };
 
         /// <summary>Opener: leans in and rams across <paramref name="distance"/> (Royal Charge's light, sized to the gap).</summary>
@@ -392,6 +406,8 @@ namespace KingLastPiece
                     dust = true },
             },
             moves = new[] { new MoveSeg(0.42f, 0.82f, 3.0f, Ease.InOut) },
+            // Top-to-bottom slash while the King somersaults down onto the board.
+            cues = new[] { new FxCue { time = 0.64f, kind = SlashFxKind.SlashBVertical, scale = 2.0f, height = 1.8f, roll = 180f, gold = true } },
         };
 
         // ---------------------------------------------------------------- spin
