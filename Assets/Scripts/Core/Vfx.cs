@@ -15,7 +15,8 @@ namespace KingLastPiece
     /// </summary>
     public static class Vfx
     {
-        public static VfxStyle Style = VfxStyle.CrackedBoard;
+        // Chosen in the Effects Lab: C. Board Ripple.
+        public static VfxStyle Style = VfxStyle.BoardRipple;
 
         public static readonly string[] Names = { "A. Classic", "B. Cracked Board", "C. Board Ripple" };
         public static readonly string[] Descriptions =
@@ -69,7 +70,7 @@ namespace KingLastPiece
 
         /// <param name="keep">When set, only particle systems whose (lower-case) name passes keep emitting.</param>
         static bool Slash(SlashFxKind kind, Vector3 pos, Quaternion rot, float scale, Color? tint, System.Predicate<string> keep,
-                          bool mirror = false)
+                          bool mirror = false, float dustLife = 1f)
         {
             Vector3 facingRight = rot * Vector3.right;
             var lib = FxLibrary.Instance;
@@ -122,7 +123,16 @@ namespace KingLastPiece
                 var main = ps.main;
                 main.scalingMode = ParticleSystemScalingMode.Hierarchy;
                 bool dust = n.Contains("dust") || n.Contains("smoke");
-                if (dust) Recolor(ps, DustColor);  // neutral dust, never "enemy red"
+                if (dust)
+                {
+                    Recolor(ps, DustColor, dustLife > 1f ? 1f : (float?)null);  // neutral dust, never "enemy red"
+                    if (dustLife > 1f)
+                    {
+                        // Denser, longer-lived dust: bigger, opaque-ish particles that linger.
+                        main.startLifetimeMultiplier *= dustLife;
+                        main.startSizeMultiplier *= 1.35f;
+                    }
+                }
                 else if (tint.HasValue) Recolor(ps, tint.Value);
                 if (dust || tint.HasValue)
                 {
@@ -133,14 +143,15 @@ namespace KingLastPiece
                     if (r.trailMaterial != null) r.trailMaterial = VertexColored(r.trailMaterial);
                 }
             }
-            Object.Destroy(fx, 2.2f);
+            Object.Destroy(fx, 2.2f * Mathf.Max(1f, dustLife));
             return true;
         }
 
         /// <summary>World-yaw correction applied to directional NamuFX slashes (calibrated in Effects Lab E6).</summary>
         public static float SlashYawFix = 180f;
 
-        static readonly Color DustColor = new Color(0.55f, 0.5f, 0.45f);
+        static readonly Color DustColor = new Color(0.5f, 0.46f, 0.41f);
+        const float DustLife = 2.5f;
 
         /// <summary>
         /// Low dust burst around a landing: only the smoke / dust layers of the NamuFX prefabs (no slashes),
@@ -151,13 +162,14 @@ namespace KingLastPiece
             center.y = 0.15f;
             bool any = false;
             System.Predicate<string> dustOnly = n => n.Contains("smoke") || n.Contains("dust");
-            int puffs = Mathf.Clamp(Mathf.RoundToInt(radius * 1.6f), 3, 7);
+            int puffs = Mathf.Clamp(Mathf.RoundToInt(radius * 2.4f), 5, 11);
             float offset = Random.value * 360f;
             for (int i = 0; i < puffs; i++)
             {
                 Vector3 d = Quaternion.Euler(0f, offset + i * 360f / puffs, 0f) * Vector3.forward;
                 var kind = i % 2 == 0 ? SlashFxKind.AoeA : SlashFxKind.SlashA;
-                any |= Slash(kind, center + d * radius * 0.6f, Quaternion.LookRotation(d), Mathf.Lerp(0.7f, 1.2f, radius / 4f), null, dustOnly);
+                any |= Slash(kind, center + d * radius * Random.Range(0.45f, 0.75f), Quaternion.LookRotation(d),
+                    Mathf.Lerp(0.9f, 1.5f, radius / 4f), null, dustOnly, false, DustLife);
             }
             if (!any) Effects.Shockwave(center, radius * 0.7f, new Color(0.22f, 0.2f, 0.18f), 0.45f);
             Effects.Sparks(center, DustColor, Mathf.RoundToInt(6 + radius * 3f), 3.5f);
@@ -178,10 +190,11 @@ namespace KingLastPiece
         }
 
         /// <summary>Recolors a particle system: start color and the color-over-lifetime gradient (alpha kept).</summary>
-        static void Recolor(ParticleSystem ps, Color c)
+        /// <param name="alpha">When set: start alpha override, and the lifetime alpha curve is strengthened (denser).</param>
+        static void Recolor(ParticleSystem ps, Color c, float? alpha = null)
         {
             var main = ps.main;
-            float a = main.startColor.mode == ParticleSystemGradientMode.Color ? main.startColor.color.a : 1f;
+            float a = alpha ?? (main.startColor.mode == ParticleSystemGradientMode.Color ? main.startColor.color.a : 1f);
             main.startColor = new ParticleSystem.MinMaxGradient(new Color(c.r, c.g, c.b, a));
             var trails = ps.trails;
             if (trails.enabled)
@@ -196,9 +209,13 @@ namespace KingLastPiece
             if (!col.enabled) return;
             var src = col.color.mode == ParticleSystemGradientMode.TwoGradients ? col.color.gradientMax : col.color.gradient;
             if (src == null) return;
+            var alphaKeys = src.alphaKeys;
+            if (alpha.HasValue)
+                for (int i = 0; i < alphaKeys.Length; i++)
+                    alphaKeys[i].alpha = Mathf.Clamp01(alphaKeys[i].alpha * 1.6f);
             var g = new Gradient();
             g.SetKeys(new[] { new GradientColorKey(Color.Lerp(c, Color.white, 0.55f), 0f), new GradientColorKey(c, 0.5f), new GradientColorKey(c * 0.8f, 1f) },
-                src.alphaKeys);
+                alphaKeys);
             col.color = new ParticleSystem.MinMaxGradient(g);
         }
 
