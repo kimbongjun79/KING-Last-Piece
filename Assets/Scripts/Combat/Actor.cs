@@ -48,7 +48,8 @@ namespace KingLastPiece
 
         protected virtual void LateUpdate()
         {
-            if (flashTimer > 0f) flashTimer -= Time.unscaledDeltaTime;
+            // Unscaled so flashes survive hit-stop; fixed step when frames are being captured.
+            if (flashTimer > 0f) flashTimer -= Time.captureDeltaTime > 0f ? Time.captureDeltaTime : Time.unscaledDeltaTime;
             Color c = flashTimer > 0f ? flashColor : glow;
             if (c == applied || mpb == null) return;
             applied = c;

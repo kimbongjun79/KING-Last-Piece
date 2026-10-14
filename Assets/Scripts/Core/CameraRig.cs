@@ -32,9 +32,19 @@ namespace KingLastPiece
 
         public void Shake(float amount) => shake = Mathf.Max(shake, amount);
 
+        /// <summary>Fixed camera used by automated captures.</summary>
+        public bool UseOverride { get; set; }
+        public Vector3 OverridePosition { get; set; }
+        public Vector3 OverrideLookAt { get; set; }
+
         void LateUpdate()
         {
             if (player == null) return;
+            if (UseOverride)
+            {
+                transform.SetPositionAndRotation(OverridePosition, Quaternion.LookRotation(OverrideLookAt - OverridePosition));
+                return;
+            }
             float dt = Time.unscaledDeltaTime;
             var game = GameManager.Instance;
             var state = game != null ? game.State : GameManager.GameState.Title;

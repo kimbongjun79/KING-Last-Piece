@@ -22,6 +22,9 @@ namespace KingLastPiece
             get
             {
                 if (template != null) return template;
+                // Authored template keeps the _EMISSION shader variant alive in player builds.
+                var authored = Resources.Load<Material>("Materials/KLP_Emissive");
+                if (authored != null) return template = new Material(authored);
                 var tmp = GameObject.CreatePrimitive(PrimitiveType.Cube);
                 var src = tmp.GetComponent<Renderer>().sharedMaterial;
                 Object.DestroyImmediate(tmp);

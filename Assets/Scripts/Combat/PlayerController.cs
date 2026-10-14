@@ -4,32 +4,13 @@ using UnityEngine;
 namespace KingLastPiece
 {
     /// <summary>
-    /// The White King: stamina-gated light/heavy attacks, i-frame dodge roll, lock-on and healing flasks.
-    /// No rig — all motion is procedural (body roll, sword swing).
+    /// The White King: fights with its own body (lean, spin, topple, stomp…) defined by an AttackStyle.
+    /// Stamina-gated light/heavy attacks, i-frame dodge roll, lock-on and healing flasks. All motion is procedural.
     /// </summary>
     public class PlayerController : Actor
     {
         enum State { Normal, Attack, Dodge, Heal, Stagger, Dead }
-        enum Buffered { None, Light, Heavy, Dodge, Heal }
-
-        struct AttackDef
-        {
-            public float duration, activeStart, activeEnd, cancelAt;
-            public float damage, poise, range, arc, cost, lunge;
-            public bool heavy;
-        }
-
-        static readonly AttackDef LightAtk = new AttackDef
-        {
-            duration = 0.55f, activeStart = 0.16f, activeEnd = 0.28f, cancelAt = 0.36f,
-            damage = 14f, poise = 12f, range = 2.4f, arc = 130f, cost = 14f, lunge = 0.7f
-        };
-
-        static readonly AttackDef HeavyAtk = new AttackDef
-        {
-            duration = 1.05f, activeStart = 0.5f, activeEnd = 0.62f, cancelAt = 0.78f,
-            damage = 34f, poise = 45f, range = 2.7f, arc = 150f, cost = 28f, lunge = 1.1f, heavy = true
-        };
+        public enum Buffered { None, Light, Heavy, Dodge, Heal }
 
         public const float MaxStamina = 100f;
         public const int MaxFlasks = 3;
@@ -38,49 +19,66 @@ namespace KingLastPiece
         const float HealDuration = 1.1f, HealAt = 0.6f, HealAmount = 45f;
         const float StaminaRegen = 45f, StaminaDelay = 0.5f;
         const float BufferWindow = 0.4f, LockRange = 20f;
-        const float BodyPivotHeight = 0.95f;
+        const float ModelHeight = 2.1f, CenterHeight = 0.95f, BaseRadius = 0.42f;
 
         public float Stamina { get; private set; }
         public int Flasks { get; private set; }
         public EnemyBase LockTarget { get; private set; }
+        public AttackStyle Style { get; set; } = AttackStyles.Default;
         public bool IsInvulnerable => state == State.Dodge && stateTime >= IFrameStart && stateTime <= IFrameEnd;
         public bool IsDodging => state == State.Dodge;
+        public bool IsAttacking => state == State.Attack;
+        public bool IsIdle => state == State.Normal;
+        public AttackDef CurrentAttack => state == State.Attack ? atk : null;
+        public float StateTime => stateTime;
+        /// <summary>For automated tests: ignore damage.</summary>
+        public bool GodMode { get; set; }
 
         State state;
         float stateTime, staminaDelay;
         AttackDef atk;
-        int combo;
+        int comboIndex;
         bool healed;
-        readonly HashSet<EnemyBase> hitThisSwing = new HashSet<EnemyBase>();
+        HashSet<EnemyBase>[] hitSets = new HashSet<EnemyBase>[0];
+        bool[] windowStarted = new bool[0];
         readonly List<EnemyBase> scratch = new List<EnemyBase>();
         Vector3 dodgeDir, knockback;
         Buffered buffer;
         float bufferTimer, bobPhase;
+        float prevMove;
 
-        Transform body, weaponPivot;
-        Vector3 weaponPose = new Vector3(-25f, 25f, 0f);
-        static readonly Vector3 RestPose = new Vector3(-25f, 25f, 0f);
+        Transform body;
+        TrailRenderer crownTrail, baseTrail;
 
         public void Build()
         {
             body = new GameObject("Body").transform;
             body.SetParent(transform, false);
-            body.localPosition = new Vector3(0f, BodyPivotHeight, 0f);
 
-            var model = PieceFactory.BuildPlayerKing(body, 2.1f);
-            model.localPosition = new Vector3(0f, -BodyPivotHeight, 0f);
+            var model = PieceFactory.BuildPlayerKing(body, ModelHeight);
+            model.localPosition = new Vector3(0f, -CenterHeight, 0f);
 
-            // Royal sword held at the right side.
-            weaponPivot = new GameObject("WeaponPivot").transform;
-            weaponPivot.SetParent(body, false);
-            weaponPivot.localPosition = new Vector3(0.5f, 0.15f, 0.15f);
-            var steel = MaterialLib.Get(new Color(0.8f, 0.82f, 0.86f), 0.9f, 0.9f);
-            var gold = MaterialLib.Get(new Color(0.85f, 0.65f, 0.2f), 0.8f, 1f);
-            PieceFactory.Part(PrimitiveType.Cube, weaponPivot, new Vector3(0, 0, 0.9f), new Vector3(0.09f, 0.03f, 1.45f), steel);
-            PieceFactory.Part(PrimitiveType.Cube, weaponPivot, new Vector3(0, 0, 0.14f), new Vector3(0.36f, 0.07f, 0.07f), gold);
-            PieceFactory.Part(PrimitiveType.Cube, weaponPivot, new Vector3(0, 0, -0.02f), new Vector3(0.06f, 0.06f, 0.28f), gold);
+            crownTrail = CreateTrail(new Vector3(0f, ModelHeight - CenterHeight - 0.05f, 0f), 0.42f, new Color(1f, 0.78f, 0.35f) * 3.5f);
+            baseTrail = CreateTrail(new Vector3(0f, -CenterHeight + 0.15f, 0f), 0.22f, new Color(1f, 0.85f, 0.6f) * 1.5f);
 
             Radius = 0.45f;
+        }
+
+        TrailRenderer CreateTrail(Vector3 localPos, float width, Color emission)
+        {
+            var go = new GameObject("Trail");
+            go.transform.SetParent(body, false);
+            go.transform.localPosition = localPos;
+            var tr = go.AddComponent<TrailRenderer>();
+            tr.time = 0.16f;
+            tr.minVertexDistance = 0.04f;
+            tr.widthMultiplier = width;
+            tr.widthCurve = new AnimationCurve(new Keyframe(0f, 1f), new Keyframe(1f, 0f));
+            tr.sharedMaterial = MaterialLib.Get(Color.black, 0f, 0f, emission);
+            tr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            tr.receiveShadows = false;
+            tr.emitting = false;
+            return tr;
         }
 
         public void ResetForWave(Vector3 pos, float yaw)
@@ -93,10 +91,10 @@ namespace KingLastPiece
             buffer = Buffered.None;
             LockTarget = null;
             transform.SetPositionAndRotation(pos, Quaternion.Euler(0f, yaw, 0f));
-            body.localPosition = new Vector3(0f, BodyPivotHeight, 0f);
-            body.localRotation = Quaternion.identity;
-            weaponPose = RestPose;
-            weaponPivot.localRotation = Quaternion.Euler(RestPose);
+            ApplyPose(default);
+            crownTrail.emitting = baseTrail.emitting = false;
+            crownTrail.Clear();
+            baseTrail.Clear();
             SetGlow(Color.black);
         }
 
@@ -110,16 +108,29 @@ namespace KingLastPiece
             Flash(new Color(1f, 0.8f, 0.3f) * 1.5f, 0.4f);
         }
 
+        public void RefillForLab()
+        {
+            Health = MaxHealth;
+            Flasks = MaxFlasks;
+        }
+
+        /// <summary>Queue an action as if the button had been pressed (used by the Attack Lab automation).</summary>
+        public void Press(Buffered action)
+        {
+            buffer = action;
+            bufferTimer = BufferWindow;
+        }
+
+        void ApplyPose(BodyPose p) => p.Apply(body, CenterHeight, BaseRadius);
+
         void Update()
         {
             float dt = Time.deltaTime;
             if (state == State.Dead)
             {
                 stateTime += dt;
-                float p = Mathf.Clamp01(stateTime / 0.9f);
-                float e = 1f - (1f - p) * (1f - p) * (1f - p);
-                body.localRotation = Quaternion.Euler(-88f * e, 0f, 8f * e);
-                body.localPosition = new Vector3(0f, Mathf.Lerp(BodyPivotHeight, 0.4f, e), -0.8f * e);
+                float p = PoseTrack.Curve(Ease.Out, stateTime / 0.9f);
+                ApplyPose(BodyPose.P(tilt: -90f * p + 6f * Mathf.Sin(Mathf.Clamp01(stateTime / 0.9f) * Mathf.PI)));
                 return;
             }
             if (Game == null || Game.State != GameManager.GameState.Playing) return;
@@ -138,7 +149,7 @@ namespace KingLastPiece
                 case State.Stagger: UpdateStagger(dt); break;
             }
 
-            weaponPivot.localRotation = Quaternion.Euler(weaponPose);
+            if (state != State.Attack) crownTrail.emitting = baseTrail.emitting = false;
             ClampToBoard();
         }
 
@@ -146,20 +157,14 @@ namespace KingLastPiece
 
         void ReadInput(float dt)
         {
-            if (GameInput.LightAttack) SetBuffer(Buffered.Light);
-            if (GameInput.HeavyAttack) SetBuffer(Buffered.Heavy);
-            if (GameInput.Dodge) SetBuffer(Buffered.Dodge);
-            if (GameInput.Heal) SetBuffer(Buffered.Heal);
+            if (GameInput.LightAttack) Press(Buffered.Light);
+            if (GameInput.HeavyAttack) Press(Buffered.Heavy);
+            if (GameInput.Dodge) Press(Buffered.Dodge);
+            if (GameInput.Heal) Press(Buffered.Heal);
             if (GameInput.LockOn) ToggleLock();
 
             bufferTimer -= dt;
             if (bufferTimer <= 0f) buffer = Buffered.None;
-        }
-
-        void SetBuffer(Buffered b)
-        {
-            buffer = b;
-            bufferTimer = BufferWindow;
         }
 
         bool TryAct()
@@ -168,11 +173,11 @@ namespace KingLastPiece
             {
                 case Buffered.Light:
                     if (Stamina < 1f) return false;
-                    StartAttack(LightAtk);
+                    StartAttack(false);
                     return true;
                 case Buffered.Heavy:
                     if (Stamina < 1f) return false;
-                    StartAttack(HeavyAtk);
+                    StartAttack(true);
                     return true;
                 case Buffered.Dodge:
                     if (Stamina < 1f) return false;
@@ -259,104 +264,131 @@ namespace KingLastPiece
             if (LockTarget != null) FaceTowards(LockTarget.FlatPos - FlatPos, 900f);
             else if (dir.sqrMagnitude > 0.01f) FaceTowards(dir, 720f);
 
-            // Chess-piece "hop" while walking.
+            // Chess-piece hop while walking, leaning into the movement.
             float m = dir.magnitude;
+            prevMove = Mathf.Lerp(prevMove, m, 1f - Mathf.Exp(-10f * dt));
             bobPhase += dt * 10f * m;
             float hop = m > 0.05f ? Mathf.Abs(Mathf.Sin(bobPhase)) * 0.12f : 0f;
-            body.localPosition = new Vector3(0f, Mathf.Lerp(body.localPosition.y, BodyPivotHeight + hop, 1f - Mathf.Exp(-20f * dt)), 0f);
-            body.localRotation = Quaternion.Slerp(body.localRotation, Quaternion.Euler(6f * m, 0f, 0f), 1f - Mathf.Exp(-10f * dt));
-            weaponPose = Vector3.Lerp(weaponPose, RestPose, 1f - Mathf.Exp(-12f * dt));
+            float heading = 0f;
+            if (m > 0.05f) heading = Vector3.SignedAngle(transform.forward, dir, Vector3.up);
+            ApplyPose(BodyPose.P(tilt: 7f * prevMove, heading: heading, lift: hop));
         }
 
-        void StartAttack(AttackDef def)
+        void StartAttack(bool heavy)
         {
-            bool chain = state == State.Attack && !atk.heavy && !def.heavy;
-            combo = chain ? 1 - combo : 0;
-            atk = def;
-            Consume(def.cost);
-            hitThisSwing.Clear();
+            var style = Style ?? AttackStyles.Default;
+            bool chain = state == State.Attack && !atk.heavy && !heavy;
+            if (heavy) atk = style.heavy;
+            else
+            {
+                comboIndex = chain ? (comboIndex + 1) % style.lights.Length : 0;
+                atk = style.lights[comboIndex];
+            }
+            Consume(atk.cost);
+
+            if (hitSets.Length < atk.hits.Length)
+            {
+                hitSets = new HashSet<EnemyBase>[atk.hits.Length];
+                windowStarted = new bool[atk.hits.Length];
+            }
+            for (int i = 0; i < hitSets.Length; i++)
+            {
+                hitSets[i] ??= new HashSet<EnemyBase>();
+                hitSets[i].Clear();
+                windowStarted[i] = false;
+            }
             Enter(State.Attack);
 
             Vector3 dir = InputDirection();
             if (LockTarget != null) dir = LockTarget.FlatPos - FlatPos;
             if (dir.sqrMagnitude > 0.01f) transform.rotation = Quaternion.LookRotation(new Vector3(dir.x, 0f, dir.z));
-            body.localPosition = new Vector3(0f, BodyPivotHeight, 0f);
         }
 
         void UpdateAttack(float dt)
         {
-            float t = stateTime;
+            float t = stateTime, prevT = t - dt;
 
-            if (t < atk.activeStart && LockTarget != null) FaceTowards(LockTarget.FlatPos - FlatPos, 540f);
+            if (t < atk.FirstHit && LockTarget != null) FaceTowards(LockTarget.FlatPos - FlatPos, 540f);
 
-            if (t < atk.activeEnd)
+            // Root motion from move segments.
+            bool blocked = LockTarget != null && (LockTarget.FlatPos - FlatPos).magnitude < Radius + LockTarget.Radius + 0.3f;
+            if (!blocked)
             {
-                bool blocked = LockTarget != null && (LockTarget.FlatPos - FlatPos).magnitude < 1.4f;
-                if (!blocked) transform.position += transform.forward * (atk.lunge / atk.activeEnd * dt);
+                foreach (var m in atk.moves)
+                {
+                    float a = PoseTrack.Curve(m.ease, (prevT - m.start) / (m.end - m.start));
+                    float b = PoseTrack.Curve(m.ease, (t - m.start) / (m.end - m.start));
+                    transform.position += transform.forward * (m.distance * (b - a));
+                }
             }
 
-            if (t >= atk.activeStart && t <= atk.activeEnd + 0.02f) DoHits();
+            ApplyPose(atk.pose.Eval(t));
 
-            AnimateSwing(t);
+            bool trail = t >= atk.FirstHit - 0.07f && t <= atk.LastHit + 0.03f;
+            crownTrail.emitting = trail;
+            baseTrail.emitting = trail && atk.heavy;
+
+            for (int i = 0; i < atk.hits.Length; i++)
+            {
+                var w = atk.hits[i];
+                if (t < w.start || t > w.end + 0.02f) continue;
+                if (!windowStarted[i])
+                {
+                    windowStarted[i] = true;
+                    if (w.impact)
+                    {
+                        Vector3 c = transform.position + transform.forward * w.forward;
+                        Effects.Shockwave(c, w.range, new Color(1f, 0.8f, 0.4f), 0.45f);
+                        Effects.Sparks(c + Vector3.up * 0.1f, new Color(0.75f, 0.7f, 0.6f), 14, 5f);
+                        Game.Rig.Shake(w.shake);
+                    }
+                }
+                DoHits(w, hitSets[i], Mathf.Clamp01((t - w.start) / Mathf.Max(0.001f, w.end - w.start)));
+            }
 
             if (t >= atk.cancelAt && TryAct()) return;
-            if (t >= atk.duration) Enter(State.Normal);
+            if (t >= atk.duration)
+            {
+                ApplyPose(default);
+                Enter(State.Normal);
+            }
         }
 
-        void AnimateSwing(float t)
-        {
-            Vector3 wind, end;
-            if (atk.heavy)
-            {
-                wind = new Vector3(-135f, 8f, 0f);
-                end = new Vector3(45f, 0f, 0f);
-            }
-            else if (combo == 0)
-            {
-                wind = new Vector3(0f, 105f, -20f);
-                end = new Vector3(12f, -85f, -20f);
-            }
-            else
-            {
-                wind = new Vector3(0f, -95f, 20f);
-                end = new Vector3(12f, 95f, 20f);
-            }
-
-            if (t < atk.activeStart) weaponPose = Vector3.Lerp(RestPose, wind, Smooth(t / atk.activeStart));
-            else if (t < atk.activeEnd) weaponPose = Vector3.Lerp(wind, end, (t - atk.activeStart) / (atk.activeEnd - atk.activeStart));
-            else weaponPose = Vector3.Lerp(end, RestPose, Smooth((t - atk.activeEnd) / (atk.duration - atk.activeEnd)));
-
-            float lean = atk.heavy
-                ? (t < atk.activeStart ? -10f * Smooth(t / atk.activeStart) : Mathf.Lerp(18f, 0f, (t - atk.activeStart) / (atk.duration - atk.activeStart)))
-                : (t < atk.activeEnd ? 10f : Mathf.Lerp(10f, 0f, (t - atk.activeEnd) / (atk.duration - atk.activeEnd)));
-            body.localRotation = Quaternion.Euler(lean, 0f, 0f);
-        }
-
-        void DoHits()
+        void DoHits(HitWindow w, HashSet<EnemyBase> already, float progress)
         {
             bool landed = false;
+            Vector3 center = FlatPos + transform.forward * w.forward;
             scratch.Clear();
             scratch.AddRange(Game.Enemies);
             foreach (var e in scratch)
             {
-                if (e == null || e.IsDead || hitThisSwing.Contains(e)) continue;
-                Vector3 to = e.FlatPos - FlatPos;
+                if (e == null || e.IsDead || already.Contains(e)) continue;
+                Vector3 to = e.FlatPos - center;
                 float d = to.magnitude;
-                if (d > atk.range + e.Radius) continue;
-                if (d > 0.4f && Vector3.Angle(transform.forward, to) > atk.arc * 0.5f) continue;
-                hitThisSwing.Add(e);
-                float dmg = atk.damage * (combo == 1 ? 1.1f : 1f);
-                if (e.TakeHit(dmg, atk.poise, transform.position))
+                if (d > w.range + e.Radius) continue;
+                if (w.shape == HitShape.Arc && d > 0.4f && Vector3.Angle(transform.forward, to) > w.arc * 0.5f) continue;
+                if (w.shape == HitShape.Arc && w.sweep && d > 0.4f)
+                {
+                    // Only what the body has already swept through gets hit.
+                    float ang = Vector3.SignedAngle(transform.forward, to, Vector3.up);
+                    float cur = Mathf.Lerp(w.sweepFrom, w.sweepTo, progress);
+                    float lo = Mathf.Min(w.sweepFrom, cur) - 15f, hi = Mathf.Max(w.sweepFrom, cur) + 15f;
+                    if (ang < lo || ang > hi) continue;
+                }
+                already.Add(e);
+                if (e.TakeHit(w.damage, w.poise, transform.position))
                 {
                     landed = true;
-                    Effects.Sparks(e.transform.position + Vector3.up * 1.0f - to.normalized * e.Radius,
-                        new Color(1f, 0.85f, 0.5f), atk.heavy ? 16 : 9, atk.heavy ? 7f : 5f);
+                    Game.ReportDamage(e, w.damage);
+                    Vector3 toE = (e.FlatPos - FlatPos).normalized;
+                    Effects.Sparks(e.transform.position + Vector3.up * 1.0f - toE * e.Radius,
+                        new Color(1f, 0.85f, 0.5f), atk.heavy ? 16 : 10, atk.heavy ? 7f : 5f);
                 }
             }
             if (landed)
             {
-                Game.HitStop(atk.heavy ? 0.09f : 0.045f);
-                Game.Rig.Shake(atk.heavy ? 0.3f : 0.12f);
+                Game.HitStop(w.hitStop);
+                if (!w.impact) Game.Rig.Shake(w.shake);
             }
         }
 
@@ -364,8 +396,8 @@ namespace KingLastPiece
         {
             Consume(DodgeCost);
             Vector3 dir = InputDirection();
-            dodgeDir = dir.sqrMagnitude > 0.01f ? dir.normalized : -transform.forward;
             bool backstep = dir.sqrMagnitude <= 0.01f;
+            dodgeDir = backstep ? -transform.forward : dir.normalized;
             if (!backstep) transform.rotation = Quaternion.LookRotation(dodgeDir);
             Enter(State.Dodge);
         }
@@ -377,28 +409,13 @@ namespace KingLastPiece
             float speed = Mathf.Lerp(backstep ? 9f : 13f, 2f, p);
             transform.position += dodgeDir * (speed * dt);
 
-            if (backstep)
-            {
-                body.localRotation = Quaternion.Euler(-15f * Mathf.Sin(p * Mathf.PI), 0f, 0f);
-                body.localPosition = new Vector3(0f, BodyPivotHeight, 0f);
-            }
-            else
-            {
-                float e = 1f - (1f - p) * (1f - p);
-                body.localRotation = Quaternion.Euler(360f * e, 0f, 0f);
-                body.localPosition = new Vector3(0f, Mathf.Lerp(BodyPivotHeight, 0.55f, Mathf.Sin(p * Mathf.PI)), 0f);
-            }
-            weaponPose = Vector3.Lerp(weaponPose, RestPose, 1f - Mathf.Exp(-12f * dt));
+            if (backstep) ApplyPose(BodyPose.P(tilt: -15f * Mathf.Sin(p * Mathf.PI)));
+            else ApplyPose(BodyPose.P(flip: 360f * PoseTrack.Curve(Ease.Out, p), lift: -0.35f * Mathf.Sin(p * Mathf.PI), squash: -0.1f * Mathf.Sin(p * Mathf.PI)));
 
-            if (stateTime >= DodgeCancelAt && (buffer == Buffered.Light || buffer == Buffered.Heavy))
-            {
-                body.localRotation = Quaternion.identity;
-                if (TryAct()) return;
-            }
+            if (stateTime >= DodgeCancelAt && (buffer == Buffered.Light || buffer == Buffered.Heavy) && TryAct()) return;
             if (p >= 1f)
             {
-                body.localRotation = Quaternion.identity;
-                body.localPosition = new Vector3(0f, BodyPivotHeight, 0f);
+                ApplyPose(default);
                 Enter(State.Normal);
             }
         }
@@ -417,7 +434,7 @@ namespace KingLastPiece
             Vector3 dir = InputDirection();
             transform.position += dir * (MoveSpeed * 0.3f * dt);
             if (LockTarget != null) FaceTowards(LockTarget.FlatPos - FlatPos, 360f);
-            weaponPose = Vector3.Lerp(weaponPose, new Vector3(-70f, 0f, 0f), 1f - Mathf.Exp(-10f * dt));
+            ApplyPose(BodyPose.P(tilt: -8f * Mathf.Sin(Mathf.Clamp01(stateTime / HealDuration) * Mathf.PI)));
 
             if (!healed && stateTime >= HealAt)
             {
@@ -438,10 +455,10 @@ namespace KingLastPiece
             transform.position += knockback * dt;
             knockback = Vector3.Lerp(knockback, Vector3.zero, 1f - Mathf.Exp(-8f * dt));
             float p = Mathf.Clamp01(stateTime / 0.4f);
-            body.localRotation = Quaternion.Euler(-18f * Mathf.Sin(p * Mathf.PI), 0f, 0f);
+            ApplyPose(BodyPose.P(tilt: -18f * Mathf.Sin(p * Mathf.PI)));
             if (stateTime >= 0.4f)
             {
-                body.localRotation = Quaternion.identity;
+                ApplyPose(default);
                 Enter(State.Normal);
             }
         }
@@ -450,7 +467,7 @@ namespace KingLastPiece
 
         public override bool TakeHit(float damage, float poiseDamage, Vector3 source)
         {
-            if (IsDead || IsInvulnerable || Game.State != GameManager.GameState.Playing) return false;
+            if (IsDead || IsInvulnerable || GodMode || Game.State != GameManager.GameState.Playing) return false;
 
             Health -= damage;
             Flash(new Color(2f, 0.1f, 0.05f), 0.15f);
@@ -478,12 +495,6 @@ namespace KingLastPiece
                 Enter(State.Stagger);
             }
             return true;
-        }
-
-        static float Smooth(float x)
-        {
-            x = Mathf.Clamp01(x);
-            return x * x * (3f - 2f * x);
         }
     }
 }

@@ -119,7 +119,8 @@ namespace KingLastPiece
 
             var inst = Object.Instantiate(prefab);
             inst.name = "WhiteKing_FBX";
-            inst.transform.SetPositionAndRotation(Vector3.zero, Quaternion.identity);
+            // Keep the FBX root rotation (Blender exports carry a -90° X axis conversion).
+            inst.transform.SetPositionAndRotation(Vector3.zero, prefab.transform.rotation);
             foreach (var c in inst.GetComponentsInChildren<Collider>()) Object.DestroyImmediate(c);
 
             var renderers = inst.GetComponentsInChildren<Renderer>();
@@ -142,7 +143,8 @@ namespace KingLastPiece
             // If the model was exported lying down, stand it up.
             if (b.size.y < Mathf.Max(b.size.x, b.size.z) * 0.8f)
             {
-                inst.transform.rotation = Quaternion.Euler(b.size.z > b.size.x ? -90f : 0f, 0f, b.size.x >= b.size.z ? 90f : 0f);
+                inst.transform.rotation = Quaternion.Euler(b.size.z > b.size.x ? -90f : 0f, 0f, b.size.x >= b.size.z ? 90f : 0f)
+                                          * inst.transform.rotation;
                 b = WorldBounds(renderers);
             }
 

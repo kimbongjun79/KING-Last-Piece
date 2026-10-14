@@ -62,7 +62,9 @@ namespace KingLastPiece
             DrawBossBar(g);
             DrawLockMarker(g);
             DrawBanner(g);
+            DrawPopups(g);
             DrawControlsHint();
+            if (g.CurrentMode == GameManager.Mode.Lab) DrawLabPanel();
 
             if (g.State == GameManager.GameState.Dead) DrawDeath(g);
             if (g.Paused) DrawPause();
@@ -147,6 +149,57 @@ namespace KingLastPiece
             var r = new Rect(0, Screen.height * 0.22f, Screen.width, 60 * scale);
             Fill(new Rect(0, r.y - 10 * scale, Screen.width, r.height + 20 * scale), new Color(0, 0, 0, 0.45f * a));
             Text(r, g.Banner.ToUpperInvariant(), mid, new Color(Gold.r, Gold.g, Gold.b, a));
+        }
+
+        void DrawPopups(GameManager g)
+        {
+            var cam = g.Rig.Cam;
+            var style = new GUIStyle(label) { alignment = TextAnchor.MiddleCenter, fontSize = Mathf.RoundToInt(22 * scale) };
+            foreach (var p in g.Popups)
+            {
+                float age = Time.unscaledTime - p.time;
+                if (age > 0.9f) continue;
+                Vector3 sp = cam.WorldToScreenPoint(p.position + Vector3.up * age * 0.8f);
+                if (sp.z < 0f) continue;
+                float a = Mathf.Clamp01((0.9f - age) / 0.3f);
+                Text(new Rect(sp.x - 60 * scale, Screen.height - sp.y - 15 * scale, 120 * scale, 30 * scale),
+                    Mathf.RoundToInt(p.amount).ToString(), style, new Color(1f, 0.9f, 0.6f, a));
+            }
+        }
+
+        void DrawLabPanel()
+        {
+            var lab = AttackLab.Instance;
+            if (lab == null) return;
+            float w = 470 * scale, x = Screen.width - w - 24 * scale, y = 24 * scale, line = 26 * scale;
+            var styles = AttackStyles.All;
+            float h = (styles.Length + 7) * line + 20 * scale;
+            Fill(new Rect(x, y, w, h), new Color(0f, 0f, 0f, 0.6f));
+            x += 14 * scale;
+            y += 10 * scale;
+            Text(new Rect(x, y, w, line), "ATTACK LAB  —  1-6 style · C reset · G pawns", label, Gold);
+            y += line * 1.3f;
+            for (int i = 0; i < styles.Length; i++)
+            {
+                bool sel = i == lab.StyleIndex;
+                string star = i == AttackStyles.DefaultIndex ? "  ★ chosen" : "";
+                Text(new Rect(x, y, w, line), $"{(sel ? "▶" : "  ")} {i + 1}. {styles[i].name} ({styles[i].koName}){star}", label,
+                    sel ? Color.white : new Color(0.65f, 0.65f, 0.65f));
+                y += line;
+            }
+            var s = lab.Style;
+            y += line * 0.4f;
+            var desc = new GUIStyle(label) { wordWrap = true, fontStyle = FontStyle.Normal, alignment = TextAnchor.UpperLeft };
+            Text(new Rect(x, y, w - 28 * scale, line * 2.2f), s.description, desc, new Color(0.85f, 0.82f, 0.75f));
+            y += line * 2.3f;
+            var light = s.lights[0];
+            Text(new Rect(x, y, w, line),
+                $"Light ×{s.lights.Length}: startup {light.FirstHit:0.00}s  reach {light.Reach:0.0}  arc {light.Coverage:0}°  DPS {s.ComboDps:0}",
+                desc, new Color(0.75f, 0.85f, 0.75f));
+            y += line;
+            Text(new Rect(x, y, w, line),
+                $"Heavy: startup {s.heavy.FirstHit:0.00}s  reach {s.heavy.Reach:0.0}  dmg {s.heavy.TotalDamage:0}  arc {s.heavy.Coverage:0}°",
+                desc, new Color(0.85f, 0.75f, 0.7f));
         }
 
         void DrawControlsHint()

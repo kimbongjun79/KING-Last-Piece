@@ -34,7 +34,28 @@ namespace KingLastPiece
         public int Deaths { get; private set; }
         public float RunTime { get; private set; }
 
+        public enum Mode { Game, Lab }
+
+        /// <summary>Set before the GameManager is created to boot into a different mode (e.g. the Attack Lab).</summary>
+        public static Mode StartMode = Mode.Game;
+        public Mode CurrentMode { get; private set; }
+        public bool HitStopEnabled { get; set; } = true;
+
+        public struct DamagePopup
+        {
+            public Vector3 position;
+            public float amount, time;
+        }
+
+        public readonly List<DamagePopup> Popups = new List<DamagePopup>();
+
         bool hitStopping;
+
+        public void RevivePlayerInPlace()
+        {
+            Player.ResetForWave(Player.FlatPos, Player.transform.eulerAngles.y);
+            EnterState(GameState.Playing);
+        }
 
         struct WaveDef
         {
@@ -93,7 +114,9 @@ namespace KingLastPiece
             Rig.Init(cam, Player);
 
             gameObject.AddComponent<Hud>();
-            EnterState(GameState.Title);
+            CurrentMode = StartMode;
+            StartMode = Mode.Game;
+            EnterState(CurrentMode == Mode.Lab ? GameState.Playing : GameState.Title);
         }
 
         void OnDestroy()
@@ -143,21 +166,45 @@ namespace KingLastPiece
 
         public EnemyBase SpawnEnemy(PieceType type, Vector3 pos)
         {
-            var go = new GameObject("Black" + type);
-            go.transform.SetPositionAndRotation(new Vector3(pos.x, 0f, pos.z), Quaternion.LookRotation(Vector3.back));
-            EnemyBase e;
             switch (type)
             {
-                case PieceType.Knight: e = go.AddComponent<KnightEnemy>(); break;
-                case PieceType.Bishop: e = go.AddComponent<BishopEnemy>(); break;
-                case PieceType.Rook: e = go.AddComponent<RookEnemy>(); break;
-                case PieceType.Queen: e = go.AddComponent<QueenEnemy>(); break;
-                default: e = go.AddComponent<PawnEnemy>(); break;
+                case PieceType.Knight: return SpawnCustom<KnightEnemy>(type, pos);
+                case PieceType.Bishop: return SpawnCustom<BishopEnemy>(type, pos);
+                case PieceType.Rook: return SpawnCustom<RookEnemy>(type, pos);
+                case PieceType.Queen: return SpawnCustom<QueenEnemy>(type, pos);
+                default: return SpawnCustom<PawnEnemy>(type, pos);
             }
-            var model = PieceFactory.Build(type, go.transform, false);
-            e.Setup(type, model);
+        }
+
+        public T SpawnCustom<T>(PieceType modelType, Vector3 pos) where T : EnemyBase
+        {
+            var go = new GameObject(typeof(T).Name);
+            go.transform.SetPositionAndRotation(new Vector3(pos.x, 0f, pos.z), Quaternion.LookRotation(Vector3.back));
+            var e = go.AddComponent<T>();
+            var model = PieceFactory.Build(modelType, go.transform, false);
+            e.Setup(modelType, model);
             Enemies.Add(e);
             return e;
+        }
+
+        public void ClearEnemies()
+        {
+            foreach (var e in Enemies) if (e != null) Destroy(e.gameObject);
+            Enemies.Clear();
+        }
+
+        public int DamageEvents { get; private set; }
+
+        public void ReportDamage(EnemyBase e, float amount)
+        {
+            DamageEvents++;
+            Popups.Add(new DamagePopup
+            {
+                position = e.transform.position + Vector3.up * (e.IsBoss ? 3.3f : 2.3f) + Random.insideUnitSphere * 0.3f,
+                amount = amount,
+                time = Time.unscaledTime,
+            });
+            if (Popups.Count > 32) Popups.RemoveAt(0);
         }
 
         public void ShowBanner(string text)
@@ -213,7 +260,7 @@ namespace KingLastPiece
                     if (Paused) break;
                     RunTime += Time.deltaTime;
                     ResolveCollisions();
-                    if (AliveCount() == 0 && StateTime > 1f)
+                    if (CurrentMode == Mode.Game && AliveCount() == 0 && StateTime > 1f)
                     {
                         if (WaveIndex >= Waves.Length - 1)
                         {
@@ -233,6 +280,11 @@ namespace KingLastPiece
                     break;
 
                 case GameState.Dead:
+                    if (CurrentMode == Mode.Lab)
+                    {
+                        if (StateTime > 1.5f) RevivePlayerInPlace();
+                        break;
+                    }
                     if (StateTime > 1.8f && GameInput.Confirm) StartWave(WaveIndex);
                     break;
 
@@ -252,7 +304,7 @@ namespace KingLastPiece
 
         public void HitStop(float duration)
         {
-            if (Paused || hitStopping || !isActiveAndEnabled) return;
+            if (!HitStopEnabled || Paused || hitStopping || !isActiveAndEnabled) return;
             StartCoroutine(HitStopRoutine(duration));
         }
 

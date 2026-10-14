@@ -1,0 +1,26 @@
+style	attack	startup	active_end	duration	cancel	reach	coverage	damage	dummies_hit
+Royal Spin	Spin	0.14	0.30	0.55	0.40	2.8	360	12	5
+Royal Spin	Spin	0.14	0.30	0.55	0.40	2.8	360	12	3
+Royal Spin	Rising Spin	0.42	0.85	1.15	0.90	4.2	360	34	11
+Royal Spin	COMBO_DPS	30.3
+Crown Smash	Crown Smash	0.24	0.34	0.60	0.42	3.4	70	16	1
+Crown Smash	Crown Smash	0.24	0.34	0.60	0.42	3.4	70	16	1
+Crown Smash	Royal Topple	0.60	0.68	1.30	1.05	4.8	360	38	3
+Crown Smash	COMBO_DPS	38.1
+Pendulum	Pendulum R→L	0.15	0.30	0.55	0.38	3.0	180	13	3
+Pendulum	Pendulum L→R	0.15	0.30	0.55	0.38	3.0	180	13	3
+Pendulum	Grand Sweep	0.48	0.68	1.10	0.85	4.1	240	32	5
+Pendulum	COMBO_DPS	34.2
+Royal Stomp	Stomp	0.40	0.46	0.65	0.48	3.5	360	14	3
+Royal Stomp	Stomp	0.40	0.46	0.65	0.48	3.5	360	14	3
+Royal Stomp	Meteor Flip	0.82	0.90	1.30	1.05	6.0	360	40	5
+Royal Stomp	COMBO_DPS	29.2
+Royal Charge	Ram	0.17	0.40	0.60	0.45	4.8	360	13	1
+Royal Charge	Ram	0.17	0.40	0.60	0.45	4.8	360	13	1
+Royal Charge	Rocket Ram	0.56	0.90	1.20	1.00	8.2	360	34	1
+Royal Charge	COMBO_DPS	28.9
+Royal Ensemble	Pendulum R→L	0.15	0.30	0.55	0.38	3.0	180	13	3
+Royal Ensemble	Pendulum L→R	0.15	0.30	0.55	0.38	3.0	180	13	3
+Royal Ensemble	Spin Finisher	0.14	0.30	0.62	0.45	2.8	360	18	3
+Royal Ensemble	Royal Topple	0.60	0.68	1.30	1.05	4.8	360	38	3
+Royal Ensemble	COMBO_DPS	36.5
