@@ -61,6 +61,7 @@ namespace KingLastPiece
             DrawEnemyBars(g);
             DrawBossBar(g);
             DrawLockMarker(g);
+            DrawJustDodge(g);
             DrawBanner(g);
             DrawPopups(g);
             DrawControlsHint();
@@ -86,7 +87,18 @@ namespace KingLastPiece
             Fill(new Rect(x - 2, y - 2, sw + 4, sh + 4), new Color(0, 0, 0, 0.75f));
             Fill(new Rect(x, y, sw * (p.Stamina / PlayerController.MaxStamina), sh), new Color(0.25f, 0.62f, 0.3f));
 
-            y += sh + 14 * scale;
+            // Dodge charges: diamonds that refill one by one.
+            y += sh + 8 * scale;
+            float ds = 14 * scale;
+            for (int i = 0; i < PlayerController.MaxDodges; i++)
+            {
+                var r = new Rect(x + i * (ds + 10 * scale), y, ds, ds);
+                Fill(new Rect(r.x - 2, r.y - 2, r.width + 4, r.height + 4), new Color(0, 0, 0, 0.7f));
+                float fill = i < p.DodgeCharges ? 1f : i == p.DodgeCharges ? p.DodgeRechargeProgress : 0f;
+                Fill(new Rect(r.x, r.y + r.height * (1f - fill), r.width, r.height * fill),
+                    i < p.DodgeCharges ? new Color(0.5f, 0.85f, 1f) : new Color(0.3f, 0.5f, 0.65f));
+            }
+            y += ds + 12 * scale;
             float fs = 26 * scale;
             for (int i = 0; i < PlayerController.MaxFlasks; i++)
             {
@@ -202,10 +214,32 @@ namespace KingLastPiece
                 desc, new Color(0.85f, 0.75f, 0.7f));
         }
 
+        void DrawJustDodge(GameManager g)
+        {
+            if (!g.SlowMoActive) return;
+            // Cool tint + letterbox while time is slowed.
+            float a = Mathf.Clamp01(g.SlowMoRemaining / 0.3f);
+            Fill(new Rect(0, 0, Screen.width, Screen.height), new Color(0.25f, 0.45f, 0.8f, 0.12f * a));
+            float bar = 50 * scale * a;
+            Fill(new Rect(0, 0, Screen.width, bar), new Color(0, 0, 0, 0.8f));
+            Fill(new Rect(0, Screen.height - bar, Screen.width, bar), new Color(0, 0, 0, 0.8f));
+
+            var p = g.Player;
+            if (p.IsCountering) return;
+            Text(new Rect(0, Screen.height * 0.28f, Screen.width, 50 * scale), "PERFECT DODGE", mid,
+                new Color(0.6f, 0.9f, 1f, a));
+            if (p.CounterReady)
+            {
+                float blink = 0.6f + 0.4f * Mathf.Sin(Time.unscaledTime * 14f);
+                Text(new Rect(0, Screen.height * 0.28f + 46 * scale, Screen.width, 36 * scale), "LMB — ROYAL THROW", small,
+                    new Color(1f, 0.9f, 0.6f, a * blink));
+            }
+        }
+
         void DrawControlsHint()
         {
             var r = new Rect(20 * scale, Screen.height - 40 * scale, Screen.width, 30 * scale);
-            Text(r, "WASD Move   Mouse Look   LMB Light   RMB Heavy   Space Roll   Q Lock-on   R Flask   Esc Pause",
+            Text(r, "WASD Move   Mouse Look   LMB Light (hold)   RMB Heavy   Space Roll (x3)   Q Lock-on   R Flask   Esc Pause",
                 new GUIStyle(label) { fontSize = Mathf.RoundToInt(15 * scale), fontStyle = FontStyle.Normal },
                 new Color(1f, 1f, 1f, 0.45f));
         }
@@ -222,8 +256,9 @@ namespace KingLastPiece
             string controls =
                 "WASD / Left Stick — Move        Mouse / Right Stick — Camera\n" +
                 "LMB / R1 — Light attack        RMB / R2 — Heavy attack\n" +
-                "Space / B — Roll (i-frames)        Q / R3 — Lock-on        R / X — Royal Flask";
-            Text(new Rect(0, cy + 250 * scale, Screen.width, 120 * scale), controls, small, new Color(0.7f, 0.7f, 0.7f));
+                "Space / B — Roll (3 charges)        Q / R3 — Lock-on        R / X — Royal Flask\n" +
+                "Roll right before a hit → slow motion → LMB: Royal Throw";
+            Text(new Rect(0, cy + 250 * scale, Screen.width, 160 * scale), controls, small, new Color(0.7f, 0.7f, 0.7f));
 
             float blink = 0.55f + 0.45f * Mathf.Sin(Time.unscaledTime * 3f);
             Text(new Rect(0, Screen.height * 0.82f, Screen.width, 40 * scale), "Press ENTER / START", mid,

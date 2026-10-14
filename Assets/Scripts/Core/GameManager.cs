@@ -1,4 +1,3 @@
-using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -49,7 +48,6 @@ namespace KingLastPiece
 
         public readonly List<DamagePopup> Popups = new List<DamagePopup>();
 
-        bool hitStopping;
 
         public void RevivePlayerInPlace()
         {
@@ -144,8 +142,8 @@ namespace KingLastPiece
                 RunTime = 0f;
             }
             WaveIndex = index;
-            Time.timeScale = 1f;
             Paused = false;
+            ResetTime();
 
             foreach (var e in Enemies) if (e != null) Destroy(e.gameObject);
             Enemies.Clear();
@@ -216,6 +214,7 @@ namespace KingLastPiece
         public void OnPlayerDied()
         {
             Deaths++;
+            ResetTime();
             EnterState(GameState.Dead);
         }
 
@@ -248,6 +247,7 @@ namespace KingLastPiece
         {
             Enemies.RemoveAll(e => e == null);
             StateTime += Time.unscaledDeltaTime;
+            TickTime();
 
             switch (State)
             {
@@ -297,24 +297,74 @@ namespace KingLastPiece
         void TogglePause()
         {
             Paused = !Paused;
-            Time.timeScale = Paused ? 0f : 1f;
             Cursor.lockState = Paused ? CursorLockMode.None : CursorLockMode.Locked;
             Cursor.visible = Paused;
+            ApplyTimeScale();
+        }
+
+        // ---------------------------------------------------------------- time control
+        // Hit-stop and slow motion are timers in real time; the world's timeScale is their product.
+        // The King runs on PlayerDeltaTime, which ignores slow motion (but not hit-stop),
+        // so a perfect dodge slows the enemies while the King keeps full speed.
+
+        const float HitStopScale = 0.1f;
+        float hitStopTimer, slowTimer, slowScale = 1f;
+
+        /// <summary>Real-time frame delta (uses the fixed capture step when frames are being recorded).</summary>
+        static float RealDelta => Time.captureDeltaTime > 0f ? Time.captureDeltaTime : Time.unscaledDeltaTime;
+
+        public bool SlowMoActive => slowTimer > 0f;
+        public float SlowMoRemaining => slowTimer;
+
+        public float PlayerDeltaTime
+        {
+            get
+            {
+                if (Paused) return 0f;
+                if (!SlowMoActive) return Time.deltaTime;
+                return RealDelta * (hitStopTimer > 0f ? HitStopScale : 1f);
+            }
         }
 
         public void HitStop(float duration)
         {
-            if (!HitStopEnabled || Paused || hitStopping || !isActiveAndEnabled) return;
-            StartCoroutine(HitStopRoutine(duration));
+            if (!HitStopEnabled || Paused || hitStopTimer > 0f) return;
+            hitStopTimer = duration;
+            ApplyTimeScale();
         }
 
-        IEnumerator HitStopRoutine(float duration)
+        public void SlowMo(float scale, float duration)
         {
-            hitStopping = true;
-            Time.timeScale = 0.1f;
-            yield return new WaitForSecondsRealtime(duration);
-            if (!Paused) Time.timeScale = 1f;
-            hitStopping = false;
+            slowScale = scale;
+            slowTimer = duration;
+            ApplyTimeScale();
+        }
+
+        public void EndSlowMo()
+        {
+            slowTimer = 0f;
+            ApplyTimeScale();
+        }
+
+        void ResetTime()
+        {
+            hitStopTimer = slowTimer = 0f;
+            ApplyTimeScale();
+        }
+
+        void TickTime()
+        {
+            if (Paused) return;
+            float dt = RealDelta;
+            if (hitStopTimer > 0f) hitStopTimer -= dt;
+            if (slowTimer > 0f) slowTimer -= dt;
+            ApplyTimeScale();
+        }
+
+        void ApplyTimeScale()
+        {
+            if (Paused) { Time.timeScale = 0f; return; }
+            Time.timeScale = (hitStopTimer > 0f ? HitStopScale : 1f) * (slowTimer > 0f ? slowScale : 1f);
         }
 
         void ResolveCollisions()

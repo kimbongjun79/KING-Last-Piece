@@ -5,17 +5,31 @@ namespace KingLastPiece
 {
     /// <summary>
     /// The White King: fights with its own body (lean, spin, topple, stomp…) defined by an AttackStyle.
-    /// Stamina-gated light/heavy attacks, i-frame dodge roll, lock-on and healing flasks. All motion is procedural.
+    /// Stamina-gated light/heavy attacks, charge-limited i-frame rolls with a perfect dodge (slow motion →
+    /// Royal Throw counter), lock-on and healing flasks. All motion is procedural.
     /// </summary>
     public class PlayerController : Actor
     {
-        enum State { Normal, Attack, Dodge, Heal, Stagger, Dead }
+        enum State { Normal, Attack, Dodge, Heal, Stagger, Counter, Dead }
         public enum Buffered { None, Light, Heavy, Dodge, Heal }
 
         public const float MaxStamina = 100f;
         public const int MaxFlasks = 3;
         const float MoveSpeed = 5.2f, LockedMoveSpeed = 4.3f;
-        const float DodgeDuration = 0.5f, IFrameStart = 0.03f, IFrameEnd = 0.36f, DodgeCost = 20f, DodgeCancelAt = 0.4f;
+        const float DodgeDuration = 0.5f, IFrameStart = 0.03f, IFrameEnd = 0.36f, DodgeCancelAt = 0.4f;
+
+        // Dodge charges replace stamina for rolling: a short burst of rolls, refilled quickly.
+        public const int MaxDodges = 3;
+        const float DodgeRechargeTime = 0.7f, DodgeRechargeDelay = 0.35f;
+
+        // Perfect dodge: an attack that lands (or narrowly misses) within this long after the roll starts.
+        const float JustWindow = 0.2f;
+        public const float NearMissMargin = 1.0f;
+        const float SlowScale = 0.25f, SlowDuration = 1.6f;
+
+        // Royal Throw (counter after a perfect dodge): approach, swing the piece around twice, hurl it.
+        const float CounterApproach = 0.12f, CounterRelease = 0.74f, CounterDuration = 1.0f;
+        const float SwingRadius = 1.8f, ThrowDamage = 55f, LandingDamage = 20f, SwingHitDamage = 25f;
         const float HealDuration = 1.1f, HealAt = 0.6f, HealAmount = 45f;
         const float StaminaRegen = 45f, StaminaDelay = 0.5f;
         const float BufferWindow = 0.4f, LockRange = 20f;
@@ -25,7 +39,15 @@ namespace KingLastPiece
         public int Flasks { get; private set; }
         public EnemyBase LockTarget { get; private set; }
         public AttackStyle Style { get; set; } = AttackStyles.Default;
-        public bool IsInvulnerable => state == State.Dodge && stateTime >= IFrameStart && stateTime <= IFrameEnd;
+        public bool IsInvulnerable =>
+            (state == State.Dodge && stateTime >= IFrameStart && stateTime <= IFrameEnd) || state == State.Counter;
+        public int DodgeCharges { get; private set; }
+        public float DodgeRechargeProgress => DodgeCharges >= MaxDodges ? 1f : Mathf.Clamp01(dodgeRecharge / DodgeRechargeTime);
+        public int JustDodgeCount { get; private set; }
+        public int ThrowCount { get; private set; }
+        /// <summary>A perfect dodge happened and the dodged piece can still be grabbed (shown as a prompt).</summary>
+        public bool CounterReady => Game != null && Game.SlowMoActive && justTarget != null && justTarget.CanBeGrabbed;
+        public bool IsCountering => state == State.Counter;
         public bool IsDodging => state == State.Dodge;
         public bool IsAttacking => state == State.Attack;
         public bool IsIdle => state == State.Normal;
@@ -49,8 +71,17 @@ namespace KingLastPiece
         Buffered buffer;
         float bufferTimer, bobPhase;
         float prevMove;
+        float dodgeRecharge;
+        bool justThisDodge;
+        EnemyBase justTarget, counterTarget;
+        Vector3 counterFrom, counterTo;
+        float counterAngle0;
+        bool counterReleased;
+        readonly HashSet<EnemyBase> counterHits = new HashSet<EnemyBase>();
 
         Transform body;
+
+        protected override float DeltaTime => Game != null ? Game.PlayerDeltaTime : Time.deltaTime;
         TrailRenderer crownTrail, baseTrail;
 
         public void Build()
@@ -93,6 +124,9 @@ namespace KingLastPiece
             stateTime = 0f;
             buffer = Buffered.None;
             LockTarget = null;
+            DodgeCharges = MaxDodges;
+            dodgeRecharge = 0f;
+            justTarget = counterTarget = null;
             transform.SetPositionAndRotation(pos, Quaternion.Euler(0f, yaw, 0f));
             ApplyPose(default);
             crownTrail.emitting = baseTrail.emitting = false;
@@ -138,10 +172,13 @@ namespace KingLastPiece
             }
             if (Game == null || Game.State != GameManager.GameState.Playing) return;
 
+            dt = DeltaTime;
             ReadInput(dt);
             stateTime += dt;
             UpdateStamina(dt);
+            UpdateDodgeCharges(dt);
             UpdateLockTarget();
+            if (justTarget != null && !Game.SlowMoActive) justTarget = null;
 
             switch (state)
             {
@@ -150,9 +187,10 @@ namespace KingLastPiece
                 case State.Dodge: UpdateDodge(dt); break;
                 case State.Heal: UpdateHeal(dt); break;
                 case State.Stagger: UpdateStagger(dt); break;
+                case State.Counter: UpdateCounter(dt); break;
             }
 
-            if (state != State.Attack) crownTrail.emitting = baseTrail.emitting = false;
+            if (state != State.Attack && state != State.Counter) crownTrail.emitting = baseTrail.emitting = false;
             ClampToBoard();
         }
 
@@ -181,6 +219,7 @@ namespace KingLastPiece
             switch (buffer)
             {
                 case Buffered.Light:
+                    if (CounterReady) { StartCounter(); return true; }
                     if (Stamina < 1f) return false;
                     StartAttack(false);
                     return true;
@@ -189,7 +228,7 @@ namespace KingLastPiece
                     StartAttack(true);
                     return true;
                 case Buffered.Dodge:
-                    if (Stamina < 1f) return false;
+                    if (DodgeCharges <= 0) return false;
                     StartDodge();
                     return true;
                 case Buffered.Heal:
@@ -205,6 +244,17 @@ namespace KingLastPiece
             buffer = Buffered.None;
             if (!InfiniteStamina) Stamina = Mathf.Max(0f, Stamina - cost);
             staminaDelay = StaminaDelay;
+        }
+
+        void UpdateDodgeCharges(float dt)
+        {
+            if (DodgeCharges >= MaxDodges) { dodgeRecharge = 0f; return; }
+            dodgeRecharge += dt;
+            if (dodgeRecharge >= DodgeRechargeTime)
+            {
+                DodgeCharges++;
+                dodgeRecharge = 0f;
+            }
         }
 
         void UpdateStamina(float dt)
@@ -412,7 +462,10 @@ namespace KingLastPiece
 
         void StartDodge()
         {
-            Consume(DodgeCost);
+            buffer = Buffered.None;
+            DodgeCharges--;
+            dodgeRecharge = -DodgeRechargeDelay;
+            justThisDodge = false;
             Vector3 dir = InputDirection();
             bool backstep = dir.sqrMagnitude <= 0.01f;
             dodgeDir = backstep ? -transform.forward : dir.normalized;
@@ -430,7 +483,9 @@ namespace KingLastPiece
             if (backstep) ApplyPose(BodyPose.P(tilt: -15f * Mathf.Sin(p * Mathf.PI)));
             else ApplyPose(BodyPose.P(flip: 360f * PoseTrack.Curve(Ease.Out, p), lift: -0.35f * Mathf.Sin(p * Mathf.PI), squash: -0.1f * Mathf.Sin(p * Mathf.PI)));
 
-            if (stateTime >= DodgeCancelAt && (buffer == Buffered.Light || buffer == Buffered.Heavy) && TryAct()) return;
+            // After a perfect dodge the roll can be cancelled almost immediately into the Royal Throw.
+            float cancelAt = CounterReady ? 0.1f : DodgeCancelAt;
+            if (stateTime >= cancelAt && (buffer == Buffered.Light || buffer == Buffered.Heavy) && TryAct()) return;
             if (p >= 1f)
             {
                 ApplyPose(default);
@@ -478,6 +533,142 @@ namespace KingLastPiece
             {
                 ApplyPose(default);
                 Enter(State.Normal);
+            }
+        }
+
+        // ---------------------------------------------------------------- perfect dodge
+
+        bool InJustWindow => state == State.Dodge && stateTime <= JustWindow;
+
+        /// <summary>An enemy attack reached the King. Handles perfect dodges before normal damage.</summary>
+        public bool TakeHitFrom(EnemyBase attacker, float damage, float poiseDamage)
+        {
+            if (InJustWindow && IsInvulnerable)
+            {
+                TriggerJustDodge(attacker);
+                return false;
+            }
+            return TakeHit(damage, poiseDamage, attacker.transform.position);
+        }
+
+        /// <summary>An enemy attack narrowly missed the King.</summary>
+        public void NotifyNearMiss(EnemyBase attacker)
+        {
+            if (InJustWindow) TriggerJustDodge(attacker);
+        }
+
+        void TriggerJustDodge(EnemyBase attacker)
+        {
+            if (justThisDodge || IsDead) return;
+            justThisDodge = true;
+            justTarget = attacker;
+            JustDodgeCount++;
+            DodgeCharges = Mathf.Min(MaxDodges, DodgeCharges + 1);
+            Game.SlowMo(SlowScale, SlowDuration);
+            Game.Rig.Kick(0.45f);
+            Flash(new Color(0.6f, 1.2f, 2.2f), 0.25f);
+            var cyan = new Color(0.45f, 0.8f, 1f);
+            Effects.Shockwave(FlatPos, 1.8f, cyan, 0.4f);
+            Effects.Sparks(transform.position + Vector3.up * 1.1f, cyan, 18, 5f);
+        }
+
+        // ---------------------------------------------------------------- royal throw (counter)
+
+        void StartCounter()
+        {
+            buffer = Buffered.None;
+            counterTarget = justTarget;
+            justTarget = null;
+            counterTarget.BeginGrab();
+            counterReleased = false;
+            counterHits.Clear();
+            counterHits.Add(counterTarget);
+            LockTarget = counterTarget;
+
+            Vector3 to = counterTarget.FlatPos - FlatPos;
+            if (to.sqrMagnitude < 0.01f) to = transform.forward;
+            counterFrom = FlatPos;
+            counterTo = counterTarget.FlatPos - to.normalized * SwingRadius;
+            counterAngle0 = Vector3.SignedAngle(Vector3.forward, to, Vector3.up);
+            transform.rotation = Quaternion.LookRotation(to);
+            Enter(State.Counter);
+        }
+
+        void UpdateCounter(float dt)
+        {
+            float t = stateTime;
+            if (counterTarget == null || (counterTarget.IsDead && !counterReleased))
+            {
+                Game.EndSlowMo();
+                ApplyPose(default);
+                Enter(State.Normal);
+                return;
+            }
+
+            if (t < CounterApproach)
+            {
+                // Lunge next to the piece and pick it up.
+                float p = PoseTrack.Curve(Ease.Out, t / CounterApproach);
+                transform.position = Vector3.Lerp(counterFrom, counterTo, p);
+                Vector3 outward = counterTarget.FlatPos - FlatPos;
+                counterTarget.SetGrabbedPose(counterTarget.FlatPos, outward, 75f * p, 0.7f * p);
+                ApplyPose(BodyPose.P(tilt: 20f * p, squash: -0.12f * p));
+                crownTrail.emitting = false;
+            }
+            else if (t < CounterRelease)
+            {
+                // Swing the piece around twice, accelerating, hitting everything it sweeps through.
+                float p = (t - CounterApproach) / (CounterRelease - CounterApproach);
+                float angle = counterAngle0 + 720f * Mathf.Pow(p, 1.7f);
+                Vector3 dir = Quaternion.Euler(0f, angle, 0f) * Vector3.forward;
+                Vector3 piecePos = FlatPos + dir * SwingRadius;
+                counterTarget.SetGrabbedPose(piecePos, dir, 75f, 0.7f + 0.3f * Mathf.Sin(p * Mathf.PI));
+                transform.rotation = Quaternion.LookRotation(dir);
+                ApplyPose(BodyPose.P(tilt: -18f, squash: -0.06f));
+                crownTrail.emitting = true;
+
+                if (Random.value < 0.6f)
+                    Effects.Sparks(piecePos + Vector3.up * 1.2f, new Color(1f, 0.8f, 0.4f), 2, 4f);
+
+                foreach (var e in Game.Enemies)
+                {
+                    if (e == null || e.IsDead || counterHits.Contains(e)) continue;
+                    if ((e.FlatPos - piecePos).magnitude > counterTarget.Radius + e.Radius + 0.5f) continue;
+                    counterHits.Add(e);
+                    if (e.TakeHit(SwingHitDamage, 50f, piecePos))
+                    {
+                        Game.ReportDamage(e, SwingHitDamage);
+                        Effects.Sparks(e.transform.position + Vector3.up, new Color(1f, 0.85f, 0.5f), 14, 6f);
+                        Game.Rig.Shake(0.3f);
+                    }
+                }
+            }
+            else
+            {
+                if (!counterReleased)
+                {
+                    // Hurl it outward.
+                    counterReleased = true;
+                    ThrowCount++;
+                    Vector3 dir = counterTarget.FlatPos - FlatPos;
+                    Game.EndSlowMo();
+                    if (counterTarget.TakeHit(ThrowDamage, 0f, transform.position)) Game.ReportDamage(counterTarget, ThrowDamage);
+                    if (!counterTarget.IsDead) counterTarget.Launch(dir, 17f, 7f, LandingDamage);
+                    Game.HitStop(0.12f);
+                    Game.Rig.Kick(1f);
+                    Game.Rig.Shake(0.5f);
+                    Effects.Shockwave(FlatPos, 2.2f, new Color(1f, 0.8f, 0.4f), 0.4f);
+                    LockTarget = null;
+                }
+                float p = Mathf.Clamp01((t - CounterRelease) / (CounterDuration - CounterRelease));
+                ApplyPose(BodyPose.Lerp(BodyPose.P(tilt: 28f), default, PoseTrack.Curve(Ease.OutBack, p)));
+                crownTrail.emitting = false;
+                if (t >= CounterDuration)
+                {
+                    counterTarget = null;
+                    ApplyPose(default);
+                    Enter(State.Normal);
+                }
             }
         }
 

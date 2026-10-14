@@ -8,7 +8,7 @@ namespace KingLastPiece
     /// </summary>
     public abstract class EnemyBase : Actor
     {
-        protected enum EState { Spawning, Move, Windup, Attack, Recover, Stagger, Dead }
+        protected enum EState { Spawning, Move, Windup, Attack, Recover, Stagger, Grabbed, Launched, Dead }
         protected enum AtkKind { Lunge, Dash, Leap, Slam }
 
         protected struct AttackPlan
@@ -26,8 +26,29 @@ namespace KingLastPiece
         public float LastHitTime { get; private set; } = -100f;
         public bool Targetable => state != EState.Spawning && !IsDead;
         public bool IsAttacking => state == EState.Windup || state == EState.Attack;
+        public float WindupProgress => state == EState.Windup ? Mathf.Clamp01(stateTime / Mathf.Max(0.01f, plan.windup)) : 0f;
+
+        /// <summary>Seconds until the current attack can first connect (∞ when not attacking).</summary>
+        public float TimeToImpact
+        {
+            get
+            {
+                bool delayed = plan.kind == AtkKind.Leap || plan.kind == AtkKind.Slam;  // hit at the end of the active phase
+                float travel = 0f;
+                if (!delayed && Player != null)
+                {
+                    // Dashes/lunges connect once they've covered the distance to the King.
+                    float along = Vector3.Dot(Player.FlatPos - FlatPos, plan.dir) - plan.radius - Player.Radius;
+                    float speed = plan.length / Mathf.Max(0.01f, plan.active);
+                    travel = Mathf.Max(0f, along) / Mathf.Max(0.01f, speed);
+                }
+                if (state == EState.Windup) return plan.windup - stateTime + (delayed ? plan.active : travel);
+                if (state == EState.Attack) return delayed ? Mathf.Max(0f, plan.active - stateTime) : travel;
+                return float.PositiveInfinity;
+            }
+        }
         public bool IgnoresCollision =>
-            IsDead || state == EState.Spawning ||
+            IsDead || state == EState.Spawning || state == EState.Grabbed || state == EState.Launched ||
             (state == EState.Attack && (plan.kind == AtkKind.Leap || plan.kind == AtkKind.Dash));
 
         protected EState state;
@@ -104,6 +125,13 @@ namespace KingLastPiece
                         SetGlow(Color.black);
                         if (!ContinueCombo()) Enter(EState.Move);
                     }
+                    break;
+                case EState.Grabbed:
+                    modelY = grabLift;
+                    modelTilt = Quaternion.Euler(grabTilt, 0f, 0f);
+                    break;
+                case EState.Launched:
+                    UpdateLaunched(dt);
                     break;
                 case EState.Stagger:
                     modelTilt = Quaternion.Euler(-20f * Mathf.Sin(Mathf.Clamp01(stateTime / staggerDuration) * Mathf.PI), 0f, 0f);
@@ -317,14 +345,106 @@ namespace KingLastPiece
         {
             if (atkHit || Player == null || Player.IsDead) return;
             Vector3 d = Player.FlatPos - new Vector3(center.x, 0f, center.z);
-            if (d.magnitude > radius + Player.Radius) return;
-            atkHit = Player.TakeHit(plan.damage, plan.poise, transform.position);
+            float dist = d.magnitude;
+            if (dist <= radius + Player.Radius) atkHit = Player.TakeHitFrom(this, plan.damage, plan.poise);
+            // A near miss still counts for a perfect dodge (rolling out of the hit at the last moment).
+            else if (dist <= radius + Player.Radius + PlayerController.NearMissMargin) Player.NotifyNearMiss(this);
         }
 
         void ClearTelegraph()
         {
             if (telegraph != null) Destroy(telegraph.gameObject);
             telegraph = null;
+        }
+
+        // ---------------------------------------------------------------- grab / throw (King's Royal Throw)
+
+        float grabTilt, grabLift, launchHeight, launchVy, launchSpin, launchDamage;
+        Vector3 launchVelocity;
+        bool wallHit;
+        readonly System.Collections.Generic.HashSet<EnemyBase> launchHits = new System.Collections.Generic.HashSet<EnemyBase>();
+
+        public bool CanBeGrabbed => !IsDead && state != EState.Spawning && state != EState.Launched;
+
+        public void BeginGrab()
+        {
+            ClearTelegraph();
+            SetGlow(Color.black);
+            grabTilt = 0f;
+            grabLift = 0f;
+            Enter(EState.Grabbed);
+        }
+
+        /// <summary>Called every frame by the King while swinging this piece around.</summary>
+        public void SetGrabbedPose(Vector3 position, Vector3 outward, float tilt, float lift)
+        {
+            transform.position = new Vector3(position.x, 0f, position.z);
+            outward.y = 0f;
+            if (outward.sqrMagnitude > 0.001f) transform.rotation = Quaternion.LookRotation(outward);
+            grabTilt = tilt;
+            grabLift = lift;
+        }
+
+        /// <summary>Throws the piece: it flies, bowls over other pieces, slams walls and takes damage on landing.</summary>
+        public void Launch(Vector3 direction, float speed, float upSpeed, float landingDamage)
+        {
+            direction.y = 0f;
+            launchVelocity = direction.normalized * speed;
+            launchHeight = Mathf.Max(grabLift, 0.3f);
+            launchVy = upSpeed;
+            launchDamage = landingDamage;
+            launchSpin = grabTilt;
+            wallHit = false;
+            launchHits.Clear();
+            launchHits.Add(this);
+            if (launchVelocity.sqrMagnitude > 0.01f) transform.rotation = Quaternion.LookRotation(launchVelocity);
+            Enter(EState.Launched);
+        }
+
+        void UpdateLaunched(float dt)
+        {
+            Vector3 p = transform.position + launchVelocity * dt;
+            float h = GameManager.PlayableHalf;
+            if (!wallHit && (Mathf.Abs(p.x) > h || Mathf.Abs(p.z) > h))
+            {
+                // Slam into the board's edge.
+                wallHit = true;
+                launchVelocity = Vector3.zero;
+                Effects.Shockwave(p, 1.6f, new Color(1f, 0.7f, 0.35f), 0.35f);
+                Effects.Sparks(p + Vector3.up * launchHeight, new Color(1f, 0.8f, 0.4f), 16, 6f);
+                Game.Rig.Shake(0.35f);
+            }
+            transform.position = p;
+
+            launchHeight += launchVy * dt;
+            launchVy -= 24f * dt;
+            launchSpin += 900f * dt;
+            modelY = Mathf.Max(0f, launchHeight);
+            modelTilt = Quaternion.Euler(launchSpin, 0f, 0f);
+
+            // Bowl over any piece in the flight path.
+            foreach (var e in Game.Enemies)
+            {
+                if (e == null || e.IsDead || launchHits.Contains(e)) continue;
+                if ((e.FlatPos - FlatPos).magnitude > Radius + e.Radius + 0.4f) continue;
+                launchHits.Add(e);
+                if (e.TakeHit(22f, 45f, transform.position))
+                {
+                    Game.ReportDamage(e, 22f);
+                    Effects.Sparks(e.transform.position + Vector3.up, new Color(1f, 0.85f, 0.5f), 12, 6f);
+                    Game.Rig.Shake(0.25f);
+                }
+            }
+
+            if (launchHeight <= 0f && launchVy < 0f)
+            {
+                modelY = 0f;
+                Effects.Shockwave(FlatPos, 2f, new Color(1f, 0.6f, 0.25f), 0.45f);
+                Game.Rig.Shake(0.4f);
+                poise = 0f;
+                Enter(EState.Stagger);
+                if (TakeHit(launchDamage, 0f, transform.position - launchVelocity)) Game.ReportDamage(this, launchDamage);
+            }
         }
 
         // ---------------------------------------------------------------- damage / death

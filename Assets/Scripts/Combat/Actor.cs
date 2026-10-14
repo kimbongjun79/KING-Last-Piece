@@ -20,6 +20,9 @@ namespace KingLastPiece
 
         protected GameManager Game => GameManager.Instance;
 
+        /// <summary>Frame delta this actor lives on (the King ignores slow motion).</summary>
+        protected virtual float DeltaTime => Time.deltaTime;
+
         readonly List<Renderer> tintable = new List<Renderer>();
         MaterialPropertyBlock mpb;
         Color glow = Color.black, flashColor;
@@ -70,7 +73,7 @@ namespace KingLastPiece
             dir.y = 0f;
             if (dir.sqrMagnitude < 0.0001f) return;
             var target = Quaternion.LookRotation(dir);
-            transform.rotation = Quaternion.RotateTowards(transform.rotation, target, degPerSec * Time.deltaTime);
+            transform.rotation = Quaternion.RotateTowards(transform.rotation, target, degPerSec * DeltaTime);
         }
 
         protected void ClampToBoard()

@@ -106,6 +106,64 @@ namespace KingLastPiece
 
         // ---------------------------------------------------------------- automated capture
 
+        /// <summary>
+        /// Automated perfect dodge → Royal Throw: a rook attacks, the King rolls just before it connects,
+        /// then counters. Captures a 5×2 sheet (slow-mo, grab, swing, release, flight) and logs the outcome.
+        /// </summary>
+        IEnumerator JustDodgeScenario(string dir, StringBuilder stats)
+        {
+            var player = game.Player;
+            var hud = game.GetComponent<Hud>();
+            if (hud != null) hud.enabled = true;
+            SelectStyle(AttackStyles.DefaultIndex);
+            game.ClearEnemies();
+            player.ResetForWave(PlayerStart, 0f);
+            var attacker = game.SpawnEnemy(PieceType.Rook, PlayerStart + new Vector3(0f, 0f, 2.0f));
+            game.SpawnCustom<TrainingDummy>(PieceType.Pawn, PlayerStart + new Vector3(-2.2f, 0f, -0.6f));
+            game.SpawnCustom<TrainingDummy>(PieceType.Pawn, PlayerStart + new Vector3(2.2f, 0f, -0.6f));
+            int justBefore = player.JustDodgeCount, throwsBefore = player.ThrowCount, hitsBefore = game.DamageEvents;
+
+            // Roll ~0.12s before the attack would connect.
+            for (int f = 0; f < 600 && attacker != null && attacker.TimeToImpact > 0.12f; f++) yield return null;
+            player.Press(PlayerController.Buffered.Dodge);
+            for (int f = 0; f < 60 && !player.CounterReady; f++) yield return null;
+            bool perfect = player.CounterReady;
+
+            const int cols = 5, rows = 2;
+            Texture2D sheet = null;
+            int tileW = 0, tileH = 0, shot = 0;
+            // Frames to wait (at the fixed 60 fps capture step) before each capture.
+            int[] waits = { 0, 12, 0, 8, 10, 10, 8, 6, 14, 24 };
+            for (int i = 0; i < waits.Length; i++)
+            {
+                for (int f = 0; f < waits[i]; f++) yield return null;
+                if (i == 2) { player.Press(PlayerController.Buffered.Light); yield return null; yield return null; }
+                yield return new WaitForEndOfFrame();
+                var tex = ScreenCapture.CaptureScreenshotAsTexture();
+                if (sheet == null)
+                {
+                    tileW = tex.width;
+                    tileH = tex.height;
+                    sheet = new Texture2D(tileW * cols, tileH * rows, TextureFormat.RGB24, false);
+                }
+                int c = shot % cols, r = shot / cols;
+                if (tex.width == tileW && tex.height == tileH)
+                    sheet.SetPixels32(c * tileW, (rows - 1 - r) * tileH, tileW, tileH, tex.GetPixels32());
+                Destroy(tex);
+                shot++;
+            }
+
+            stats.AppendLine($"JustDodge\tperfect={perfect}\tjust_count={player.JustDodgeCount - justBefore}\t" +
+                             $"throws={player.ThrowCount - throwsBefore}\tdamage_events={game.DamageEvents - hitsBefore}\t" +
+                             $"rook_dead={(attacker == null || attacker.IsDead)}");
+            if (sheet != null)
+            {
+                sheet.Apply();
+                File.WriteAllBytes(Path.Combine(dir, "7_Perfect_Dodge_Royal_Throw.png"), sheet.EncodeToPNG());
+                Destroy(sheet);
+            }
+        }
+
         static string GetArg(string name)
         {
             var args = System.Environment.GetCommandLineArgs();
@@ -206,6 +264,8 @@ namespace KingLastPiece
                     Destroy(sheet);
                 }
             }
+
+            yield return JustDodgeScenario(dir, stats);
 
             File.WriteAllText(Path.Combine(dir, "stats.tsv"), stats.ToString());
             Application.Quit();
