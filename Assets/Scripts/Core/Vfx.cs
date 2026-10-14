@@ -73,7 +73,7 @@ namespace KingLastPiece
 
         /// <param name="keep">When set, only particle systems whose (lower-case) name passes keep emitting.</param>
         static bool Slash(SlashFxKind kind, Vector3 pos, Quaternion rot, float scale, Color? tint, System.Predicate<string> keep,
-                          bool mirror = false, float dustLife = 1f)
+                          bool mirror = false, float dustLife = 1f, bool burst = false)
         {
             Vector3 facingRight = rot * Vector3.right;
             var lib = FxLibrary.Instance;
@@ -125,6 +125,8 @@ namespace KingLastPiece
                 }
                 var main = ps.main;
                 main.scalingMode = ParticleSystemScalingMode.Hierarchy;
+                // Burst layers (flare, sparks) sit ~1.4 up in the slash prefab; pull them onto the hit point itself.
+                if (burst) ps.transform.localPosition = Vector3.zero;
                 bool dust = n.Contains("dust") || n.Contains("smoke");
                 if (dust)
                 {
@@ -141,9 +143,9 @@ namespace KingLastPiece
                 {
                     var r = ps.GetComponent<ParticleSystemRenderer>();
                     var mats = r.sharedMaterials;
-                    for (int i = 0; i < mats.Length; i++) mats[i] = VertexColored(mats[i]);
+                    for (int i = 0; i < mats.Length; i++) mats[i] = VertexColored(mats[i], burst);
                     r.sharedMaterials = mats;
-                    if (r.trailMaterial != null) r.trailMaterial = VertexColored(r.trailMaterial);
+                    if (r.trailMaterial != null) r.trailMaterial = VertexColored(r.trailMaterial, burst);
                 }
             }
             Object.Destroy(fx, 2.2f * Mathf.Max(1f, dustLife));
@@ -161,7 +163,7 @@ namespace KingLastPiece
                 foreach (var l in layers) if (n.Contains(l)) return true;
                 return false;
             };
-            return Slash(kind, pos, rot, scale, tint, keep);
+            return Slash(kind, pos, rot, scale, tint, keep, false, 1f, true);
         }
 
         /// <summary>World-yaw correction applied to directional NamuFX slashes (calibrated in Effects Lab E6).</summary>
@@ -193,16 +195,24 @@ namespace KingLastPiece
         }
 
         static readonly Dictionary<Material, Material> vertexColored = new Dictionary<Material, Material>();
+        static readonly Dictionary<Material, Material> flatColored = new Dictionary<Material, Material>();
+        static readonly int GradientMapId = Shader.PropertyToID("_GradientMap");
         static readonly int UseCustomColorId = Shader.PropertyToID("_UseCustomdata_Color");
 
-        /// <summary>Copy of a NamuFX material that takes its color from particle color instead of custom data.</summary>
-        public static Material VertexColored(Material src)
+        /// <summary>
+        /// Copy of a NamuFX material that takes its color from particle color instead of custom data. <paramref name="flat"/>
+        /// also swaps the material's color ramp (_GradientMap, e.g. the flare's purple→gold) for plain white so the tint
+        /// is the only color.
+        /// </summary>
+        public static Material VertexColored(Material src, bool flat = false)
         {
             if (src == null || !src.HasProperty(UseCustomColorId)) return src;
-            if (vertexColored.TryGetValue(src, out var m) && m != null) return m;
-            m = new Material(src) { name = src.name + "_Tinted" };
+            var cache = flat ? flatColored : vertexColored;
+            if (cache.TryGetValue(src, out var m) && m != null) return m;
+            m = new Material(src) { name = src.name + (flat ? "_Flat" : "_Tinted") };
             m.SetFloat(UseCustomColorId, 0f);
-            vertexColored[src] = m;
+            if (flat && m.HasProperty(GradientMapId) && m.GetTexture(GradientMapId) != null) m.SetTexture(GradientMapId, Texture2D.whiteTexture);
+            cache[src] = m;
             return m;
         }
 
