@@ -568,7 +568,10 @@ namespace KingLastPiece
                 if (!windowStarted[i])
                 {
                     windowStarted[i] = true;
-                    if (w.slash)
+                    bool authored = w.fx != SlashFxKind.None &&
+                        Vfx.Slash(w.fx, transform.position + Vector3.up * w.fxHeight, transform.rotation * Quaternion.Euler(0f, w.fxYaw, w.fxFlip ? 180f : 0f),
+                            w.fxScale, w.fxGold ? Vfx.Gold : (Color?)null);
+                    if (w.slash && !authored)
                         SlashFx.Spawn(FlatPos + transform.forward * w.forward, transform.forward, w.range * 0.82f,
                             w.sweepFrom, w.sweepTo, w.end - w.start, new Color(1f, 0.82f, 0.45f));
                     if (w.kick > 0f) Game.Rig.Kick(w.kick);

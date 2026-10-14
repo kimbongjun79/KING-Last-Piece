@@ -4,7 +4,10 @@ using UnityEngine;
 namespace KingLastPiece
 {
     /// <summary>Selectable effect looks, compared side by side in Scenes/EffectsLab.unity.</summary>
-    public enum VfxStyle { Classic, KintsugiCrack, BoardRipple }
+    public enum VfxStyle { Classic, CrackedBoard, BoardRipple }
+
+    /// <summary>Authored slash prefabs (NamuFX Simple Stylized Slash vol2) registered in <see cref="FxLibrary"/>.</summary>
+    public enum SlashFxKind { None, SlashA, SlashB, SlashC, SlashD, Ink, Water, AoeA }
 
     /// <summary>
     /// Gameplay-facing effect events. Gameplay calls these (never raw sparks/shockwaves for hits and slams),
@@ -12,13 +15,13 @@ namespace KingLastPiece
     /// </summary>
     public static class Vfx
     {
-        public static VfxStyle Style = VfxStyle.Classic;
+        public static VfxStyle Style = VfxStyle.CrackedBoard;
 
-        public static readonly string[] Names = { "A. Classic", "B. Kintsugi Crack", "C. Board Ripple" };
+        public static readonly string[] Names = { "A. Classic", "B. Cracked Board", "C. Board Ripple" };
         public static readonly string[] Descriptions =
         {
             "Current effects: gold cube sparks, flat glowing shockwave disc.",
-            "Hits chip off black & ivory marble. Slams crack the board; the cracks glow gold (kintsugi), then cool to dark lines; chips in the struck square's color.",
+            "Hits chip off black & ivory marble. Slams crack the board (decal cracks), with debris in the struck square's color and heaved shards.",
             "Hits burst into black & white square confetti. Slams make the real board squares ripple outward, with a square shockwave and a small center crack.",
         };
 
@@ -37,7 +40,7 @@ namespace KingLastPiece
             dir = dir.sqrMagnitude > 0.001f ? dir.normalized : Vector3.forward;
             switch (style)
             {
-                case VfxStyle.KintsugiCrack:
+                case VfxStyle.CrackedBoard:
                     HitFlashFx.Spawn(pos, Gold, heavy ? 0.9f : 0.6f);
                     Chips(pos, dir, heavy ? 18 : 11, heavy ? 6.5f : 5f, Ivory, Onyx, heavy ? 0.16f : 0.13f);
                     Effects.Sparks(pos, Gold, heavy ? 8 : 4, heavy ? 6f : 4f);
@@ -53,6 +56,93 @@ namespace KingLastPiece
             }
         }
 
+        // ---------------------------------------------------------------- authored slashes
+
+        /// <summary>
+        /// Plays a NamuFX slash prefab. Particle systems are switched to hierarchy scaling so <paramref name="scale"/>
+        /// works; <paramref name="tint"/> recolors every system's start color (keeping alpha).
+        /// Returns false when the asset isn't available (callers fall back to the primitive crescent).
+        /// </summary>
+        public static bool Slash(SlashFxKind kind, Vector3 pos, Quaternion rot, float scale, Color? tint = null)
+        {
+            var lib = FxLibrary.Instance;
+            if (lib == null) return false;
+            GameObject prefab = kind switch
+            {
+                SlashFxKind.SlashA => lib.slashA,
+                SlashFxKind.SlashB => lib.slashB,
+                SlashFxKind.SlashC => lib.slashC,
+                SlashFxKind.SlashD => lib.slashD,
+                SlashFxKind.Ink => lib.slashInk,
+                SlashFxKind.Water => lib.slashWater,
+                SlashFxKind.AoeA => lib.slashAoeA,
+                _ => null,
+            };
+            if (prefab == null) return false;
+
+            var fx = Object.Instantiate(prefab, pos, rot);
+            fx.transform.localScale = Vector3.one * scale;
+            foreach (var ps in fx.GetComponentsInChildren<ParticleSystem>())
+            {
+                var main = ps.main;
+                main.scalingMode = ParticleSystemScalingMode.Hierarchy;
+                string n = ps.name.ToLowerInvariant();
+                if (n.Contains("dust") || n.Contains("smoke"))
+                    Recolor(ps, new Color(0.55f, 0.5f, 0.45f));  // neutral dust, never "enemy red"
+                else if (tint.HasValue)
+                    Recolor(ps, tint.Value);
+            }
+            if (tint.HasValue)
+                foreach (var r in fx.GetComponentsInChildren<ParticleSystemRenderer>())
+                {
+                    var mats = r.sharedMaterials;
+                    for (int i = 0; i < mats.Length; i++) mats[i] = VertexColored(mats[i]);
+                    r.sharedMaterials = mats;
+                    if (r.trailMaterial != null) r.trailMaterial = VertexColored(r.trailMaterial);
+                }
+            Object.Destroy(fx, 2.2f);
+            return true;
+        }
+
+        static readonly Dictionary<Material, Material> vertexColored = new Dictionary<Material, Material>();
+        static readonly int UseCustomColorId = Shader.PropertyToID("_UseCustomdata_Color");
+
+        /// <summary>Copy of a NamuFX material that takes its color from particle color instead of custom data.</summary>
+        static Material VertexColored(Material src)
+        {
+            if (src == null || !src.HasProperty(UseCustomColorId)) return src;
+            if (vertexColored.TryGetValue(src, out var m) && m != null) return m;
+            m = new Material(src) { name = src.name + "_Tinted" };
+            m.SetFloat(UseCustomColorId, 0f);
+            vertexColored[src] = m;
+            return m;
+        }
+
+        /// <summary>Recolors a particle system: start color and the color-over-lifetime gradient (alpha kept).</summary>
+        static void Recolor(ParticleSystem ps, Color c)
+        {
+            var main = ps.main;
+            float a = main.startColor.mode == ParticleSystemGradientMode.Color ? main.startColor.color.a : 1f;
+            main.startColor = new ParticleSystem.MinMaxGradient(new Color(c.r, c.g, c.b, a));
+            var trails = ps.trails;
+            if (trails.enabled)
+            {
+                trails.colorOverLifetime = new ParticleSystem.MinMaxGradient(new Color(c.r, c.g, c.b, 1f));
+                trails.colorOverTrail = new ParticleSystem.MinMaxGradient(Color.white);
+                trails.inheritParticleColor = false;
+            }
+            var bySpeed = ps.colorBySpeed;
+            if (bySpeed.enabled) bySpeed.enabled = false;
+            var col = ps.colorOverLifetime;
+            if (!col.enabled) return;
+            var src = col.color.mode == ParticleSystemGradientMode.TwoGradients ? col.color.gradientMax : col.color.gradient;
+            if (src == null) return;
+            var g = new Gradient();
+            g.SetKeys(new[] { new GradientColorKey(Color.Lerp(c, Color.white, 0.55f), 0f), new GradientColorKey(c, 0.5f), new GradientColorKey(c * 0.8f, 1f) },
+                src.alphaKeys);
+            col.color = new ParticleSystem.MinMaxGradient(g);
+        }
+
         // ---------------------------------------------------------------- ground impact (slams / landings)
 
         /// <param name="strength">~0.6 small landing, 1 normal slam, 1.3+ big finisher.</param>
@@ -66,8 +156,8 @@ namespace KingLastPiece
             Color accent = hostile ? Ember : Gold;
             switch (style)
             {
-                case VfxStyle.KintsugiCrack:
-                    CrackFx.Spawn(center, radius * 0.85f, strength, accent);
+                case VfxStyle.CrackedBoard:
+                    CrackDecalFx.Spawn(center, radius * 1.9f, strength);
                     Chips(center + Vector3.up * 0.05f, Vector3.zero, Mathf.RoundToInt(10 * strength), 4.5f * strength,
                         SquareColor(center), SquareColor(center) * 0.7f, 0.13f);
                     Effects.Sparks(center + Vector3.up * 0.1f, accent, Mathf.RoundToInt(6 * strength), 4f);
@@ -75,7 +165,7 @@ namespace KingLastPiece
                 case VfxStyle.BoardRipple:
                     BoardFx.Ripple(center, radius, strength);
                     SquareRingFx.Spawn(center, radius, accent, 0.5f);
-                    CrackFx.Spawn(center, Mathf.Min(1.2f, radius * 0.35f), strength * 0.8f, null);
+                    CrackDecalFx.Spawn(center, Mathf.Min(2.4f, radius * 0.8f), strength * 0.8f);
                     Confetti(center + Vector3.up * 0.1f, Vector3.zero, Mathf.RoundToInt(10 * strength), 4f * strength);
                     break;
                 default:
@@ -396,6 +486,63 @@ namespace KingLastPiece
             float s = size * (p < 0.35f ? p / 0.35f : 1f - (p - 0.35f) / 0.65f);
             transform.localScale = new Vector3(s, s * 0.6f, s);
             if (p >= 1f) Destroy(gameObject);
+        }
+    }
+}
+
+namespace KingLastPiece
+{
+    /// <summary>
+    /// Board cracks as a URP decal (textures from Resources/Textures/Decals, baked by KING ▸ Setup ▸ Effects Assets).
+    /// Random crack image and rotation, sized to the slam, then fades out. Falls back to primitive cracks when the
+    /// decal assets are missing.
+    /// </summary>
+    public class CrackDecalFx : MonoBehaviour
+    {
+        const float Hold = 2.2f, Fade = 0.9f, Depth = 0.24f;
+        static readonly Dictionary<Texture2D, Material> materials = new Dictionary<Texture2D, Material>();
+        static readonly int BaseMapId = Shader.PropertyToID("Base_Map");  // URP Decal shader graph property
+
+        UnityEngine.Rendering.Universal.DecalProjector projector;
+        float t;
+
+        /// <param name="size">Width of the crack image on the board.</param>
+        public static void Spawn(Vector3 center, float size, float strength)
+        {
+            var lib = FxLibrary.Instance;
+            if (lib == null || lib.crackDecal == null || lib.crackTextures == null || lib.crackTextures.Length == 0)
+            {
+                CrackFx.Spawn(center, size * 0.45f, strength, null);
+                return;
+            }
+            var tex = lib.crackTextures[Random.Range(0, lib.crackTextures.Length)];
+            if (!materials.TryGetValue(tex, out var mat) || mat == null)
+            {
+                mat = new Material(lib.crackDecal) { name = "KLP_Crack_" + tex.name };
+                mat.SetTexture(BaseMapId, tex);
+                materials[tex] = mat;
+            }
+
+            var go = new GameObject("CrackDecal");
+            go.transform.SetPositionAndRotation(new Vector3(center.x, 0f, center.z), Quaternion.Euler(90f, Random.value * 360f, 0f));
+            var fx = go.AddComponent<CrackDecalFx>();
+            var dp = go.AddComponent<UnityEngine.Rendering.Universal.DecalProjector>();
+            dp.material = mat;
+            float s = size * Mathf.Lerp(0.85f, 1.15f, Random.value);
+            dp.size = new Vector3(s, s, Depth);
+            dp.pivot = Vector3.zero;
+            // Only the board's flat top: steep surfaces (piece sides) are skipped.
+            dp.startAngleFade = 25f;
+            dp.endAngleFade = 45f;
+            dp.fadeFactor = 1f;
+            fx.projector = dp;
+        }
+
+        void Update()
+        {
+            t += Time.deltaTime;
+            if (projector != null) projector.fadeFactor = 1f - Mathf.Clamp01((t - Hold) / Fade);
+            if (t > Hold + Fade) Destroy(gameObject);
         }
     }
 }

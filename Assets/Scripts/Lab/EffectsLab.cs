@@ -185,7 +185,53 @@ namespace KingLastPiece
                 },
                 i => (Station(i) + new Vector3(3.5f, 4f, -6.5f), Station(i) + new Vector3(0f, 0.6f, 1f)));
 
+            // E5: NamuFX slash prefabs as authored (identity rotation, at chest height) — rows = prefabs.
+            var lib = FxLibrary.Instance;
+            if (lib != null)
+            {
+                var prefabs = new[] { lib.slashA, lib.slashB, lib.slashC, lib.slashD, lib.slashInk, lib.slashWater, lib.slashAoeA };
+                yield return PrefabSheet(Path.Combine(dir, "E5_Slash_Prefabs.png"), prefabs, new[] { 3, 8, 14, 22, 36 });
+            }
+
             Application.Quit();
+        }
+
+        /// <summary>Spawns each prefab at the middle station and captures it over time (one row per prefab).</summary>
+        IEnumerator PrefabSheet(string path, GameObject[] prefabs, int[] frames)
+        {
+            game.Rig.OverridePosition = Station(1) + new Vector3(3.2f, 3.4f, -5.5f);
+            game.Rig.OverrideLookAt = Station(1) + new Vector3(0f, 1f, 0.5f);
+            game.Player.ResetForWave(Station(1) + new Vector3(0f, 0f, -0.5f), 0f);
+            int rows = prefabs.Length, cols = frames.Length;
+            Texture2D sheet = null;
+            int tileW = 0, tileH = 0;
+            for (int i = 0; i < rows; i++)
+            {
+                for (int f = 0; f < 70; f++) yield return null;
+                if (prefabs[i] == null) continue;
+                var fx = Instantiate(prefabs[i], Station(1) + Vector3.up, Quaternion.identity);
+                int elapsed = 0;
+                for (int c = 0; c < cols; c++)
+                {
+                    for (; elapsed < frames[c]; elapsed++) yield return null;
+                    yield return new WaitForEndOfFrame();
+                    var tex = ScreenCapture.CaptureScreenshotAsTexture();
+                    if (sheet == null)
+                    {
+                        tileW = tex.width;
+                        tileH = tex.height;
+                        sheet = new Texture2D(tileW * cols, tileH * rows, TextureFormat.RGB24, false);
+                    }
+                    if (tex.width == tileW && tex.height == tileH)
+                        sheet.SetPixels32(c * tileW, (rows - 1 - i) * tileH, tileW, tileH, tex.GetPixels32());
+                    Destroy(tex);
+                }
+                Destroy(fx, 2f);
+            }
+            if (sheet == null) yield break;
+            sheet.Apply();
+            File.WriteAllBytes(path, sheet.EncodeToPNG());
+            Destroy(sheet);
         }
 
         /// <summary>For each style: place the camera, trigger the event, capture frames at the given delays.</summary>

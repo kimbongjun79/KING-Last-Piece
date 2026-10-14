@@ -1,0 +1,26 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3c154b29c78ad6768b7bf68e61f27d56, type: 3}
+  m_Name: FxLibrary
+  m_EditorClassIdentifier: Assembly-CSharp::KingLastPiece.FxLibrary
+  slashA: {fileID: 5484218944294176571, guid: 063091fcdabad66489d9c94721816c86, type: 3}
+  slashB: {fileID: 7611201976539897820, guid: 39706049c667f7d4bbca965b63cd3bec, type: 3}
+  slashC: {fileID: 1004038278230665889, guid: 4a3f5dad39cb5084e982602bb505a400, type: 3}
+  slashD: {fileID: 1713045243172065375, guid: f791790f35137b946b82347edb9264f2, type: 3}
+  slashInk: {fileID: 8587560481101609250, guid: 2204f06b178af014986bf95a7bda8e6e, type: 3}
+  slashWater: {fileID: 607914935907159708, guid: 22b9fc8929c1f1e43b844b37ab4cb21b, type: 3}
+  slashAoeA: {fileID: 6855955652325114174, guid: f8dc879bd6649cb4782409815764d676, type: 3}
+  crackDecal: {fileID: 2100000, guid: 9ec0894b2095afd46bf21847e77c3c2a, type: 2}
+  crackTextures:
+  - {fileID: 2800000, guid: 8edc32bb14d82ec43960bcdf251ef64a, type: 3}
+  - {fileID: 2800000, guid: 2623c7097f3befc4a984f3e626568bbb, type: 3}
+  - {fileID: 2800000, guid: 498da82f56453d94da849ec85ce7b89a, type: 3}

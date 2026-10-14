@@ -71,6 +71,16 @@
 - 게임 코드는 `Vfx.Hit` / `Vfx.GroundImpact` 이벤트만 호출하므로 `Vfx.Style` 하나로 전체 스타일이 바뀝니다 (현재 기본값: Classic).
 - 비교 캡처: [`Docs/EffectsLab`](Docs/EffectsLab) (행 = 안 A/B/C, 열 = 시간 경과)
 
+### 적용 중인 공격 이펙트 (기본 스타일: B. Cracked Board)
+
+- **바닥 균열 = URP 데칼**: `Resources/Textures/Crack*.png`(바르코 생성)을 `KING ▸ Setup ▸ Effects Assets`가 투명 데칼 텍스처로 변환(흰 배경 → 투명, 가장자리 페이드) → 무작위 이미지·회전으로 바닥에 찍히고 약 3초 뒤 사라짐. 빛나는 균열은 사용하지 않음
+- **공격 궤적 = NamuFX Simple Stylized Slash vol2** (`Resources/FxLibrary.asset`에 등록)
+  - 1·2타: Slash_B 금색 (2타는 뒤집어 반대 방향)
+  - 3타 사이클론: Slash_D 백색 바람 고리 ×2
+  - 4타 메테오·우클릭 스톰프: Slash_Aoe_A 금색 + 균열 데칼
+  - 금색 틴트는 시작색·수명 그라디언트·트레일을 바꾸고, 커스텀 데이터 색을 끈 머티리얼 사본을 사용. 먼지·연기는 중립 회갈색
+- NamuFX는 서드파티 에셋이라 **저장소에 포함하지 않습니다**(로컬 `Assets/NamuFX`). 없으면 기존 바닥 초승달 궤적으로 대체됩니다.
+
 > **히트스톱**: 공격이 처음 적중하는 순간 0.04~0.12초 동안 게임 속도를 10%로 늦춰 타격감을 줍니다. 공격 한 번당 한 번만 걸립니다.
 
 ## 저스트 회피 → 로열 스로우
