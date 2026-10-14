@@ -290,7 +290,7 @@ namespace KingLastPiece
             {
                 new HitWindow
                 {
-                    start = 0.13f, end = 0.29f, forward = 0.6f, range = 2.8f, arc = 220f, damage = 14f, poise = 14f, shake = 0.16f,
+                    start = 0.13f, end = 0.29f, range = 2.8f, arc = 220f, damage = 14f, poise = 14f, shake = 0.16f,
                     sweep = true, sweepFrom = 110f * side, sweepTo = -110f * side, slash = true,
                 },
             },
