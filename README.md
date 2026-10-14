@@ -68,10 +68,10 @@
 | C. Board Ripple | 상아 섬광 + 흑백 사각 꽃종이 | **실제 체스판 칸들이 파도처럼 들썩임** + 사각형 충격파 + 중앙 균열 |
 
 - 적의 내려찍기는 같은 연출을 **붉은 불씨색**으로 표시해 킹의 금색과 구분합니다.
-- 게임 코드는 `Vfx.Hit` / `Vfx.GroundImpact` 이벤트만 호출하므로 `Vfx.Style` 하나로 전체 스타일이 바뀝니다 (현재 기본값: Classic).
+- 게임 코드는 `Vfx.Hit` / `Vfx.GroundImpact` 이벤트만 호출하므로 `Vfx.Style` 하나로 전체 스타일이 바뀝니다 (**메인: C. Board Ripple**).
 - 비교 캡처: [`Docs/EffectsLab`](Docs/EffectsLab) (행 = 안 A/B/C, 열 = 시간 경과)
 
-### 적용 중인 공격 이펙트 (기본 스타일: B. Cracked Board)
+### 적용 중인 공격 이펙트 (메인 스타일: C. Board Ripple)
 
 - **바닥 균열 = URP 데칼**: `Resources/Textures/Crack*.png`(바르코 생성)을 `KING ▸ Setup ▸ Effects Assets`가 투명 데칼 텍스처로 변환(흰 배경 → 투명, 가장자리 페이드) → 무작위 이미지·회전으로 바닥에 찍히고 약 3초 뒤 사라짐. 빛나는 균열은 사용하지 않음
 - **공격 궤적 = NamuFX Simple Stylized Slash vol2** (`Resources/FxLibrary.asset`에 등록)
