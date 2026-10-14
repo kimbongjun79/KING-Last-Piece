@@ -110,7 +110,6 @@ namespace KingLastPiece
         int airHits;
         float modelHeight = 1.5f;
         Vector3 flinchPush, airKnock;
-        Vector3 fallAxis;
         static readonly Color WindupGlow = new Color(1.6f, 0.12f, 0.04f);
 
         public void Setup(PieceType type, Transform modelRoot)
@@ -684,20 +683,40 @@ namespace KingLastPiece
             SetGlow(Color.black);
             Vector3 away = FlatPos - new Vector3(source.x, 0f, source.z);
             if (away.sqrMagnitude < 0.001f) away = -transform.forward;
-            fallAxis = transform.InverseTransformDirection(Vector3.Cross(Vector3.up, away.normalized));
+            deathAway = away.normalized;
+            crumbled = false;
             Enter(EState.Dead);
+            Flash(new Color(1.8f, 1.7f, 1.5f), CrackTime);
             Effects.Sparks(transform.position + Vector3.up, new Color(0.4f, 0.4f, 0.45f), 18, 6f);
         }
 
+        const float CrackTime = 0.14f;
+        Vector3 deathAway;
+        bool crumbled;
+
+        /// <summary>Captured: the piece cracks (shudder + flash), then collapses into rubble like a castle wall.</summary>
         void AnimateDeath()
         {
             float t = stateTime;
-            float fall = Mathf.Clamp01(t / 0.5f);
-            fall = fall * fall;
-            model.localRotation = Quaternion.AngleAxis(88f * fall, fallAxis);
-            float sink = Mathf.Clamp01((t - 0.9f) / 1.2f);
-            model.localPosition = new Vector3(0f, -1.5f * sink, 0f);
-            if (t > 2.2f) Destroy(gameObject);
+            if (!crumbled)
+            {
+                if (t < CrackTime)
+                {
+                    model.localPosition = new Vector3(Random.Range(-0.05f, 0.05f), model.localPosition.y, Random.Range(-0.05f, 0.05f));
+                    return;
+                }
+                crumbled = true;
+                var rends = model.GetComponentsInChildren<Renderer>();
+                if (rends.Length > 0)
+                {
+                    var b = rends[0].bounds;
+                    foreach (var r in rends) b.Encapsulate(r.bounds);
+                    Crumble.Spawn(b, rends[0].sharedMaterial, deathAway);
+                }
+                model.gameObject.SetActive(false);
+                Game.Rig.Shake(IsBoss ? 0.6f : 0.2f);
+            }
+            if (t > CrackTime + 0.3f) Destroy(gameObject);
         }
 
         void AnimateSpawn()

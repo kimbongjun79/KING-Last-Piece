@@ -394,6 +394,49 @@ namespace KingLastPiece
             }
         }
 
+        /// <summary>Death crumble: a pawn, rook and queen are captured at once; 5×2 frames over ~3s.</summary>
+        IEnumerator CrumbleScenario(string dir)
+        {
+            var hud = game.GetComponent<Hud>();
+            if (hud != null) hud.enabled = false;
+            game.ClearEnemies();
+            var player = game.Player;
+            player.ResetForWave(new Vector3(0f, 0f, -5f), 0f);
+            var victims = new[]
+            {
+                game.SpawnEnemy(PieceType.Pawn, new Vector3(-2.2f, 0f, 0f)),
+                game.SpawnEnemy(PieceType.Rook, new Vector3(0f, 0f, 0f)),
+                game.SpawnEnemy(PieceType.Queen, new Vector3(2.6f, 0f, 0f)),
+            };
+            game.Rig.OverridePosition = new Vector3(0.5f, 2.6f, -6.5f);
+            game.Rig.OverrideLookAt = new Vector3(0.2f, 1.1f, 0f);
+            for (int f = 0; f < 60; f++) yield return null;
+            foreach (var v in victims) v.TakeHit(99999f, 0f, player.transform.position);
+
+            const int cols = 5, rows = 2;
+            int[] waits = { 4, 6, 8, 10, 14, 18, 24, 30, 36, 40 };
+            Texture2D sheet = null;
+            int tileW = 0, tileH = 0;
+            for (int i = 0; i < waits.Length; i++)
+            {
+                for (int f = 0; f < waits[i]; f++) yield return null;
+                yield return new WaitForEndOfFrame();
+                var tex = ScreenCapture.CaptureScreenshotAsTexture();
+                if (sheet == null)
+                {
+                    tileW = tex.width;
+                    tileH = tex.height;
+                    sheet = new Texture2D(tileW * cols, tileH * rows, TextureFormat.RGB24, false);
+                }
+                if (tex.width == tileW && tex.height == tileH)
+                    sheet.SetPixels32((i % cols) * tileW, (rows - 1 - i / cols) * tileH, tileW, tileH, tex.GetPixels32());
+                Destroy(tex);
+            }
+            sheet.Apply();
+            File.WriteAllBytes(Path.Combine(dir, "11_Death_Crumble.png"), sheet.EncodeToPNG());
+            Destroy(sheet);
+        }
+
         static string GetArg(string name)
         {
             var args = System.Environment.GetCommandLineArgs();
@@ -499,6 +542,7 @@ namespace KingLastPiece
             yield return PieceLineup(dir);
             yield return StaggerScenario(dir, stats);
             yield return AutoAssistScenario(dir, stats);
+            yield return CrumbleScenario(dir);
 
             File.WriteAllText(Path.Combine(dir, "stats.tsv"), stats.ToString());
             Application.Quit();

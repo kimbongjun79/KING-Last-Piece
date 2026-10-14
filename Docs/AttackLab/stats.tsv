@@ -26,7 +26,7 @@ Royal Ensemble	Royal Meteor	0.52	0.57	0.88	0.68	4.8	360	20	5
 Royal Ensemble	Checkmate Topple	0.62	0.80	1.35	1.08	8.5	360	52	6
 Royal Ensemble	COMBO_DPS	33.0
 JustDodge	perfect=True	just_count=1	throws=1	damage_events=1	rook_dead=False
-Stagger	pawn_hp=100	launches=1	dead=True	timeline=mmssssVVVUUUUUUUUVVVVVVVVVmmmx
+Stagger	pawn_hp=100	launches=1	dead=True	timeline=mmmsssVVVUUUUUUUUVVVVVVVVVmmmx
 AutoDodge	Bishop	dashing=True	roll_vs_attack_angle=90	damage_taken=0
 AutoDodge	Rook	dashing=True	roll_vs_attack_angle=90	damage_taken=0
 AutoAim	cluster_facing=61deg(cluster 50-94, lone -70)	cluster_hits=3	behind_facing_err=0	far_facing_err=96(should stay ~90)

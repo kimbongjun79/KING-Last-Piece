@@ -33,7 +33,7 @@ namespace KingLastPiece
                     kind = AtkKind.Lunge, dir = to, windup = 0.6f, active = 0.18f, recover = 0.8f,
                     length = 1.7f, damage = 12f, poise = 15f, radius = 0.7f, trackUntil = 0.7f
                 });
-                cooldown = Random.Range(1.4f, 2.4f);
+                cooldown = Random.Range(2.6f, 3.8f);
             }
             else Strafe(strafeSign, moveSpeed * 0.5f, dt);
         }
@@ -89,7 +89,7 @@ namespace KingLastPiece
                     kind = AtkKind.Leap, target = Player.FlatPos, windup = 0.75f, active = 0.55f, recover = 0.9f,
                     damage = 20f, poise = 35f, radius = 1.5f
                 });
-                cooldown = Random.Range(2.2f, 3.2f);
+                cooldown = Random.Range(3.4f, 4.6f);
                 return;
             }
 
@@ -149,7 +149,7 @@ namespace KingLastPiece
                     kind = AtkKind.Dash, dir = dir, windup = 0.7f, recover = 0.85f,
                     length = 13f, speed = 15f, damage = 18f, poise = 30f, radius = 0.75f
                 });
-                cooldown = Random.Range(1.8f, 2.6f);
+                cooldown = Random.Range(3.0f, 4.0f);
             }
             else MoveTowards(q, moveSpeed, dt);
         }
