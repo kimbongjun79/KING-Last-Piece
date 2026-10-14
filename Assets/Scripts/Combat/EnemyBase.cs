@@ -765,7 +765,7 @@ namespace KingLastPiece
             if (p >= 1f)
             {
                 model.localPosition = Vector3.zero;
-                Effects.Shockwave(transform.position, 1.2f, new Color(0.5f, 0.1f, 0.4f), 0.3f);
+                Effects.DarkWave(transform.position, 2.4f);
                 Vfx.Dust(transform.position, 1.1f);  // set down on the board like a chess move
                 Enter(EState.Move);
             }

@@ -30,6 +30,24 @@ namespace KingLastPiece
             s.radius = radius;
             s.duration = duration;
         }
+
+        /// <summary>
+        /// Dark ripple: translucent black rings that spread out across the board and fade (a piece being set down).
+        /// <paramref name="rings"/> waves follow each other a moment apart.
+        /// </summary>
+        public static void DarkWave(Vector3 center, float radius, float duration = 0.6f, int rings = 2)
+        {
+            for (int i = 0; i < rings; i++)
+            {
+                var go = new GameObject("DarkWave");
+                go.transform.position = new Vector3(center.x, 0.035f, center.z);
+                var w = go.AddComponent<DarkWaveFx>();
+                w.radius = radius * (1f - 0.25f * i);
+                w.duration = duration;
+                w.delay = i * 0.12f;
+                w.thickness = i == 0 ? 0.22f : 0.12f;
+            }
+        }
     }
 
     public class SparkParticle : MonoBehaviour
@@ -73,6 +91,71 @@ namespace KingLastPiece
             pos.y = p < 0.5f ? 0.03f : Mathf.Lerp(0.03f, -0.1f, (p - 0.5f) * 2f);
             transform.position = pos;
             if (p >= 1f) Destroy(gameObject);
+        }
+    }
+
+    /// <summary>An expanding, fading, smooth ring of translucent onyx (see <see cref="Effects.DarkWave"/>).</summary>
+    public class DarkWaveFx : MonoBehaviour
+    {
+        public float radius = 1.5f, duration = 0.6f, delay, thickness = 0.2f;
+        const int Segments = 72;
+        float t;
+        Mesh mesh;
+        Vector3[] verts;
+        MeshRenderer mr;
+        Material mat;
+
+        void Start()
+        {
+            // A flat annulus mesh rebuilt each frame (inner/outer radius), so the ring stays perfectly round.
+            verts = new Vector3[Segments * 2];
+            var tris = new int[Segments * 6];
+            for (int i = 0; i < Segments; i++)
+            {
+                int a = i * 2, b = ((i + 1) % Segments) * 2;
+                tris[i * 6 + 0] = a; tris[i * 6 + 1] = b; tris[i * 6 + 2] = a + 1;
+                tris[i * 6 + 3] = a + 1; tris[i * 6 + 4] = b; tris[i * 6 + 5] = b + 1;
+            }
+            mesh = new Mesh { name = "DarkWave" };
+            mesh.vertices = verts;
+            mesh.triangles = tris;
+            gameObject.AddComponent<MeshFilter>().sharedMesh = mesh;
+            mr = gameObject.AddComponent<MeshRenderer>();
+            mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            // Own material instance so the alpha can fade without touching the shared cache.
+            mat = new Material(MaterialLib.Transparent(new Color(0.02f, 0.02f, 0.03f, 0.75f)));
+            mr.sharedMaterial = mat;
+            mr.enabled = false;
+        }
+
+        void Update()
+        {
+            t += Time.deltaTime;
+            if (t < delay) return;
+            float p = Mathf.Clamp01((t - delay) / duration);
+            float ease = 1f - (1f - p) * (1f - p) * (1f - p);
+            float outer = Mathf.Lerp(0.25f, radius, ease);
+            float inner = Mathf.Max(0f, outer - thickness * Mathf.Lerp(1f, 0.35f, p));
+            for (int i = 0; i < Segments; i++)
+            {
+                float a = i * Mathf.PI * 2f / Segments;
+                var d = new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a));
+                verts[i * 2] = d * inner;
+                verts[i * 2 + 1] = d * outer;
+            }
+            mesh.vertices = verts;
+            mesh.RecalculateNormals();
+            mesh.RecalculateBounds();
+            mr.enabled = true;
+            var c = mat.GetColor("_BaseColor");
+            c.a = 0.75f * (1f - p * p);
+            mat.SetColor("_BaseColor", c);
+            if (p >= 1f)
+            {
+                Destroy(mat);
+                Destroy(mesh);
+                Destroy(gameObject);
+            }
         }
     }
 }

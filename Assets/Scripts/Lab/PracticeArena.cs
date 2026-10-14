@@ -433,7 +433,18 @@ namespace KingLastPiece
             };
             game.Rig.OverridePosition = new Vector3(0.5f, 2.6f, -6.5f);
             game.Rig.OverrideLookAt = new Vector3(0.2f, 1.1f, 0f);
-            for (int f = 0; f < 60; f++) yield return null;
+            for (int f = 0; f < 60; f++)
+            {
+                yield return null;
+                if (f == 40)
+                {
+                    // Spawn landing: the dark ripple under each piece.
+                    yield return new WaitForEndOfFrame();
+                    var spawnTex = ScreenCapture.CaptureScreenshotAsTexture();
+                    File.WriteAllBytes(Path.Combine(dir, "13_Spawn_Wave.png"), spawnTex.EncodeToPNG());
+                    Destroy(spawnTex);
+                }
+            }
             foreach (var v in victims) v.TakeHit(99999f, 0f, player.transform.position);
 
             const int cols = 5, rows = 2;
