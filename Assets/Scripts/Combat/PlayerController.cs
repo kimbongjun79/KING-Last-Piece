@@ -579,10 +579,11 @@ namespace KingLastPiece
                 if (!windowStarted[i])
                 {
                     windowStarted[i] = true;
-                    bool authored = w.fx != SlashFxKind.None &&
+                    if (w.fx != SlashFxKind.None)
                         Vfx.Slash(w.fx, transform.position + Vector3.up * w.fxHeight, transform.rotation * Quaternion.Euler(0f, w.fxYaw, 0f),
                             w.fxScale, w.fxGold ? Vfx.Gold : (Color?)null, w.fxFlip);
-                    if (w.slash && !authored)
+                    // Ground range marker (a ring of chess squares) shows the attack's real reach.
+                    if (w.slash)
                         SlashFx.Spawn(FlatPos + transform.forward * w.forward, transform.forward, w.range * 0.82f,
                             w.sweepFrom, w.sweepTo, w.end - w.start, new Color(1f, 0.82f, 0.45f));
                     if (w.kick > 0f) Game.Rig.Kick(w.kick);
@@ -739,6 +740,7 @@ namespace KingLastPiece
                 Health = Mathf.Min(MaxHealth, Health + HealAmount);
                 Flash(new Color(1f, 0.8f, 0.3f) * 2f, 0.25f);
                 Effects.Sparks(transform.position + Vector3.up * 1.2f, new Color(1f, 0.8f, 0.3f), 14, 3f);
+                Vfx.Slash(SlashFxKind.SlashD, transform.position + Vector3.up * 0.3f, transform.rotation, 0.9f, Vfx.Gold);
             }
             if (stateTime >= HealDuration)
             {
@@ -793,6 +795,8 @@ namespace KingLastPiece
             Flash(new Color(0.6f, 1.2f, 2.2f), 0.25f);
             var cyan = new Color(0.45f, 0.8f, 1f);
             Effects.Shockwave(FlatPos, 1.8f, cyan, 0.4f);
+            // Silver-blue wind ring around the King: the attack slipped past.
+            Vfx.Slash(SlashFxKind.SlashD, transform.position + Vector3.up * 0.8f, transform.rotation, 1.3f, cyan);
             Effects.Sparks(transform.position + Vector3.up * 1.1f, cyan, 18, 5f);
         }
 
@@ -881,6 +885,7 @@ namespace KingLastPiece
                     Game.Rig.Kick(1f);
                     Game.Rig.Shake(0.5f);
                     Effects.Shockwave(FlatPos, 2.2f, new Color(1f, 0.8f, 0.4f), 0.4f);
+                    Vfx.Slash(SlashFxKind.AoeA, transform.position + Vector3.up * 0.9f, transform.rotation, 1.2f, Vfx.Gold);
                     LockTarget = null;
                 }
                 float p = Mathf.Clamp01((t - CounterRelease) / (CounterDuration - CounterRelease));

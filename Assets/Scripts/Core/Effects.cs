@@ -80,18 +80,18 @@ namespace KingLastPiece
 namespace KingLastPiece
 {
     /// <summary>
-    /// Glowing crescent drawn on the ground that follows a body sweep, so the full hit range reads visually.
-    /// Segments appear progressively from <see cref="from"/> to <see cref="to"/> (degrees relative to forward, + = right).
+    /// Ground range marker: a band of chess squares (two checkered rows) laid along the attack's sweep, so the real
+    /// reach reads on the board. Squares pop in progressively from <see cref="from"/> to <see cref="to"/>
+    /// (degrees relative to forward, + = right), hold briefly, then shrink away.
     /// </summary>
     public class SlashFx : MonoBehaviour
     {
         public Vector3 center, forward;
-        public float radius, from, to, sweepTime, life = 0.28f;
+        public float radius, from, to, sweepTime, life = 0.42f;
         public Color color;
-        const int Segments = 18;
-        float t;
-        int spawned;
-        Material mat;
+        float t, side;
+        int columns, spawned;
+        Material ivoryMat, onyxMat;
 
         public static void Spawn(Vector3 center, Vector3 forward, float radius, float from, float to, float sweepTime, Color color)
         {
@@ -105,26 +105,60 @@ namespace KingLastPiece
             fx.color = color;
         }
 
-        void Start() => mat = MaterialLib.Emissive(color, 3.5f);
+        void Start()
+        {
+            // Ivory squares glow softly in the King's gold; onyx squares stay glossy black.
+            ivoryMat = MaterialLib.Get(new Color(0.95f, 0.92f, 0.82f), 0.6f, 0f, color * 0.9f);
+            onyxMat = MaterialLib.Get(new Color(0.05f, 0.05f, 0.06f), 0.9f, 0.2f);
+            side = Mathf.Clamp(radius * 0.12f, 0.24f, 0.44f);
+            float arcLength = Mathf.Abs(to - from) * Mathf.Deg2Rad * radius;
+            columns = Mathf.Max(4, Mathf.CeilToInt(arcLength / side));
+        }
 
         void Update()
         {
             t += Time.deltaTime;
-            int target = Mathf.Min(Segments, Mathf.CeilToInt(t / sweepTime * Segments));
-            float step = (to - from) / Segments;
-            float chord = Mathf.Abs(step) * Mathf.Deg2Rad * radius * 1.15f;
+            int target = Mathf.Min(columns, Mathf.CeilToInt(t / sweepTime * columns));
+            float step = (to - from) / columns;
             for (; spawned < target; spawned++)
             {
                 float a = from + step * (spawned + 0.5f);
                 Vector3 dir = Quaternion.Euler(0f, a, 0f) * forward;
-                // Thicker in the middle of the arc, tapered at both ends; long axis along the tangent.
-                float k = Mathf.Sin((spawned + 0.5f) / Segments * Mathf.PI);
-                PieceFactory.Part(PrimitiveType.Cube, transform, center + dir * radius + Vector3.up * 0.04f,
-                        new Vector3(0.12f + 0.22f * k, 0.03f, chord), mat,
-                        (Quaternion.LookRotation(dir) * Quaternion.Euler(0f, 90f, 0f)).eulerAngles)
-                    .gameObject.AddComponent<FadeSink>().life = life;
+                var rot = Quaternion.LookRotation(dir).eulerAngles;
+                for (int row = 0; row < 2; row++)
+                {
+                    float r = radius + (row == 0 ? -0.5f : 0.5f) * side;
+                    bool isLight = (spawned + row) % 2 == 0;
+                    var sq = PieceFactory.Part(PrimitiveType.Cube, transform, center + dir * r + Vector3.up * 0.035f,
+                        new Vector3(side * 0.94f, 0.03f, side * 0.94f), isLight ? ivoryMat : onyxMat, rot);
+                    sq.gameObject.AddComponent<PopSquare>().life = life;
+                }
             }
-            if (spawned >= Segments && transform.childCount == 0) Destroy(gameObject);
+            if (spawned >= columns && transform.childCount == 0) Destroy(gameObject);
+        }
+    }
+
+    /// <summary>Pops a marker square in, holds it, then shrinks it away.</summary>
+    public class PopSquare : MonoBehaviour
+    {
+        public float life = 0.4f;
+        const float PopIn = 0.07f, ShrinkOut = 0.16f;
+        float t;
+        Vector3 full;
+
+        void Start()
+        {
+            full = transform.localScale;
+            transform.localScale = new Vector3(0f, full.y, 0f);
+        }
+
+        void Update()
+        {
+            t += Time.deltaTime;
+            float k = t < PopIn ? PoseTrack.Curve(Ease.OutBack, t / PopIn)
+                : t > life - ShrinkOut ? 1f - Mathf.Clamp01((t - (life - ShrinkOut)) / ShrinkOut) : 1f;
+            transform.localScale = new Vector3(full.x * k, full.y, full.z * k);
+            if (t >= life) Destroy(gameObject);
         }
     }
 

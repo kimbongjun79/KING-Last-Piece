@@ -43,11 +43,13 @@ namespace KingLastPiece
             {
                 case VfxStyle.CrackedBoard:
                     HitFlashFx.Spawn(pos, Gold, heavy ? 0.9f : 0.6f);
+                    Burst(SlashFxKind.SlashC, pos, Quaternion.LookRotation(dir), heavy ? 0.9f : 0.6f, Gold, "flare", "spark");
                     Chips(pos, dir, heavy ? 18 : 11, heavy ? 6.5f : 5f, Ivory, Onyx, heavy ? 0.16f : 0.13f);
                     Effects.Sparks(pos, Gold, heavy ? 8 : 4, heavy ? 6f : 4f);
                     break;
                 case VfxStyle.BoardRipple:
                     HitFlashFx.Spawn(pos, Ivory, heavy ? 0.9f : 0.6f);
+                    Burst(SlashFxKind.SlashC, pos, Quaternion.LookRotation(dir), heavy ? 0.9f : 0.6f, Ivory, "flare", "spark");
                     Confetti(pos, dir, heavy ? 22 : 14, heavy ? 6.5f : 5f);
                     Effects.Sparks(pos, Gold, heavy ? 6 : 3, 4f);
                     break;
@@ -145,6 +147,20 @@ namespace KingLastPiece
             }
             Object.Destroy(fx, 2.2f * Mathf.Max(1f, dustLife));
             return true;
+        }
+
+        /// <summary>
+        /// Plays only some layers of a NamuFX prefab (e.g. just its flash and sparks), recolored.
+        /// Layers match by substring of the particle system's name. Returns false when the pack is missing.
+        /// </summary>
+        public static bool Burst(SlashFxKind kind, Vector3 pos, Quaternion rot, float scale, Color tint, params string[] layers)
+        {
+            System.Predicate<string> keep = n =>
+            {
+                foreach (var l in layers) if (n.Contains(l)) return true;
+                return false;
+            };
+            return Slash(kind, pos, rot, scale, tint, keep);
         }
 
         /// <summary>World-yaw correction applied to directional NamuFX slashes (calibrated in Effects Lab E6).</summary>

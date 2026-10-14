@@ -76,40 +76,131 @@ namespace KingLastPiece
 
         void DrawPlayerBars(PlayerController p)
         {
-            float x = 40 * scale, y = 36 * scale;
-            float w = 420 * scale, h = 18 * scale;
+            float x = 32 * scale, y = 28 * scale;
+            float panelW = 520 * scale, panelH = 150 * scale;
 
-            Fill(new Rect(x - 2, y - 2, w + 4, h + 4), new Color(0, 0, 0, 0.75f));
-            Fill(new Rect(x, y, w * Mathf.Clamp01(hpTrail / p.MaxHealth), h), new Color(0.95f, 0.7f, 0.25f));
-            Fill(new Rect(x, y, w * Mathf.Clamp01(p.Health / p.MaxHealth), h), Blood);
+            // Backing plate with a gold hairline, and a chess-tile emblem with the King's crown.
+            Fill(new Rect(x - 12 * scale, y - 12 * scale, panelW, panelH), new Color(0f, 0f, 0f, 0.45f));
+            Fill(new Rect(x - 12 * scale, y - 12 * scale, panelW, 2 * scale), new Color(Gold.r, Gold.g, Gold.b, 0.6f));
+            float em = 66 * scale;
+            DrawEmblem(new Rect(x, y, em, em));
 
-            y += h + 8 * scale;
-            float sw = 340 * scale, sh = 12 * scale;
-            Fill(new Rect(x - 2, y - 2, sw + 4, sh + 4), new Color(0, 0, 0, 0.75f));
-            Fill(new Rect(x, y, sw * (p.Stamina / PlayerController.MaxStamina), sh), new Color(0.25f, 0.62f, 0.3f));
+            float bx = x + em + 14 * scale;
 
-            // Dodge charges: diamonds that refill one by one.
-            y += sh + 8 * scale;
-            float ds = 14 * scale;
+            // Health.
+            float w = 400 * scale, h = 20 * scale;
+            Gauge(new Rect(bx, y + 2 * scale, w, h), p.Health / p.MaxHealth, hpTrail / p.MaxHealth,
+                new Color(0.62f, 0.07f, 0.06f), new Color(0.95f, 0.3f, 0.22f));
+            SmallText(new Rect(bx + 8 * scale, y + 2 * scale, w - 16 * scale, h), $"{Mathf.CeilToInt(p.Health)} / {Mathf.RoundToInt(p.MaxHealth)}",
+                TextAnchor.MiddleRight);
+
+            // Stamina (pulses amber when nearly empty).
+            float sy = y + h + 10 * scale, sw = 330 * scale, sh = 12 * scale;
+            float st = p.Stamina / PlayerController.MaxStamina;
+            bool low = st < 0.25f;
+            float pulse = low ? 0.5f + 0.5f * Mathf.Sin(Time.unscaledTime * 10f) : 0f;
+            Color stMain = Color.Lerp(new Color(0.2f, 0.55f, 0.28f), new Color(0.85f, 0.55f, 0.15f), pulse);
+            Color stHi = Color.Lerp(new Color(0.45f, 0.9f, 0.5f), new Color(1f, 0.8f, 0.35f), pulse);
+            Gauge(new Rect(bx, sy, sw, sh), st, st, stMain, stHi);
+
+            // Roll charges: gold-rimmed diamonds; a recharging one grows from the middle.
+            float ry = sy + sh + 16 * scale, ds = 12 * scale;
+            SmallText(new Rect(bx, ry - 9 * scale, 60 * scale, 18 * scale), "ROLL", TextAnchor.MiddleLeft);
             for (int i = 0; i < PlayerController.MaxDodges; i++)
             {
-                var r = new Rect(x + i * (ds + 10 * scale), y, ds, ds);
-                Fill(new Rect(r.x - 2, r.y - 2, r.width + 4, r.height + 4), new Color(0, 0, 0, 0.7f));
-                float fill = i < p.DodgeCharges ? 1f : i == p.DodgeCharges ? p.DodgeRechargeProgress : 0f;
-                Fill(new Rect(r.x, r.y + r.height * (1f - fill), r.width, r.height * fill),
-                    i < p.DodgeCharges ? new Color(0.5f, 0.85f, 1f) : new Color(0.3f, 0.5f, 0.65f));
+                var c = new Vector2(bx + 64 * scale + i * 26 * scale, ry);
+                Diamond(c, ds + 3 * scale, new Color(Gold.r, Gold.g, Gold.b, 0.9f));
+                Diamond(c, ds, new Color(0.04f, 0.05f, 0.08f, 0.95f));
+                if (i < p.DodgeCharges) Diamond(c, ds - 2 * scale, new Color(0.55f, 0.88f, 1f));
+                else if (i == p.DodgeCharges) Diamond(c, (ds - 2 * scale) * p.DodgeRechargeProgress, new Color(0.3f, 0.5f, 0.65f));
             }
-            y += ds + 12 * scale;
-            float fs = 26 * scale;
+
+            // Royal Flasks: little gold vials.
+            float fx = bx + 160 * scale, fy = ry - 13 * scale;
             for (int i = 0; i < PlayerController.MaxFlasks; i++)
+                DrawVial(new Rect(fx + i * 24 * scale, fy, 16 * scale, 26 * scale), i < p.Flasks);
+            SmallText(new Rect(fx + PlayerController.MaxFlasks * 24 * scale + 4 * scale, ry - 9 * scale, 120 * scale, 18 * scale),
+                "FLASK", TextAnchor.MiddleLeft);
+        }
+
+        // ---------------------------------------------------------------- styled primitives
+
+        /// <summary>Framed gauge: gold rim, dark well, damage trail, two-tone fill with a highlight, 10% notches.</summary>
+        void Gauge(Rect r, float frac, float trail, Color main, Color highlight)
+        {
+            frac = Mathf.Clamp01(frac);
+            trail = Mathf.Clamp01(Mathf.Max(trail, frac));
+            float b = Mathf.Max(1f, 1.5f * scale);
+            Fill(new Rect(r.x - b - 1, r.y - b - 1, r.width + 2 * b + 2, r.height + 2 * b + 2), new Color(0f, 0f, 0f, 0.8f));
+            Fill(new Rect(r.x - b, r.y - b, r.width + 2 * b, r.height + 2 * b), new Color(Gold.r * 0.8f, Gold.g * 0.8f, Gold.b * 0.8f, 0.9f));
+            Fill(r, new Color(0.05f, 0.03f, 0.03f, 0.95f));
+            if (trail > frac) Fill(new Rect(r.x + r.width * frac, r.y, r.width * (trail - frac), r.height), new Color(0.95f, 0.75f, 0.35f, 0.9f));
+            var f = new Rect(r.x, r.y, r.width * frac, r.height);
+            Fill(f, main);
+            Fill(new Rect(f.x, f.y, f.width, f.height * 0.42f), new Color(highlight.r, highlight.g, highlight.b, 0.55f));
+            Fill(new Rect(f.x, f.y + f.height * 0.82f, f.width, f.height * 0.18f), new Color(0f, 0f, 0f, 0.25f));
+            if (frac > 0.01f) Fill(new Rect(f.xMax - 2 * scale, f.y, 2 * scale, f.height), new Color(1f, 1f, 1f, 0.5f));
+            for (int i = 1; i < 10; i++)
+                Fill(new Rect(r.x + r.width * i / 10f, r.y, Mathf.Max(1f, scale), r.height), new Color(0f, 0f, 0f, 0.28f));
+        }
+
+        static void Diamond(Vector2 center, float half, Color c)
+        {
+            if (half <= 0.5f) return;
+            var m = GUI.matrix;
+            GUIUtility.RotateAroundPivot(45f, center);
+            Fill(new Rect(center.x - half, center.y - half, half * 2f, half * 2f), c);
+            GUI.matrix = m;
+        }
+
+        /// <summary>2×2 chess tile in a gold frame with a little crown.</summary>
+        void DrawEmblem(Rect r)
+        {
+            Fill(new Rect(r.x - 3 * scale, r.y - 3 * scale, r.width + 6 * scale, r.height + 6 * scale), Gold);
+            float hw = r.width / 2f, hh = r.height / 2f;
+            var ivory = new Color(0.9f, 0.87f, 0.78f);
+            var onyx = new Color(0.1f, 0.09f, 0.1f);
+            Fill(new Rect(r.x, r.y, hw, hh), ivory);
+            Fill(new Rect(r.x + hw, r.y, hw, hh), onyx);
+            Fill(new Rect(r.x, r.y + hh, hw, hh), onyx);
+            Fill(new Rect(r.x + hw, r.y + hh, hw, hh), ivory);
+            // Crown: band + three points + jewel.
+            float cw = r.width * 0.62f, cx = r.center.x - cw / 2f, cy = r.center.y + r.height * 0.06f;
+            var crown = new Color(1f, 0.82f, 0.35f);
+            var shadow = new Color(0f, 0f, 0f, 0.6f);
+            Fill(new Rect(cx + 2 * scale, cy + 2 * scale, cw, r.height * 0.16f), shadow);
+            Fill(new Rect(cx, cy, cw, r.height * 0.16f), crown);
+            float pw = cw * 0.2f, ph = r.height * 0.22f;
+            for (int i = 0; i < 3; i++)
             {
-                var r = new Rect(x + i * (fs + 8 * scale), y, fs, fs);
-                Fill(r, new Color(0, 0, 0, 0.7f));
-                var inner = new Rect(r.x + 4 * scale, r.y + 4 * scale, r.width - 8 * scale, r.height - 8 * scale);
-                Fill(inner, i < p.Flasks ? Gold : new Color(0.2f, 0.2f, 0.2f, 0.8f));
+                float px = cx + i * (cw - pw) / 2f;
+                Fill(new Rect(px, cy - ph, pw, ph), crown);
             }
-            Text(new Rect(x + PlayerController.MaxFlasks * (fs + 8 * scale) + 6 * scale, y - 2 * scale, 300 * scale, fs + 4 * scale),
-                "Royal Flask", label, new Color(0.85f, 0.8f, 0.7f));
+            Diamond(new Vector2(r.center.x, cy - ph - 3 * scale), 3.5f * scale, crown);
+            Diamond(new Vector2(r.center.x, cy + r.height * 0.08f), 3f * scale, new Color(0.75f, 0.1f, 0.1f));
+        }
+
+        void DrawVial(Rect r, bool full)
+        {
+            var glass = new Color(0.05f, 0.05f, 0.07f, 0.9f);
+            var rim = new Color(Gold.r, Gold.g, Gold.b, 0.85f);
+            float neckW = r.width * 0.45f, neckH = r.height * 0.22f;
+            var neck = new Rect(r.center.x - neckW / 2f, r.y, neckW, neckH);
+            var body = new Rect(r.x, r.y + neckH, r.width, r.height - neckH);
+            Fill(new Rect(body.x - 1.5f * scale, body.y - 1.5f * scale, body.width + 3 * scale, body.height + 3 * scale), rim);
+            Fill(new Rect(neck.x - 1.5f * scale, neck.y - 1.5f * scale, neck.width + 3 * scale, neck.height + 1.5f * scale), rim);
+            Fill(body, glass);
+            Fill(neck, glass);
+            if (!full) return;
+            var liquid = new Rect(body.x + 2 * scale, body.y + body.height * 0.2f, body.width - 4 * scale, body.height * 0.8f - 2 * scale);
+            Fill(liquid, new Color(0.95f, 0.65f, 0.18f));
+            Fill(new Rect(liquid.x, liquid.y, liquid.width * 0.35f, liquid.height), new Color(1f, 0.9f, 0.6f, 0.6f));
+        }
+
+        void SmallText(Rect r, string text, TextAnchor anchor)
+        {
+            var st = new GUIStyle(label) { fontSize = Mathf.RoundToInt(13 * scale), alignment = anchor };
+            Text(r, text, st, new Color(0.95f, 0.92f, 0.85f, 0.95f));
         }
 
         void DrawEnemyBars(GameManager g)
@@ -135,10 +226,13 @@ namespace KingLastPiece
             if (boss == null) return;
             float w = 900 * scale, h = 16 * scale;
             float x = (Screen.width - w) / 2f, y = Screen.height - 110 * scale;
-            Text(new Rect(x, y - 36 * scale, w, 32 * scale), boss.DisplayName, label, new Color(0.9f, 0.85f, 0.75f));
-            Fill(new Rect(x - 2, y - 2, w + 4, h + 4), new Color(0, 0, 0, 0.8f));
-            Fill(new Rect(x, y, w * bossTrail, h), new Color(0.95f, 0.7f, 0.25f));
-            Fill(new Rect(x, y, w * (boss.Health / boss.MaxHealth), h), Blood);
+            var name = new GUIStyle(label) { fontSize = Mathf.RoundToInt(22 * scale) };
+            Text(new Rect(x, y - 36 * scale, w, 32 * scale), boss.DisplayName.ToUpperInvariant(), name, Gold);
+            Gauge(new Rect(x, y, w, h), boss.Health / boss.MaxHealth, bossTrail,
+                new Color(0.5f, 0.06f, 0.1f), new Color(0.9f, 0.25f, 0.35f));
+            // Ornamental diamonds capping both ends.
+            Diamond(new Vector2(x - 12 * scale, y + h / 2f), 8 * scale, Gold);
+            Diamond(new Vector2(x + w + 12 * scale, y + h / 2f), 8 * scale, Gold);
         }
 
         void DrawLockMarker(GameManager g)

@@ -338,7 +338,7 @@ namespace KingLastPiece
                 {
                     start = 0.14f, end = 0.34f, shape = HitShape.Circle, range = 3.4f, damage = 9f, poise = 12f, shake = 0.25f,
                     slash = true, sweepFrom = 0f, sweepTo = 360f, sparkTrail = true,
-                    fx = SlashFxKind.AoeA, fxScale = 1.6f, fxHeight = 0.9f, fxGold = true,
+                    fx = SlashFxKind.AoeA, fxScale = 1.05f, fxHeight = 0.9f, fxGold = true,
                 },
                 new HitWindow
                 {
@@ -366,12 +366,12 @@ namespace KingLastPiece
                 {
                     start = 0.52f, end = 0.57f, shape = HitShape.Circle, range = 3.2f, damage = 20f, poise = 32f,
                     hitStop = 0.09f, shake = 0.45f, impact = true, kick = 0.6f,
-                    dust = true,
+                    dust = true, slash = true, sweepFrom = 0f, sweepTo = 360f,
                 },
             },
             moves = new[] { new MoveSeg(0.14f, 0.52f, 1.6f, Ease.InOut) },
             // Top-to-bottom slash while the King somersaults down onto the board.
-            cues = new[] { new FxCue { time = 0.4f, kind = SlashFxKind.SlashBVertical, scale = 1.6f, height = 1.4f, roll = 180f, gold = true } },
+            cues = new[] { new FxCue { time = 0.4f, kind = SlashFxKind.SlashBVertical, scale = 2.6f, height = 1.8f, roll = 180f, gold = true } },
         };
 
         /// <summary>Opener: leans in and rams across <paramref name="distance"/> (Royal Charge's light, sized to the gap).</summary>
@@ -403,7 +403,7 @@ namespace KingLastPiece
             {
                 new HitWindow { start = 0.82f, end = 0.9f, shape = HitShape.Circle, range = 4.3f, damage = 46f, poise = 65f,
                     hitStop = 0.12f, shake = 0.65f, impact = true, kick = 1f,
-                    dust = true },
+                    dust = true, slash = true, sweepFrom = 0f, sweepTo = 360f },
             },
             moves = new[] { new MoveSeg(0.42f, 0.82f, 3.0f, Ease.InOut) },
             // Top-to-bottom slash while the King somersaults down onto the board.

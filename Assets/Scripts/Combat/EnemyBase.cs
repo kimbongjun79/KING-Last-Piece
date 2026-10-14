@@ -615,7 +615,11 @@ namespace KingLastPiece
             airKnock = away.sqrMagnitude > 0.001f ? away.normalized * (alreadyAirborne ? 1.2f : 2.2f) : Vector3.zero;
             Enter(EState.Airborne);
             Effects.Sparks(transform.position + Vector3.up * (airHeight + 1f), VulnerableColor, 10, 5f);
-            if (!alreadyAirborne) Effects.Shockwave(FlatPos, 1.2f, VulnerableColor, 0.3f);
+            if (!alreadyAirborne)
+            {
+                Effects.Shockwave(FlatPos, 1.2f, VulnerableColor, 0.3f);
+                Vfx.Slash(SlashFxKind.SlashBVertical, transform.position + Vector3.up * 0.8f, Quaternion.LookRotation(airKnock.sqrMagnitude > 0.01f ? airKnock : transform.forward), 1.1f, Vfx.Gold);
+            }
         }
 
         void UpdateAirborne(float dt)
@@ -657,6 +661,7 @@ namespace KingLastPiece
         {
             Flash(VulnerableColor * 2.2f, 0.18f);
             Effects.Shockwave(FlatPos, 1.6f, VulnerableColor, 0.35f);
+            Vfx.Burst(SlashFxKind.SlashC, transform.position + Vector3.up * (modelHeight + 0.2f), Quaternion.identity, 0.9f, VulnerableColor, "flare", "spark");
             Effects.Sparks(transform.position + Vector3.up * 2f, VulnerableColor, 16, 4f);
             Game.Rig.Shake(0.15f);
         }
@@ -722,6 +727,7 @@ namespace KingLastPiece
             {
                 model.localPosition = Vector3.zero;
                 Effects.Shockwave(transform.position, 1.2f, new Color(0.5f, 0.1f, 0.4f), 0.3f);
+                Vfx.Dust(transform.position, 1.1f);  // set down on the board like a chess move
                 Enter(EState.Move);
             }
         }
