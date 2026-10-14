@@ -110,6 +110,28 @@ namespace KingLastPiece
             return Get(color * 0.3f, 0.2f, 0f, color * intensity);
         }
 
+        static Material transparentTemplate;
+
+        /// <summary>Alpha-blended Lit material (from the authored KLP_Transparent template so the variant ships).</summary>
+        public static Material Transparent(Color color, Color? emission = null)
+        {
+            Color e = emission ?? Color.black;
+            string key = $"T|{color}|{e}";
+            if (cache.TryGetValue(key, out var cached) && cached != null) return cached;
+            if (transparentTemplate == null)
+            {
+                var authored = Resources.Load<Material>("Materials/KLP_Transparent");
+                transparentTemplate = authored != null ? new Material(authored) : new Material(Template);
+            }
+            var m = new Material(transparentTemplate) { name = "KLP_T" + cache.Count };
+            m.SetColor(BaseColorId, color);
+            m.SetFloat(SmoothnessId, 0.2f);
+            m.EnableKeyword("_EMISSION");
+            m.SetColor(EmissionId, e);
+            cache[key] = m;
+            return m;
+        }
+
         public static bool HasEmission(Material m)
         {
             if (m == null || !m.HasProperty(EmissionId)) return false;

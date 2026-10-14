@@ -114,7 +114,7 @@ namespace KingLastPiece
         public SlashFxKind fx;
         public float fxScale = 1f, fxYaw, fxHeight = 0.9f;
         public bool fxFlip;            // mirrored (negative X scale) = the arc sweeps the other way
-        public bool fxGold;            // recolor the prefab to the King's gold
+        public bool fxGold;            // recolor the prefab to the King's accent (white)
         public bool dust;              // low dust burst around the impact (NamuFX smoke layers)
     }
 

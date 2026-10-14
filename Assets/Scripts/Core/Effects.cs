@@ -80,17 +80,19 @@ namespace KingLastPiece
 namespace KingLastPiece
 {
     /// <summary>
-    /// Ground range marker: a band of chess squares (two checkered rows) laid along the attack's sweep, so the real
-    /// reach reads on the board. Squares pop in progressively from <see cref="from"/> to <see cref="to"/>
-    /// (degrees relative to forward, + = right), hold briefly, then shrink away.
+    /// Ground range marker: a clean, tapered arc laid along the attack's sweep so the real reach reads on the board.
+    /// Two translucent lanes — an ivory outer edge and an onyx inner edge — grow from <see cref="from"/> to
+    /// <see cref="to"/> (degrees relative to forward, + = right), then shrink away.
     /// </summary>
     public class SlashFx : MonoBehaviour
     {
         public Vector3 center, forward;
-        public float radius, from, to, sweepTime, life = 0.42f;
+        public float radius, from, to, sweepTime, life = 0.3f;
         public Color color;
-        float t, side;
-        int columns, spawned;
+        const int Segments = 18;
+        const float Alpha = 0.55f;
+        float t;
+        int segments, spawned;
         Material ivoryMat, onyxMat;
 
         public static void Spawn(Vector3 center, Vector3 forward, float radius, float from, float to, float sweepTime, Color color)
@@ -107,58 +109,37 @@ namespace KingLastPiece
 
         void Start()
         {
-            // Ivory squares glow softly in the King's gold; onyx squares stay glossy black.
-            ivoryMat = MaterialLib.Get(new Color(0.95f, 0.92f, 0.82f), 0.6f, 0f, color * 0.9f);
-            onyxMat = MaterialLib.Get(new Color(0.05f, 0.05f, 0.06f), 0.9f, 0.2f);
-            side = Mathf.Clamp(radius * 0.12f, 0.24f, 0.44f);
-            float arcLength = Mathf.Abs(to - from) * Mathf.Deg2Rad * radius;
-            columns = Mathf.Max(4, Mathf.CeilToInt(arcLength / side));
+            ivoryMat = MaterialLib.Transparent(new Color(0.97f, 0.96f, 0.93f, Alpha), new Color(0.35f, 0.35f, 0.33f));
+            onyxMat = MaterialLib.Transparent(new Color(0.03f, 0.03f, 0.04f, Alpha * 0.9f));
+            // Full rings get more segments so the circle stays smooth.
+            segments = Mathf.Max(Segments, Mathf.CeilToInt(Mathf.Abs(to - from) / 10f));
         }
 
         void Update()
         {
             t += Time.deltaTime;
-            int target = Mathf.Min(columns, Mathf.CeilToInt(t / sweepTime * columns));
-            float step = (to - from) / columns;
+            int target = Mathf.Min(segments, Mathf.CeilToInt(t / sweepTime * segments));
+            float step = (to - from) / segments;
+            bool ring = Mathf.Abs(to - from) >= 359f;
             for (; spawned < target; spawned++)
             {
                 float a = from + step * (spawned + 0.5f);
                 Vector3 dir = Quaternion.Euler(0f, a, 0f) * forward;
-                var rot = Quaternion.LookRotation(dir).eulerAngles;
-                for (int row = 0; row < 2; row++)
+                // Thicker in the middle of the arc, tapered at both ends (a full ring stays even).
+                float k = ring ? 0.8f : Mathf.Sin((spawned + 0.5f) / segments * Mathf.PI);
+                float w = 0.08f + 0.14f * k;
+                var rot = (Quaternion.LookRotation(dir) * Quaternion.Euler(0f, 90f, 0f)).eulerAngles;
+                for (int lane = 0; lane < 2; lane++)
                 {
-                    float r = radius + (row == 0 ? -0.5f : 0.5f) * side;
-                    bool isLight = (spawned + row) % 2 == 0;
-                    var sq = PieceFactory.Part(PrimitiveType.Cube, transform, center + dir * r + Vector3.up * 0.035f,
-                        new Vector3(side * 0.94f, 0.03f, side * 0.94f), isLight ? ivoryMat : onyxMat, rot);
-                    sq.gameObject.AddComponent<PopSquare>().life = life;
+                    // Outer lane ivory, inner lane onyx; each lane's chord matches its own radius so they stay seamless.
+                    float r = radius + (lane == 0 ? 0.5f : -0.5f) * w;
+                    float chord = Mathf.Abs(step) * Mathf.Deg2Rad * r;
+                    PieceFactory.Part(PrimitiveType.Cube, transform, center + dir * r + Vector3.up * 0.04f,
+                            new Vector3(w, 0.01f, chord), lane == 0 ? ivoryMat : onyxMat, rot)
+                        .gameObject.AddComponent<FadeSink>().life = life;
                 }
             }
-            if (spawned >= columns && transform.childCount == 0) Destroy(gameObject);
-        }
-    }
-
-    /// <summary>Pops a marker square in, holds it, then shrinks it away.</summary>
-    public class PopSquare : MonoBehaviour
-    {
-        public float life = 0.4f;
-        const float PopIn = 0.07f, ShrinkOut = 0.16f;
-        float t;
-        Vector3 full;
-
-        void Start()
-        {
-            full = transform.localScale;
-            transform.localScale = new Vector3(0f, full.y, 0f);
-        }
-
-        void Update()
-        {
-            t += Time.deltaTime;
-            float k = t < PopIn ? PoseTrack.Curve(Ease.OutBack, t / PopIn)
-                : t > life - ShrinkOut ? 1f - Mathf.Clamp01((t - (life - ShrinkOut)) / ShrinkOut) : 1f;
-            transform.localScale = new Vector3(full.x * k, full.y, full.z * k);
-            if (t >= life) Destroy(gameObject);
+            if (spawned >= segments && transform.childCount == 0) Destroy(gameObject);
         }
     }
 

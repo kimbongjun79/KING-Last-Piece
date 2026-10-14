@@ -565,7 +565,7 @@ namespace KingLastPiece
                 foreach (var cue in atk.cues)
                     if (prevT < cue.time && t >= cue.time)
                         Vfx.Slash(cue.kind, transform.position + Vector3.up * cue.height, transform.rotation * Quaternion.Euler(0f, cue.yaw, cue.roll),
-                            cue.scale, cue.gold ? Vfx.Gold : (Color?)null, cue.mirror);
+                            cue.scale, cue.gold ? Vfx.Accent : (Color?)null, cue.mirror);
 
             bool trail = t >= atk.FirstHit - 0.07f && t <= atk.LastHit + 0.03f;
             // An authored slash replaces the crown trail for this attack.
@@ -581,8 +581,8 @@ namespace KingLastPiece
                     windowStarted[i] = true;
                     if (w.fx != SlashFxKind.None)
                         Vfx.Slash(w.fx, transform.position + Vector3.up * w.fxHeight, transform.rotation * Quaternion.Euler(0f, w.fxYaw, 0f),
-                            w.fxScale, w.fxGold ? Vfx.Gold : (Color?)null, w.fxFlip);
-                    // Ground range marker (a ring of chess squares) shows the attack's real reach.
+                            w.fxScale, w.fxGold ? Vfx.Accent : (Color?)null, w.fxFlip);
+                    // Ground range marker (translucent black/white arc) shows the attack's real reach.
                     if (w.slash)
                         SlashFx.Spawn(FlatPos + transform.forward * w.forward, transform.forward, w.range * 0.82f,
                             w.sweepFrom, w.sweepTo, w.end - w.start, new Color(1f, 0.82f, 0.45f));
@@ -596,7 +596,7 @@ namespace KingLastPiece
                     }
                 }
                 if (w.sparkTrail && Random.value < 0.8f)
-                    Effects.Sparks(crownTrail.transform.position, new Color(1f, 0.8f, 0.4f), 2, 6f);
+                    Effects.Sparks(crownTrail.transform.position, Vfx.Accent, 2, 6f);
                 DoHits(w, hitSets[i], Mathf.Clamp01((t - w.start) / Mathf.Max(0.001f, w.end - w.start)));
             }
 
@@ -740,7 +740,7 @@ namespace KingLastPiece
                 Health = Mathf.Min(MaxHealth, Health + HealAmount);
                 Flash(new Color(1f, 0.8f, 0.3f) * 2f, 0.25f);
                 Effects.Sparks(transform.position + Vector3.up * 1.2f, new Color(1f, 0.8f, 0.3f), 14, 3f);
-                Vfx.Slash(SlashFxKind.SlashD, transform.position + Vector3.up * 0.3f, transform.rotation, 0.9f, Vfx.Gold);
+                Vfx.Slash(SlashFxKind.SlashD, transform.position + Vector3.up * 0.3f, transform.rotation, 0.9f, new Color(1f, 0.8f, 0.4f));
             }
             if (stateTime >= HealDuration)
             {
@@ -856,7 +856,7 @@ namespace KingLastPiece
                 crownTrail.emitting = true;
 
                 if (Random.value < 0.6f)
-                    Effects.Sparks(piecePos + Vector3.up * 1.2f, new Color(1f, 0.8f, 0.4f), 2, 4f);
+                    Effects.Sparks(piecePos + Vector3.up * 1.2f, Vfx.Accent, 2, 4f);
 
                 foreach (var e in Game.Enemies)
                 {
@@ -866,7 +866,7 @@ namespace KingLastPiece
                     if (e.TakeHit(SwingHitDamage, 50f, piecePos))
                     {
                         Game.ReportDamage(e, SwingHitDamage);
-                        Effects.Sparks(e.transform.position + Vector3.up, new Color(1f, 0.85f, 0.5f), 14, 6f);
+                        Effects.Sparks(e.transform.position + Vector3.up, Vfx.Accent, 14, 6f);
                         Game.Rig.Shake(0.3f);
                     }
                 }
@@ -884,8 +884,8 @@ namespace KingLastPiece
                     Game.HitStop(0.12f);
                     Game.Rig.Kick(1f);
                     Game.Rig.Shake(0.5f);
-                    Effects.Shockwave(FlatPos, 2.2f, new Color(1f, 0.8f, 0.4f), 0.4f);
-                    Vfx.Slash(SlashFxKind.AoeA, transform.position + Vector3.up * 0.9f, transform.rotation, 1.2f, Vfx.Gold);
+                    Effects.Shockwave(FlatPos, 2.2f, Vfx.Accent, 0.4f);
+                    Vfx.Slash(SlashFxKind.AoeA, transform.position + Vector3.up * 0.9f, transform.rotation, 1.2f, Vfx.Accent);
                     LockTarget = null;
                 }
                 float p = Mathf.Clamp01((t - CounterRelease) / (CounterDuration - CounterRelease));

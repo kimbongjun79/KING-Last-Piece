@@ -26,7 +26,8 @@ namespace KingLastPiece
             "Hits burst into black & white square confetti. Slams make the real board squares ripple outward, with a square shockwave and a small center crack.",
         };
 
-        public static readonly Color Gold = new Color(1f, 0.8f, 0.4f);
+        /// <summary>The King's attack-effect color (white, slightly warm).</summary>
+        public static readonly Color Accent = new Color(1f, 0.97f, 0.92f);
         public static readonly Color Ember = new Color(1f, 0.3f, 0.1f);
         public static readonly Color Ivory = new Color(0.92f, 0.89f, 0.8f);
         public static readonly Color Onyx = new Color(0.06f, 0.06f, 0.07f);
@@ -42,19 +43,19 @@ namespace KingLastPiece
             switch (style)
             {
                 case VfxStyle.CrackedBoard:
-                    HitFlashFx.Spawn(pos, Gold, heavy ? 0.9f : 0.6f);
-                    Burst(SlashFxKind.SlashC, pos, Quaternion.LookRotation(dir), heavy ? 0.9f : 0.6f, Gold, "flare", "spark");
+                    HitFlashFx.Spawn(pos, Accent, heavy ? 0.9f : 0.6f);
+                    Burst(SlashFxKind.SlashC, pos, Quaternion.LookRotation(dir), heavy ? 0.9f : 0.6f, Accent, "flare", "spark");
                     Chips(pos, dir, heavy ? 18 : 11, heavy ? 6.5f : 5f, Ivory, Onyx, heavy ? 0.16f : 0.13f);
-                    Effects.Sparks(pos, Gold, heavy ? 8 : 4, heavy ? 6f : 4f);
+                    Effects.Sparks(pos, Accent, heavy ? 8 : 4, heavy ? 6f : 4f);
                     break;
                 case VfxStyle.BoardRipple:
                     HitFlashFx.Spawn(pos, Ivory, heavy ? 0.9f : 0.6f);
                     Burst(SlashFxKind.SlashC, pos, Quaternion.LookRotation(dir), heavy ? 0.9f : 0.6f, Ivory, "flare", "spark");
                     Confetti(pos, dir, heavy ? 22 : 14, heavy ? 6.5f : 5f);
-                    Effects.Sparks(pos, Gold, heavy ? 6 : 3, 4f);
+                    Effects.Sparks(pos, Accent, heavy ? 6 : 3, 4f);
                     break;
                 default:
-                    Effects.Sparks(pos, new Color(1f, 0.85f, 0.5f), heavy ? 16 : 10, heavy ? 7f : 5f);
+                    Effects.Sparks(pos, Accent, heavy ? 16 : 10, heavy ? 7f : 5f);
                     break;
             }
         }
@@ -245,7 +246,7 @@ namespace KingLastPiece
         public static void GroundImpact(VfxStyle style, Vector3 center, float radius, float strength, bool hostile = false)
         {
             center.y = 0f;
-            Color accent = hostile ? Ember : Gold;
+            Color accent = hostile ? Ember : Accent;
             switch (style)
             {
                 case VfxStyle.CrackedBoard:

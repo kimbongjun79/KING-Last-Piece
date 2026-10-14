@@ -491,8 +491,8 @@ namespace KingLastPiece
                 // Slam into the board's edge.
                 wallHit = true;
                 launchVelocity = Vector3.zero;
-                Effects.Shockwave(p, 1.6f, new Color(1f, 0.7f, 0.35f), 0.35f);
-                Effects.Sparks(p + Vector3.up * launchHeight, new Color(1f, 0.8f, 0.4f), 16, 6f);
+                Effects.Shockwave(p, 1.6f, Vfx.Accent, 0.35f);
+                Effects.Sparks(p + Vector3.up * launchHeight, Vfx.Accent, 16, 6f);
                 Game.Rig.Shake(0.35f);
             }
             transform.position = p;
@@ -512,7 +512,7 @@ namespace KingLastPiece
                 if (e.TakeHit(22f, 45f, transform.position))
                 {
                     Game.ReportDamage(e, 22f);
-                    Effects.Sparks(e.transform.position + Vector3.up, new Color(1f, 0.85f, 0.5f), 12, 6f);
+                    Effects.Sparks(e.transform.position + Vector3.up, Vfx.Accent, 12, 6f);
                     Game.Rig.Shake(0.25f);
                 }
             }
@@ -618,7 +618,7 @@ namespace KingLastPiece
             if (!alreadyAirborne)
             {
                 Effects.Shockwave(FlatPos, 1.2f, VulnerableColor, 0.3f);
-                Vfx.Slash(SlashFxKind.SlashBVertical, transform.position + Vector3.up * 0.8f, Quaternion.LookRotation(airKnock.sqrMagnitude > 0.01f ? airKnock : transform.forward), 1.1f, Vfx.Gold);
+                Vfx.Slash(SlashFxKind.SlashBVertical, transform.position + Vector3.up * 0.8f, Quaternion.LookRotation(airKnock.sqrMagnitude > 0.01f ? airKnock : transform.forward), 1.1f, Vfx.Accent);
             }
         }
 
