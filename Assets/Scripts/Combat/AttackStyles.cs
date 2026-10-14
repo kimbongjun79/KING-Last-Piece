@@ -300,6 +300,7 @@ namespace KingLastPiece
                     sweep = true, sweepFrom = 110f * side, sweepTo = -110f * side, slash = true,
                     // Plays in place of the crown trail, at the height the crown sweeps through.
                     fx = SlashFxKind.SlashB, fxScale = 1.7f, fxHeight = 1.2f, fxFlip = side > 0f, fxGold = true,
+                    fxYaw = side > 0f ? 180f : 0f,  // the mirrored 1st whip faces backwards otherwise
                 },
             },
             moves = new[] { new MoveSeg(0.04f, 0.3f, 1.0f) },
