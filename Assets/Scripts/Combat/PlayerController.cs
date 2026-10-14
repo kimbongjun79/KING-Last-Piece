@@ -164,6 +164,12 @@ namespace KingLastPiece
             if (GameInput.HeavyAttack) Press(Buffered.Heavy);
             if (GameInput.Dodge) Press(Buffered.Dodge);
             if (GameInput.Heal) Press(Buffered.Heal);
+            // Holding an attack button keeps re-queuing it, so the combo continues at each cancel point.
+            if (buffer == Buffered.None)
+            {
+                if (GameInput.LightHeld) Press(Buffered.Light);
+                else if (GameInput.HeavyHeld) Press(Buffered.Heavy);
+            }
             if (GameInput.LockOn) ToggleLock();
 
             bufferTimer -= dt;
@@ -351,6 +357,8 @@ namespace KingLastPiece
                         Game.Rig.Shake(w.shake);
                     }
                 }
+                if (w.sparkTrail && Random.value < 0.8f)
+                    Effects.Sparks(crownTrail.transform.position, new Color(1f, 0.8f, 0.4f), 2, 6f);
                 DoHits(w, hitSets[i], Mathf.Clamp01((t - w.start) / Mathf.Max(0.001f, w.end - w.start)));
             }
 

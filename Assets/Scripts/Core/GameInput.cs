@@ -53,6 +53,18 @@ namespace KingLastPiece
             (Keyboard.current != null && Keyboard.current.jKey.wasPressedThisFrame) ||
             (Gamepad.current != null && Gamepad.current.rightShoulder.wasPressedThisFrame);
 
+        /// <summary>Light attack button held down (holding keeps the combo going).</summary>
+        public static bool LightHeld =>
+            (Mouse.current != null && Mouse.current.leftButton.isPressed && Cursor.lockState == CursorLockMode.Locked) ||
+            (Keyboard.current != null && Keyboard.current.jKey.isPressed) ||
+            (Gamepad.current != null && Gamepad.current.rightShoulder.isPressed);
+
+        /// <summary>Heavy attack button held down (holding repeats the heavy).</summary>
+        public static bool HeavyHeld =>
+            (Mouse.current != null && Mouse.current.rightButton.isPressed && Cursor.lockState == CursorLockMode.Locked) ||
+            (Keyboard.current != null && Keyboard.current.kKey.isPressed) ||
+            (Gamepad.current != null && Gamepad.current.rightTrigger.isPressed);
+
         public static bool HeavyAttack =>
             (Mouse.current != null && Mouse.current.rightButton.wasPressedThisFrame) ||
             (Keyboard.current != null && Keyboard.current.kKey.wasPressedThisFrame) ||

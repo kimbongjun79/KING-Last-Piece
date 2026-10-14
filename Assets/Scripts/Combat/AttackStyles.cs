@@ -109,6 +109,7 @@ namespace KingLastPiece
         public float sweepFrom, sweepTo;
         public bool slash;             // draw a ground crescent along the sweep (shows the real reach)
         public float kick;             // camera zoom punch on window start
+        public bool sparkTrail;        // spray sparks from the crown while the window is active
     }
 
     public struct MoveSeg
@@ -262,24 +263,34 @@ namespace KingLastPiece
             moves = new[] { new MoveSeg(0.04f, 0.3f, 1.0f) },
         };
 
-        /// <summary>3rd hit: a big grounded spin that hits everything around the King.</summary>
+        /// <summary>3rd hit: a violent three-turn spin that wobbles and bucks, hitting everything around twice.</summary>
         static AttackDef EnsembleCyclone() => new AttackDef
         {
-            name = "Royal Cyclone", duration = 0.72f, cancelAt = 0.48f, cost = 15f,
+            name = "Royal Cyclone", duration = 0.86f, cancelAt = 0.6f, cost = 15f,
             pose = new PoseTrack()
                 .Key(0f, P())
-                .Key(0.12f, P(tilt: 16f, heading: -80f, spin: -80f, squash: -0.18f), Ease.Out)
-                .Key(0.42f, P(tilt: 50f, heading: 650f, spin: 650f, lift: 0.3f, squash: 0.06f), Ease.Linear)
-                .Key(0.72f, P(heading: 720f, spin: 720f), Ease.OutBack),
+                .Key(0.12f, P(tilt: 22f, heading: -110f, spin: -110f, squash: -0.26f), Ease.Out)
+                // Alternating deep/shallow lean and hops make the spin wobble and buck like a thrown top.
+                .Key(0.22f, P(tilt: 70f, heading: 160f, spin: 160f, lift: 0.5f, squash: 0.12f), Ease.Linear)
+                .Key(0.32f, P(tilt: 50f, heading: 430f, spin: 430f, lift: 0.12f, squash: -0.08f), Ease.Linear)
+                .Key(0.42f, P(tilt: 74f, heading: 700f, spin: 700f, lift: 0.6f, squash: 0.14f), Ease.Linear)
+                .Key(0.52f, P(tilt: 56f, heading: 980f, spin: 980f, lift: 0.1f, squash: -0.1f), Ease.Linear)
+                .Key(0.62f, P(tilt: 18f, heading: 1080f, spin: 1080f, squash: -0.24f), Ease.Out)
+                .Key(0.86f, P(heading: 1080f, spin: 1080f), Ease.OutBack),
             hits = new[]
             {
                 new HitWindow
                 {
-                    start = 0.14f, end = 0.42f, shape = HitShape.Circle, range = 3.4f, damage = 15f, poise = 18f, shake = 0.2f,
-                    slash = true, sweepFrom = 0f, sweepTo = 360f,
+                    start = 0.14f, end = 0.34f, shape = HitShape.Circle, range = 3.4f, damage = 9f, poise = 12f, shake = 0.25f,
+                    slash = true, sweepFrom = 0f, sweepTo = 360f, sparkTrail = true,
+                },
+                new HitWindow
+                {
+                    start = 0.35f, end = 0.56f, shape = HitShape.Circle, range = 3.4f, damage = 9f, poise = 12f, shake = 0.3f,
+                    slash = true, sweepFrom = 0f, sweepTo = 360f, sparkTrail = true, kick = 0.35f,
                 },
             },
-            moves = new[] { new MoveSeg(0.1f, 0.42f, 0.6f, Ease.InOut) },
+            moves = new[] { new MoveSeg(0.1f, 0.56f, 0.8f, Ease.InOut) },
         };
 
         /// <summary>4th hit: leaps, somersaults once in the air and slams down with a shockwave.</summary>
