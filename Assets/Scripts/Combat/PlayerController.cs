@@ -19,6 +19,10 @@ namespace KingLastPiece
         const float SprintSpeed = 8.2f, SprintDrain = 14f, SprintRecoverAt = 20f;
         /// <summary>Light (combo) attacks cost only this fraction of their listed stamina.</summary>
         const float LightCostScale = 0.35f;
+        // Soft auto-targeting: nearby piece within this range/angle of the aim gets faced when an attack starts.
+        // Close pieces get a wide cone (helps when they slip to the side); farther ones need to be roughly aimed at.
+        const float SoftTargetMinRange = 2.5f, SoftTargetMaxRange = 4.5f, SoftTargetCloseRange = 3f;
+        const float SoftTargetCloseAngle = 120f, SoftTargetFarAngle = 60f;
         const float DodgeDuration = 0.5f, IFrameStart = 0.03f, IFrameEnd = 0.36f, DodgeCancelAt = 0.4f;
 
         // Dodge charges replace stamina for rolling: a short burst of rolls, refilled quickly.
@@ -53,6 +57,7 @@ namespace KingLastPiece
         public bool CounterReady => Game != null && Game.SlowMoActive && justTarget != null && justTarget.CanBeGrabbed;
         public bool IsCountering => state == State.Counter;
         public bool IsSprinting { get; private set; }
+        public Vector3 LastDodgeDirection { get; private set; }
         public bool IsDodging => state == State.Dodge;
         public bool IsAttacking => state == State.Attack;
         public bool IsIdle => state == State.Normal;
@@ -79,7 +84,7 @@ namespace KingLastPiece
         float dodgeRecharge, sprintBlend;
         bool sprintExhausted;
         bool justThisDodge;
-        EnemyBase justTarget, counterTarget;
+        EnemyBase justTarget, counterTarget, softTarget;
         Vector3 counterFrom, counterTo;
         float counterAngle0;
         bool counterReleased;
@@ -385,18 +390,52 @@ namespace KingLastPiece
             Enter(State.Attack);
 
             Vector3 dir = InputDirection();
-            if (LockTarget != null) dir = LockTarget.FlatPos - FlatPos;
+            // Soft auto-targeting (no visuals): without a lock-on, turn toward a nearby piece in the aimed direction.
+            softTarget = LockTarget == null ? FindSoftTarget(dir.sqrMagnitude > 0.01f ? dir : transform.forward, atk.Reach) : null;
+            var aim = AimTarget;
+            if (aim != null) dir = aim.FlatPos - FlatPos;
             if (dir.sqrMagnitude > 0.01f) transform.rotation = Quaternion.LookRotation(new Vector3(dir.x, 0f, dir.z));
+        }
+
+        /// <summary>Lock-on target, or the soft auto-target picked when the attack started.</summary>
+        EnemyBase AimTarget => LockTarget != null ? LockTarget : softTarget != null && !softTarget.IsDead ? softTarget : null;
+
+        /// <summary>
+        /// Nearest piece within reach that is roughly where the player is aiming (stick/keys, or facing when idle).
+        /// Distance matters most; the angle only breaks ties, so close enemies win even slightly off-axis.
+        /// </summary>
+        EnemyBase FindSoftTarget(Vector3 aimDir, float reach)
+        {
+            float maxDist = Mathf.Clamp(reach + 0.8f, SoftTargetMinRange, SoftTargetMaxRange);
+            EnemyBase best = null;
+            float bestScore = float.MaxValue;
+            foreach (var e in Game.Enemies)
+            {
+                if (e == null || e.IsDead || !e.Targetable) continue;
+                Vector3 to = e.FlatPos - FlatPos;
+                float d = to.magnitude;
+                if (d > maxDist + e.Radius) continue;
+                float angle = d > 0.01f ? Vector3.Angle(aimDir, to) : 0f;
+                if (angle > (d <= SoftTargetCloseRange ? SoftTargetCloseAngle : SoftTargetFarAngle)) continue;
+                float score = d + angle * 0.02f;
+                if (score < bestScore) { bestScore = score; best = e; }
+            }
+            return best;
         }
 
         void UpdateAttack(float dt)
         {
             float t = stateTime, prevT = t - dt;
 
-            if (t < atk.FirstHit && LockTarget != null) FaceTowards(LockTarget.FlatPos - FlatPos, 540f);
+            var aim = AimTarget;
+            if (t < atk.FirstHit && aim != null) FaceTowards(aim.FlatPos - FlatPos, 540f);
+
+            // Dodge can cancel the attack at any time except during its first active hit frames.
+            bool inActive = t >= atk.FirstHit && t <= atk.hits[0].end;
+            if (buffer == Buffered.Dodge && !inActive && TryAct()) return;
 
             // Root motion from move segments.
-            bool blocked = LockTarget != null && (LockTarget.FlatPos - FlatPos).magnitude < Radius + LockTarget.Radius + 0.3f;
+            bool blocked = aim != null && (aim.FlatPos - FlatPos).magnitude < Radius + aim.Radius + 0.3f;
             if (!blocked)
             {
                 foreach (var m in atk.moves)
@@ -491,12 +530,50 @@ namespace KingLastPiece
             DodgeCharges--;
             dodgeRecharge = -DodgeRechargeDelay;
             justThisDodge = false;
-            Vector3 dir = InputDirection();
+            Vector3 dir = AutoDodgeDirection(InputDirection());
             bool backstep = dir.sqrMagnitude <= 0.01f;
             dodgeDir = backstep ? -transform.forward : dir.normalized;
+            LastDodgeDirection = dodgeDir;
             if (!backstep) transform.rotation = Quaternion.LookRotation(dodgeDir);
             Enter(State.Dodge);
         }
+
+        /// <summary>
+        /// Steers the roll out of the most imminent attack aimed at the King:
+        /// across a dash/lunge line (perpendicular to its path), or out of a leap/slam circle.
+        /// Free input that already escapes is kept; no input rolls along the escape instead of backstepping.
+        /// </summary>
+        Vector3 AutoDodgeDirection(Vector3 input)
+        {
+            bool hasInput = input.sqrMagnitude > 0.01f;
+            Vector3 escape = Vector3.zero;
+            bool isLine = false;
+            float soonest = float.MaxValue;
+            foreach (var e in Game.Enemies)
+            {
+                if (e == null || !e.TryGetThreat(FlatPos, Radius, out var esc, out var line, out var tti)) continue;
+                if (tti < soonest) { soonest = tti; escape = esc; isLine = line; }
+            }
+            if (escape == Vector3.zero) return input;
+
+            if (isLine)
+            {
+                // Pick the side the player leans toward; otherwise stay on our side, unless that side is the board edge.
+                float lean = hasInput ? Vector3.Dot(input.normalized, escape) : 0f;
+                if (lean < -0.1f) escape = -escape;
+                else if (Mathf.Abs(lean) <= 0.1f && !InsideBoard(FlatPos + escape * 2.5f)) escape = -escape;
+                // Input clearly sideways already escapes the line; keep it.
+                if (hasInput && Mathf.Abs(Vector3.Dot(input.normalized, escape)) >= 0.7f) return input;
+                return escape;
+            }
+
+            // Circle: keep input unless it points back into the blast.
+            if (hasInput && Vector3.Dot(input.normalized, escape) >= 0.2f) return input;
+            return escape;
+        }
+
+        static bool InsideBoard(Vector3 p) =>
+            Mathf.Abs(p.x) <= GameManager.PlayableHalf && Mathf.Abs(p.z) <= GameManager.PlayableHalf;
 
         void UpdateDodge(float dt)
         {

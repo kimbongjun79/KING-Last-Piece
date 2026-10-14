@@ -47,6 +47,45 @@ namespace KingLastPiece
                 return float.PositiveInfinity;
             }
         }
+        /// <summary>Direction of the current attack (dashes/lunges travel along it).</summary>
+        public Vector3 AttackDirection => plan.dir;
+
+        /// <summary>
+        /// If this piece's wind-up/attack is about to hit <paramref name="playerPos"/>, gives the way out:
+        /// perpendicular to a dash/lunge line (<paramref name="isLine"/>), or radially out of a leap/slam circle.
+        /// Used to auto-steer the King's roll.
+        /// </summary>
+        public bool TryGetThreat(Vector3 playerPos, float playerRadius, out Vector3 escape, out bool isLine, out float timeToImpact)
+        {
+            const float Margin = 1.2f, MaxLead = 0.9f;
+            escape = Vector3.zero;
+            isLine = false;
+            timeToImpact = TimeToImpact;
+            if (IsDead || (state != EState.Windup && state != EState.Attack) || timeToImpact > MaxLead) return false;
+            playerPos.y = 0f;
+
+            if (plan.kind == AtkKind.Dash || plan.kind == AtkKind.Lunge)
+            {
+                Vector3 d = plan.dir;
+                float s = Mathf.Clamp(Vector3.Dot(playerPos - atkStart, d), 0f, plan.length + plan.radius);
+                Vector3 off = playerPos - (atkStart + d * s);
+                off.y = 0f;
+                if (off.magnitude > plan.radius + playerRadius + Margin) return false;
+                Vector3 perp = Vector3.Cross(Vector3.up, d);
+                float side = Vector3.Dot(off, perp);
+                escape = perp * (Mathf.Abs(side) > 0.05f ? Mathf.Sign(side) : 1f);
+                isLine = true;
+                return true;
+            }
+
+            Vector3 center = plan.kind == AtkKind.Leap ? plan.target : atkStart;
+            Vector3 radial = playerPos - new Vector3(center.x, 0f, center.z);
+            if (radial.magnitude > plan.radius + playerRadius + Margin) return false;
+            escape = radial.sqrMagnitude > 0.01f ? radial.normalized : (playerPos - FlatPos).normalized;
+            if (escape.sqrMagnitude < 0.01f) escape = -transform.forward;
+            return true;
+        }
+
         public bool IgnoresCollision =>
             IsDead || state == EState.Spawning || state == EState.Grabbed || state == EState.Launched || state == EState.Airborne ||
             (state == EState.Attack && (plan.kind == AtkKind.Leap || plan.kind == AtkKind.Dash));

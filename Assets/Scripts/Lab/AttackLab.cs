@@ -267,6 +267,118 @@ namespace KingLastPiece
             }
         }
 
+        /// <summary>
+        /// Auto-dodge: a bishop / rook dashes at the King and he rolls with NO direction input — the roll should be
+        /// perpendicular to the dash and take no damage. Auto-target: with no lock-on, a light attack should turn to
+        /// a dummy at the King's side, but ignore one directly behind him.
+        /// </summary>
+        IEnumerator AutoAssistScenario(string dir, StringBuilder stats)
+        {
+            var hud = game.GetComponent<Hud>();
+            if (hud != null) hud.enabled = false;
+            var player = game.Player;
+            Texture2D sheet = null;
+            int tileW = 0, tileH = 0, shot = 0;
+            const int cols = 5, rows = 2;
+
+            var cases = new[]
+            {
+                (PieceType.Bishop, new Vector3(-4.2f, 0f, 4.2f)),
+                (PieceType.Rook, new Vector3(0f, 0f, 6.5f)),
+            };
+            for (int c = 0; c < cases.Length; c++)
+            {
+                game.ClearEnemies();
+                player.ResetForWave(PlayerStart, 0f);
+                player.GodMode = false;
+                var enemy = game.SpawnEnemy(cases[c].Item1, PlayerStart + cases[c].Item2);
+                game.Rig.OverridePosition = PlayerStart + new Vector3(7f, 6f, -3f);
+                game.Rig.OverrideLookAt = PlayerStart + new Vector3(0f, 0.5f, 1.5f);
+
+                bool dashing = false;
+                for (int f = 0; f < 900 && enemy != null; f++)
+                {
+                    yield return null;
+                    if (enemy.TryGetThreat(player.FlatPos, player.Radius, out _, out var line, out var tti) && line && tti < 0.3f)
+                    {
+                        dashing = true;
+                        break;
+                    }
+                }
+                float hpBefore = player.Health;
+                Vector3 atkDir = enemy != null ? enemy.AttackDirection : Vector3.zero;
+                player.Press(PlayerController.Buffered.Dodge);  // no movement input
+                for (int i = 0; i < cols; i++)
+                {
+                    for (int f = 0; f < 7; f++) yield return null;
+                    yield return new WaitForEndOfFrame();
+                    var tex = ScreenCapture.CaptureScreenshotAsTexture();
+                    if (sheet == null)
+                    {
+                        tileW = tex.width;
+                        tileH = tex.height;
+                        sheet = new Texture2D(tileW * cols, tileH * rows, TextureFormat.RGB24, false);
+                    }
+                    if (tex.width == tileW && tex.height == tileH)
+                        sheet.SetPixels32(i * tileW, (rows - 1 - c) * tileH, tileW, tileH, tex.GetPixels32());
+                    Destroy(tex);
+                    shot++;
+                }
+                for (int f = 0; f < 40; f++) yield return null;
+                float angle = Vector3.Angle(atkDir, player.LastDodgeDirection);
+                stats.AppendLine($"AutoDodge\t{cases[c].Item1}\tdashing={dashing}\troll_vs_attack_angle={angle:0}\tdamage_taken={hpBefore - player.Health:0}");
+            }
+            player.GodMode = true;
+
+            // Auto-target: dummy on the right (90°), dummy behind (180°); King faces +Z, no lock, no input.
+            game.ClearEnemies();
+            player.ResetForWave(PlayerStart, 0f);
+            var side = game.SpawnCustom<TrainingDummy>(PieceType.Pawn, PlayerStart + new Vector3(2.2f, 0f, 0f));
+            for (int f = 0; f < 50; f++) yield return null;
+            int before = game.DamageEvents;
+            player.Press(PlayerController.Buffered.Light);
+            for (int f = 0; f < 6; f++) yield return null;
+            float sideAngle = Vector3.Angle(player.transform.forward, side.FlatPos - player.FlatPos);
+            for (int f = 0; f < 34; f++) yield return null;
+            int sideHits = game.DamageEvents - before;
+
+            game.ClearEnemies();
+            player.ResetForWave(PlayerStart, 0f);
+            var behind = game.SpawnCustom<TrainingDummy>(PieceType.Pawn, PlayerStart + new Vector3(0f, 0f, -2.2f));
+            for (int f = 0; f < 50; f++) yield return null;
+            player.Press(PlayerController.Buffered.Light);
+            for (int f = 0; f < 6; f++) yield return null;
+            float behindAngle = Vector3.Angle(player.transform.forward, behind.FlatPos - player.FlatPos);
+            stats.AppendLine($"AutoTarget\tside_facing_angle={sideAngle:0}\tside_hits={sideHits}\tbehind_facing_angle={behindAngle:0}");
+
+            // Dodge cancel: during a light wind-up, and right after the heavy's first hit (long before its old cancel point).
+            game.ClearEnemies();
+            player.ResetForWave(PlayerStart, 0f);
+            for (int f = 0; f < 10; f++) yield return null;
+            player.Press(PlayerController.Buffered.Light);
+            for (int f = 0; f < 4; f++) yield return null;
+            player.Press(PlayerController.Buffered.Dodge);
+            for (int f = 0; f < 2; f++) yield return null;
+            bool cancelWindup = player.IsDodging;
+            for (int f = 0; f < 60; f++) yield return null;
+            player.Press(PlayerController.Buffered.Heavy);
+            yield return null;
+            var heavy = player.CurrentAttack;
+            while (player.CurrentAttack == heavy && player.StateTime < heavy.hits[0].end + 0.03f) yield return null;
+            float pressedAt = player.StateTime;
+            player.Press(PlayerController.Buffered.Dodge);
+            for (int f = 0; f < 2; f++) yield return null;
+            stats.AppendLine($"DodgeCancel\tduring_light_windup={cancelWindup}\tafter_heavy_hit={player.IsDodging}" +
+                             $"\tat={pressedAt:0.00}s_vs_old_cancel={heavy.cancelAt:0.00}s");
+
+            if (sheet != null)
+            {
+                sheet.Apply();
+                File.WriteAllBytes(Path.Combine(dir, "10_Auto_Dodge.png"), sheet.EncodeToPNG());
+                Destroy(sheet);
+            }
+        }
+
         static string GetArg(string name)
         {
             var args = System.Environment.GetCommandLineArgs();
@@ -371,6 +483,7 @@ namespace KingLastPiece
             yield return JustDodgeScenario(dir, stats);
             yield return PieceLineup(dir);
             yield return StaggerScenario(dir, stats);
+            yield return AutoAssistScenario(dir, stats);
 
             File.WriteAllText(Path.Combine(dir, "stats.tsv"), stats.ToString());
             Application.Quit();
