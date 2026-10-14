@@ -164,6 +164,48 @@ namespace KingLastPiece
             }
         }
 
+        /// <summary>All piece models side by side, turned toward the King: front, side and close-up views.</summary>
+        IEnumerator PieceLineup(string dir)
+        {
+            var hud = game.GetComponent<Hud>();
+            if (hud != null) hud.enabled = false;
+            game.ClearEnemies();
+            var player = game.Player;
+            player.ResetForWave(new Vector3(0f, 0f, -4f), 0f);
+            var types = new[] { PieceType.Pawn, PieceType.Knight, PieceType.Bishop, PieceType.Rook, PieceType.Queen };
+            for (int i = 0; i < types.Length; i++)
+                game.SpawnCustom<TrainingDummy>(types[i], new Vector3((i - 2) * 1.8f, 0f, 0f));
+            for (int f = 0; f < 150; f++) yield return null;  // land + turn toward the King
+
+            var views = new[]
+            {
+                (new Vector3(0f, 2.2f, -8.5f), new Vector3(0f, 1.1f, 0f)),   // front (from behind the King)
+                (new Vector3(9f, 1.8f, 0.5f), new Vector3(0f, 1.0f, 0f)),     // side
+                (new Vector3(-1.5f, 1.8f, -3.2f), new Vector3(-0.9f, 1.2f, 0f)), // close-up pawn / knight
+            };
+            Texture2D sheet = null;
+            int tileW = 0, tileH = 0;
+            for (int v = 0; v < views.Length; v++)
+            {
+                game.Rig.OverridePosition = views[v].Item1;
+                game.Rig.OverrideLookAt = views[v].Item2;
+                yield return null;
+                yield return new WaitForEndOfFrame();
+                var tex = ScreenCapture.CaptureScreenshotAsTexture();
+                if (sheet == null)
+                {
+                    tileW = tex.width;
+                    tileH = tex.height;
+                    sheet = new Texture2D(tileW * views.Length, tileH, TextureFormat.RGB24, false);
+                }
+                if (tex.width == tileW && tex.height == tileH) sheet.SetPixels32(v * tileW, 0, tileW, tileH, tex.GetPixels32());
+                Destroy(tex);
+            }
+            sheet.Apply();
+            File.WriteAllBytes(Path.Combine(dir, "8_Piece_Models.png"), sheet.EncodeToPNG());
+            Destroy(sheet);
+        }
+
         static string GetArg(string name)
         {
             var args = System.Environment.GetCommandLineArgs();
@@ -266,6 +308,7 @@ namespace KingLastPiece
             }
 
             yield return JustDodgeScenario(dir, stats);
+            yield return PieceLineup(dir);
 
             File.WriteAllText(Path.Combine(dir, "stats.tsv"), stats.ToString());
             Application.Quit();

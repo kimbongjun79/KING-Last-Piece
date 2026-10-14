@@ -63,6 +63,8 @@ Lab 조작: `1`–`6` 스타일 전환 · `C` 허수아비 리셋 · `G` 공격�
 
 ## 흑색 기물 (적)
 
+폰·나이트·비숍·퀸은 `Resources/Models`의 디자인 모델을 사용합니다(텍스처 유지). 룩은 모델 에셋이 없어 프리미티브로 만듭니다. [모델 캡처](Docs/AttackLab/8_Piece_Models.png)
+
 체스 이동 규칙을 공격 패턴으로 옮겼습니다.
 
 - **Pawn** – 느리게 접근해 전방 찌르기
@@ -101,7 +103,8 @@ Lab 조작: `1`–`6` 스타일 전환 · `C` 허수아비 리셋 · `G` 공격�
 
 ```
 Assets/
-  Resources/Models/White_Chess_King_v02.fbx   플레이어 킹 모델 (런타임 로드, 높이 자동 정규화)
+  Resources/Models/                            킹·폰·나이트·비숍·퀸 디자인 모델 (런타임 로드, 높이 자동 정규화)
+  Resources/Materials/                         발광 지원 템플릿 머티리얼 (빌드에서 셰이더 변형 유지)
   Scenes/AttackLab.unity                       공격 방식 비교 테스트 씬
   Scripts/
     Core/
@@ -109,7 +112,7 @@ Assets/
       CameraRig.cs     3인칭 궤도 카메라 + 락온 + 화면 흔들림
       Hud.cs           체력/스태미나/플라스크, 보스 바, CHECKMATE 등 오버레이 (IMGUI)
       GameInput.cs     Input System 디바이스 래퍼
-      PieceFactory.cs  프리미티브로 체스 기물 모델 생성 / 킹 FBX 로드
+      PieceFactory.cs  디자인 FBX 모델 로드(텍스처 유지·높이 정규화) / 에셋 없는 룩은 프리미티브
       MaterialLib.cs   런타임 URP Lit 머티리얼 캐시
       Telegraph.cs     공격 예고 바닥 표시
       Effects.cs       스파크·충격파 이펙트

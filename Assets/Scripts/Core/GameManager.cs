@@ -179,7 +179,7 @@ namespace KingLastPiece
             var go = new GameObject(typeof(T).Name);
             go.transform.SetPositionAndRotation(new Vector3(pos.x, 0f, pos.z), Quaternion.LookRotation(Vector3.back));
             var e = go.AddComponent<T>();
-            var model = PieceFactory.Build(modelType, go.transform, false);
+            var model = PieceFactory.BuildEnemy(modelType, go.transform);
             e.Setup(modelType, model);
             Enemies.Add(e);
             return e;

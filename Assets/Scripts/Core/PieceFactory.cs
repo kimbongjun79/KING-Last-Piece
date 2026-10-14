@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace KingLastPiece
@@ -53,7 +54,6 @@ namespace KingLastPiece
                         Part(PrimitiveType.Cube, root, new Vector3(Mathf.Cos(a) * 0.3f, 1.58f, Mathf.Sin(a) * 0.3f),
                             new Vector3(0.24f, 0.26f, 0.24f), mat, new Vector3(0, i * 90f + 45f, 0));
                     }
-                    if (!white) Part(PrimitiveType.Cube, root, new Vector3(0, 1.1f, 0.3f), new Vector3(0.36f, 0.05f, 0.06f), eye);
                     break;
 
                 case PieceType.Bishop:
@@ -107,36 +107,67 @@ namespace KingLastPiece
             return root;
         }
 
-        /// <summary>Loads the White King FBX from Resources and normalizes it to the given height.
-        /// Falls back to a primitive king if the model is missing.</summary>
+        // ---------------------------------------------------------------- designed models (FBX in Resources/Models)
+
+        /// <summary>Designed model per piece type, its height on the board and a yaw fix so it faces +Z.</summary>
+        static readonly Dictionary<PieceType, (string path, float height, float yaw)> Designed =
+            new Dictionary<PieceType, (string, float, float)>
+            {
+                { PieceType.Pawn, ("Models/Black_Chess_Pawn_v03", 1.35f, 0f) },
+                { PieceType.Knight, ("Models/Black_Chess_Knight_v03", 1.75f, 0f) },
+                { PieceType.Bishop, ("Models/Black_Chess_Bishop_v03", 1.95f, 0f) },
+                { PieceType.Queen, ("Models/Black_Chess_Queen_v03", 2.5f, 0f) },
+                { PieceType.King, ("Models/White_Chess_King_v02", 2.1f, 0f) },
+            };
+
+        /// <summary>Black piece: the designed FBX when there is one (Rook has none), otherwise primitives.</summary>
+        public static Transform BuildEnemy(PieceType type, Transform parent)
+        {
+            if (Designed.TryGetValue(type, out var d))
+            {
+                var model = LoadDesigned(d.path, parent, d.height, d.yaw);
+                if (model != null) return model;
+            }
+            return Build(type, parent, false);
+        }
+
+        /// <summary>Loads the White King FBX and normalizes it to the given height.</summary>
         public static Transform BuildPlayerKing(Transform parent, float height)
         {
-            var prefab = Resources.Load<GameObject>("Models/White_Chess_King_v02");
-            if (prefab == null) return Build(PieceType.King, parent, true);
+            var d = Designed[PieceType.King];
+            return LoadDesigned(d.path, parent, height, d.yaw) ?? Build(PieceType.King, parent, true);
+        }
 
-            var container = new GameObject("King_Model").transform;
-            container.SetParent(parent, false);
+        /// <summary>
+        /// Instantiates a model from Resources, keeps its own textures (converted onto emissive-capable
+        /// materials so hit flashes/glows work), stands it up, scales it to <paramref name="height"/> and puts
+        /// its base center at the container origin. Returns null if the model is missing.
+        /// </summary>
+        static Transform LoadDesigned(string path, Transform parent, float height, float yaw)
+        {
+            var prefab = Resources.Load<GameObject>(path);
+            if (prefab == null) return null;
 
             var inst = Object.Instantiate(prefab);
-            inst.name = "WhiteKing_FBX";
+            inst.name = prefab.name;
             // Keep the FBX root rotation (Blender exports carry a -90° X axis conversion).
-            inst.transform.SetPositionAndRotation(Vector3.zero, prefab.transform.rotation);
+            inst.transform.SetPositionAndRotation(Vector3.zero, Quaternion.Euler(0f, yaw, 0f) * prefab.transform.rotation);
             foreach (var c in inst.GetComponentsInChildren<Collider>()) Object.DestroyImmediate(c);
 
             var renderers = inst.GetComponentsInChildren<Renderer>();
             if (renderers.Length == 0)
             {
-                Object.Destroy(inst);
-                Object.Destroy(container.gameObject);
-                return Build(PieceType.King, parent, true);
+                Object.DestroyImmediate(inst);
+                return null;
             }
 
-            var mat = MaterialLib.Get(PieceFactory.WhitePiece, 0.6f);
             foreach (var r in renderers)
             {
-                var mats = new Material[r.sharedMaterials.Length];
-                for (int i = 0; i < mats.Length; i++) mats[i] = mat;
+                var src = r.sharedMaterials;
+                var mats = new Material[src.Length];
+                for (int i = 0; i < mats.Length; i++) mats[i] = MaterialLib.FromImported(src[i]);
                 r.sharedMaterials = mats;
+                r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
             }
 
             Bounds b = WorldBounds(renderers);
@@ -153,6 +184,8 @@ namespace KingLastPiece
             b = WorldBounds(renderers);
             inst.transform.position -= new Vector3(b.center.x, b.min.y, b.center.z);
 
+            var container = new GameObject(prefab.name + "_Model").transform;
+            container.SetParent(parent, false);
             inst.transform.SetParent(container, false);
             return container;
         }
