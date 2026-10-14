@@ -15,6 +15,8 @@ namespace KingLastPiece
         public const float TileSize = 2f;
         public const float BoardHalf = 8f;
         public const float PlayableHalf = 7.3f;
+        public static readonly Color LightSquare = new Color(0.74f, 0.7f, 0.62f);
+        public static readonly Color DarkSquare = new Color(0.26f, 0.12f, 0.1f);
 
         public static GameManager Instance { get; private set; }
 
@@ -33,7 +35,7 @@ namespace KingLastPiece
         public int Deaths { get; private set; }
         public float RunTime { get; private set; }
 
-        public enum Mode { Game, Lab }
+        public enum Mode { Game, Practice, Effects }
 
         /// <summary>Set before the GameManager is created to boot into a different mode (e.g. the Attack Lab).</summary>
         public static Mode StartMode = Mode.Game;
@@ -131,7 +133,7 @@ namespace KingLastPiece
             gameObject.AddComponent<Hud>();
             CurrentMode = StartMode;
             StartMode = Mode.Game;
-            EnterState(CurrentMode == Mode.Lab ? GameState.Playing : GameState.Title);
+            EnterState(CurrentMode != Mode.Game ? GameState.Playing : GameState.Title);
         }
 
         void OnDestroy()
@@ -305,7 +307,7 @@ namespace KingLastPiece
                     break;
 
                 case GameState.Dead:
-                    if (CurrentMode == Mode.Lab)
+                    if (CurrentMode != Mode.Game)
                     {
                         if (StateTime > 1.5f) RevivePlayerInPlace();
                         break;
@@ -429,18 +431,20 @@ namespace KingLastPiece
         void BuildArena()
         {
             var root = new GameObject("Arena").transform;
-            var light = MaterialLib.Get(new Color(0.74f, 0.7f, 0.62f), 0.35f);
-            var dark = MaterialLib.Get(new Color(0.26f, 0.12f, 0.1f), 0.45f);
+            var light = MaterialLib.Get(LightSquare, 0.35f);
+            var dark = MaterialLib.Get(DarkSquare, 0.45f);
             var wood = MaterialLib.Get(new Color(0.16f, 0.09f, 0.05f), 0.5f);
             var stone = MaterialLib.Get(new Color(0.16f, 0.16f, 0.18f), 0.15f);
             var floor = MaterialLib.Get(new Color(0.04f, 0.04f, 0.05f), 0.1f);
 
+            var squares = new Transform[8, 8];
             for (int f = 0; f < 8; f++)
             for (int r = 0; r < 8; r++)
             {
                 var pos = new Vector3((f - 3.5f) * TileSize, -0.2f, (r - 3.5f) * TileSize);
-                PieceFactory.Part(PrimitiveType.Cube, root, pos, new Vector3(TileSize, 0.4f, TileSize), (f + r) % 2 == 0 ? dark : light);
+                squares[f, r] = PieceFactory.Part(PrimitiveType.Cube, root, pos, new Vector3(TileSize, 0.4f, TileSize), (f + r) % 2 == 0 ? dark : light);
             }
+            BoardFx.Register(squares);
 
             float edge = BoardHalf + 0.35f;
             float len = BoardHalf * 2f + 1.4f;

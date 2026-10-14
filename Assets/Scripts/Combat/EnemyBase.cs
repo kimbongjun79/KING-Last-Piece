@@ -390,7 +390,7 @@ namespace KingLastPiece
                         {
                             landed = true;
                             transform.position = plan.target;
-                            Effects.Shockwave(plan.target, plan.radius, new Color(1f, 0.25f, 0.1f));
+                            Vfx.GroundImpact(plan.target, plan.radius, 0.9f, hostile: true);
                             Game.Rig.Shake(0.25f);
                         }
                         squash = 0.8f;
@@ -405,7 +405,7 @@ namespace KingLastPiece
                         if (!landed)
                         {
                             landed = true;
-                            Effects.Shockwave(atkStart, plan.radius, new Color(1f, 0.25f, 0.1f), 0.5f);
+                            Vfx.GroundImpact(atkStart, plan.radius, 1.1f, hostile: true);
                             Game.Rig.Shake(0.4f);
                         }
                         squash = 0.75f;
@@ -520,7 +520,7 @@ namespace KingLastPiece
             if (launchHeight <= 0f && launchVy < 0f)
             {
                 modelY = 0f;
-                Effects.Shockwave(FlatPos, 2f, new Color(1f, 0.6f, 0.25f), 0.45f);
+                Vfx.GroundImpact(FlatPos, 2f, 1f);
                 Game.Rig.Shake(0.4f);
                 // Crash down and lie on the board before getting up (damage only, no stagger reaction).
                 Enter(EState.Getup);

@@ -29,10 +29,10 @@
 | 웨이브 사이 휴식 | 플라스크 리필 + 체력 일부 회복 (모닥불 대체) |
 
 
-## 공격 방식 — Attack Lab
+## 공격 방식 (확정: Royal Ensemble)
 
 킹은 칼 없이 **몸 전체를 휘둘러** 싸웁니다. 몸은 받침 테두리를 축으로 기울고, 회전하고, 뛰고, 쓰러집니다(절차적 포즈 + 왕관 트레일).
-`Assets/Scenes/AttackLab.unity` 테스트 씬에서 6가지 후보를 허수아비 6개(정면·대각·측면·후방)에 비교할 수 있습니다.
+6가지 후보를 허수아비 6개(정면·대각·측면·후방)에 비교해 **Royal Ensemble**로 확정했습니다. 비교 기록은 [`Docs/AttackLab`](Docs/AttackLab)에 남아 있습니다.
 
 | # | 방식 | 약공격 | 강공격 | 판정 |
 | --- | --- | --- | --- | --- |
@@ -51,9 +51,25 @@
 - 우클릭 강공격 **메테오 스톰프**: 도약해 공중제비 후 착지 충격파 — 반경 4.3, 피해 46, **기력 48(약 절반)** 소모 (4번 Royal Stomp의 강공격을 넓힌 버전)
 - 진자 스윙은 **왕관이 실제로 지나간 각도의 적만** 순서대로 맞습니다(스윕 판정)
 
-자동 평가: Attack Lab 플레이어 빌드를 `-autoshot <폴더>` 인자로 실행하면 스타일별 콘택트 시트(행: 약공격 콤보 각 타·강공격 / 열: 준비→타격→회복)와 `stats.tsv`를 생성합니다. 결과물은 [`Docs/AttackLab`](Docs/AttackLab)에 있습니다.
+자동 회귀 테스트: 연습장 플레이어 빌드를 `-autoshot <폴더>` 인자로 실행하면 공격·저스트 회피·경직·오토 에임·사망 연출 캡처와 `stats.tsv`를 생성합니다 ([`Docs/AttackLab`](Docs/AttackLab)).
 
-Lab 조작: `1`–`6` 스타일 전환 · `C` 허수아비 리셋 · `G` 공격하는 폰 소환 · `H` 히트스톱 켜기/끄기 · 실험실에서는 **기력 무제한**
+## 연습장 (Scenes/Practice.unity)
+
+확정된 전투 방식으로 허수아비와 실제 기물을 상대로 연습합니다. `1`~`5` 폰/나이트/비숍/룩/퀸 소환 · `X` 기물 제거 · `C` 초기화 · `G` 무적 · `I` 기력 무제한 · `H` 히트스톱
+
+## 이펙트 비교 (Scenes/EffectsLab.unity)
+
+세 가지 체스풍 이펙트안을 나란히 두고 같은 이벤트(약타격·강타격·킹 내려찍기·적 내려찍기)를 동시에 반복 재생합니다. `1`~`3` 킹 공격에 적용할 스타일 선택(직접 플레이 비교) · `P` 데모 정지/재생 · `F` 즉시 재생
+
+| 안 | 타격 | 바닥 내려찍기 |
+| --- | --- | --- |
+| A. Classic | 금빛 큐브 불꽃 (현재) | 금빛 원판 충격파 |
+| B. Kintsugi Crack | 금빛 섬광 + 흑/상아 대리석 파편 | **바닥이 갈라지며 균열이 금빛으로 빛났다 식음**(킨츠기) → 어두운 크레이터, 맞은 칸 색의 파편·솟은 조각 |
+| C. Board Ripple | 상아 섬광 + 흑백 사각 꽃종이 | **실제 체스판 칸들이 파도처럼 들썩임** + 사각형 충격파 + 중앙 균열 |
+
+- 적의 내려찍기는 같은 연출을 **붉은 불씨색**으로 표시해 킹의 금색과 구분합니다.
+- 게임 코드는 `Vfx.Hit` / `Vfx.GroundImpact` 이벤트만 호출하므로 `Vfx.Style` 하나로 전체 스타일이 바뀝니다 (현재 기본값: Classic).
+- 비교 캡처: [`Docs/EffectsLab`](Docs/EffectsLab) (행 = 안 A/B/C, 열 = 시간 경과)
 
 > **히트스톱**: 공격이 처음 적중하는 순간 0.04~0.12초 동안 게임 속도를 10%로 늦춰 타격감을 줍니다. 공격 한 번당 한 번만 걸립니다.
 
@@ -143,7 +159,8 @@ Lab 조작: `1`–`6` 스타일 전환 · `C` 허수아비 리셋 · `G` 공격�
 Assets/
   Resources/Models/                            킹·폰·나이트·비숍·퀸 디자인 모델 (런타임 로드, 높이 자동 정규화)
   Resources/Materials/                         발광 지원 템플릿 머티리얼 (빌드에서 셰이더 변형 유지)
-  Scenes/AttackLab.unity                       공격 방식 비교 테스트 씬
+  Scenes/Practice.unity                        연습장 (+ 자동 회귀 테스트)
+  Scenes/EffectsLab.unity                      이펙트 비교 씬
   Scripts/
     Core/
       GameManager.cs   아레나 생성, 웨이브 진행, 충돌 분리, 히트스톱, 부트스트랩
@@ -154,6 +171,7 @@ Assets/
       MaterialLib.cs   런타임 URP Lit 머티리얼 캐시
       Telegraph.cs     공격 예고 바닥 표시
       Effects.cs       스파크·충격파 이펙트
+      Vfx.cs           이펙트 이벤트(타격·바닥 충격)와 스타일 A/B/C, 균열·보드 파동·사각 충격파
     Combat/
       Actor.cs             체력 + 피격 플래시/발광 공통
       PlayerController.cs  킹: 이동·몸통 공격·구르기·회복·락온
@@ -163,8 +181,9 @@ Assets/
       StaggerController.cs 경직 게이지 / 취약 판정 (보스 제외)
       Enemies.cs           Pawn / Knight / Bishop / Rook / Queen AI
     Lab/
-      AttackLab.cs         테스트 씬 컨트롤러 + 자동 캡처(-autoshot)
+      PracticeArena.cs     연습장 컨트롤러 + 자동 회귀 캡처(-autoshot)
+      EffectsLab.cs        이펙트 비교 씬 + 비교 캡처(-autoshot)
       TrainingDummy.cs     공격하지 않는 허수아비
     Editor/
-      LabBuild.cs          KING 메뉴: Attack Lab / 게임 Windows 빌드
+      LabBuild.cs          KING 메뉴: 연습장 / 이펙트 랩 / 게임 Windows 빌드
 ```

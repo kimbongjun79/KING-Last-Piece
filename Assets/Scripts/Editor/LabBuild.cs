@@ -4,26 +4,36 @@ using UnityEngine;
 
 namespace KingLastPiece.EditorTools
 {
-    /// <summary>Builds standalone players for the game and the Attack Lab test scene.</summary>
+    /// <summary>Builds standalone players for the game, the practice arena and the effects lab.</summary>
     public static class LabBuild
     {
         const string GameScene = "Assets/Scenes/SampleScene.unity";
-        const string LabScene = "Assets/Scenes/AttackLab.unity";
+        const string PracticeScene = "Assets/Scenes/Practice.unity";
+        const string EffectsScene = "Assets/Scenes/EffectsLab.unity";
 
-        [MenuItem("KING/Build Attack Lab (Windows)")]
-        public static void BuildLabMenu() => Build(new[] { LabScene }, "Builds/AttackLab/AttackLab.exe");
+        [MenuItem("KING/Build Practice (Windows)")]
+        public static void BuildPracticeMenu() => Build(new[] { PracticeScene }, "Builds/Practice/Practice.exe");
+
+        [MenuItem("KING/Build Effects Lab (Windows)")]
+        public static void BuildEffectsMenu() => Build(new[] { EffectsScene }, "Builds/EffectsLab/EffectsLab.exe");
 
         [MenuItem("KING/Build Game (Windows)")]
         public static void BuildGameMenu() => Build(new[] { GameScene }, "Builds/Game/KING.exe");
 
-        /// <summary>CLI: -executeMethod KingLastPiece.EditorTools.LabBuild.BuildLabCli -buildPath &lt;exe&gt;</summary>
+        /// <summary>
+        /// CLI: -executeMethod KingLastPiece.EditorTools.LabBuild.BuildLabCli -scene &lt;scene path&gt; -buildPath &lt;exe&gt;
+        /// (defaults to the practice arena).
+        /// </summary>
         public static void BuildLabCli()
         {
-            string path = "Builds/AttackLab/AttackLab.exe";
+            string scene = PracticeScene, path = "Builds/Practice/Practice.exe";
             var args = System.Environment.GetCommandLineArgs();
             for (int i = 0; i < args.Length - 1; i++)
+            {
                 if (args[i] == "-buildPath") path = args[i + 1];
-            bool ok = Build(new[] { LabScene }, path);
+                if (args[i] == "-scene") scene = args[i + 1];
+            }
+            bool ok = Build(new[] { scene }, path);
             EditorApplication.Exit(ok ? 0 : 1);
         }
 

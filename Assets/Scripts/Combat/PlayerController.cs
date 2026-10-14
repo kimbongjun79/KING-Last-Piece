@@ -575,8 +575,7 @@ namespace KingLastPiece
                     if (w.impact)
                     {
                         Vector3 c = transform.position + transform.forward * w.forward;
-                        Effects.Shockwave(c, w.range, new Color(1f, 0.8f, 0.4f), 0.45f);
-                        Effects.Sparks(c + Vector3.up * 0.1f, new Color(0.75f, 0.7f, 0.6f), 14, 5f);
+                        Vfx.GroundImpact(c, w.range, atk.heavy ? 1.4f : 1f);
                         Game.Rig.Shake(w.shake);
                     }
                 }
@@ -620,8 +619,7 @@ namespace KingLastPiece
                     landed = true;
                     Game.ReportDamage(e, w.damage);
                     Vector3 toE = (e.FlatPos - FlatPos).normalized;
-                    Effects.Sparks(e.transform.position + Vector3.up * 1.0f - toE * e.Radius,
-                        new Color(1f, 0.85f, 0.5f), atk.heavy ? 16 : 10, atk.heavy ? 7f : 5f);
+                    Vfx.Hit(e.transform.position + Vector3.up * 1.0f - toE * e.Radius, toE, atk.heavy);
                 }
             }
             if (landed)

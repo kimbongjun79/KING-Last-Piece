@@ -7,16 +7,20 @@ using UnityEngine.InputSystem;
 namespace KingLastPiece
 {
     /// <summary>
-    /// Test scene controller (Scenes/AttackLab.unity) for comparing the King's body-attack styles
-    /// against training dummies placed all around him.
-    /// Keys: 1-6 switch style, C reset dummies, G spawn hostile pawns.
-    /// Run a player build with "-autoshot &lt;dir&gt;" to capture contact sheets + stats for every style.
+    /// Practice arena (Scenes/Practice.unity): the final combat kit (Royal Ensemble) against training dummies,
+    /// plus real pieces on demand. Keys: 1-5 spawn Pawn/Knight/Bishop/Rook/Queen, X clear pieces, C reset,
+    /// G invincible, I infinite stamina, H hit-stop.
+    /// A player build run with "-autoshot &lt;dir&gt;" captures regression sheets + stats (styles, dodge, stagger…).
     /// </summary>
-    public class AttackLab : MonoBehaviour
+    public class PracticeArena : MonoBehaviour
     {
-        public static AttackLab Instance { get; private set; }
+        public static PracticeArena Instance { get; private set; }
 
         public int StyleIndex { get; private set; } = AttackStyles.DefaultIndex;
+        public bool Invincible { get; private set; }
+        public bool InfiniteStamina { get; private set; } = true;
+
+        static readonly PieceType[] SpawnKeys = { PieceType.Pawn, PieceType.Knight, PieceType.Bishop, PieceType.Rook, PieceType.Queen };
         public AttackStyle Style => AttackStyles.All[StyleIndex];
 
         static readonly Vector3 PlayerStart = new Vector3(0f, 0f, -3f);
@@ -40,7 +44,7 @@ namespace KingLastPiece
         void Awake()
         {
             Instance = this;
-            GameManager.StartMode = GameManager.Mode.Lab;
+            GameManager.StartMode = GameManager.Mode.Practice;
             game = new GameObject("GameManager").AddComponent<GameManager>();
         }
 
@@ -73,6 +77,21 @@ namespace KingLastPiece
             for (int i = 0; i < DummySlots.Length; i++) SpawnDummy(i);
         }
 
+        /// <summary>Drops a hostile piece on a free square of the 7th/8th rank, facing the King.</summary>
+        void SpawnPiece(PieceType type)
+        {
+            string rank = type == PieceType.Pawn ? "7" : "8";
+            string file = "abcdefgh".Substring(Random.Range(1, 7), 1);
+            game.SpawnEnemy(type, GameManager.SquareToWorld(file + rank));
+        }
+
+        /// <summary>Removes every hostile piece but keeps the training dummies.</summary>
+        void ClearPieces()
+        {
+            foreach (var e in game.Enemies.ToArray())
+                if (e != null && !(e is TrainingDummy)) Destroy(e.gameObject);
+        }
+
         void SpawnDummy(int slot)
         {
             dummies[slot] = game.SpawnCustom<TrainingDummy>(PieceType.Pawn, DummySlots[slot]);
@@ -86,12 +105,13 @@ namespace KingLastPiece
             var kb = Keyboard.current;
             if (kb != null)
             {
-                for (int i = 0; i < AttackStyles.All.Length && i < DigitKeys.Length; i++)
-                    if (kb[DigitKeys[i]].wasPressedThisFrame) SelectStyle(i);
+                for (int i = 0; i < SpawnKeys.Length; i++)
+                    if (kb[DigitKeys[i]].wasPressedThisFrame) SpawnPiece(SpawnKeys[i]);
+                if (kb.xKey.wasPressedThisFrame) ClearPieces();
                 if (kb.cKey.wasPressedThisFrame) ResetLab();
                 if (kb.hKey.wasPressedThisFrame) game.HitStopEnabled = !game.HitStopEnabled;
-                if (kb.gKey.wasPressedThisFrame)
-                    foreach (var sq in new[] { "c7", "e7", "g7" }) game.SpawnEnemy(PieceType.Pawn, GameManager.SquareToWorld(sq));
+                if (kb.gKey.wasPressedThisFrame) game.Player.GodMode = Invincible = !Invincible;
+                if (kb.iKey.wasPressedThisFrame) game.Player.InfiniteStamina = InfiniteStamina = !InfiniteStamina;
             }
 
             if (game.Player.Health < game.Player.MaxHealth * 0.3f) game.Player.RefillForLab();

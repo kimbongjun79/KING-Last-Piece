@@ -66,7 +66,7 @@ namespace KingLastPiece
             DrawPopups(g);
             if (g.CurrentMode == GameManager.Mode.Game) DrawRound(g);
             DrawControlsHint();
-            if (g.CurrentMode == GameManager.Mode.Lab) DrawLabPanel();
+            if (g.CurrentMode == GameManager.Mode.Practice) DrawPracticePanel();
 
             if (g.State == GameManager.GameState.Dead) DrawDeath(g);
             if (g.Paused) DrawPause();
@@ -186,39 +186,31 @@ namespace KingLastPiece
             }
         }
 
-        void DrawLabPanel()
+        void DrawPracticePanel()
         {
-            var lab = AttackLab.Instance;
-            if (lab == null) return;
-            float w = 620 * scale, x = Screen.width - w - 24 * scale, y = 24 * scale, line = 26 * scale;
-            var styles = AttackStyles.All;
-            float h = (styles.Length + 7) * line + 20 * scale;
-            Fill(new Rect(x, y, w, h), new Color(0f, 0f, 0f, 0.6f));
-            x += 14 * scale;
-            y += 10 * scale;
-            Text(new Rect(x, y, w, line), $"ATTACK LAB  —  1-6 style · C reset · G pawns · H hit-stop {(GameManager.Instance.HitStopEnabled ? "ON" : "OFF")} · Stamina ∞", label, Gold);
-            y += line * 1.3f;
-            for (int i = 0; i < styles.Length; i++)
+            var arena = PracticeArena.Instance;
+            if (arena == null) return;
+            var g = GameManager.Instance;
+            float w = 430 * scale, x = Screen.width - w - 24 * scale, y = 24 * scale, line = 26 * scale;
+            string[] rows =
             {
-                bool sel = i == lab.StyleIndex;
-                string star = i == AttackStyles.DefaultIndex ? "  ★ chosen" : "";
-                Text(new Rect(x, y, w, line), $"{(sel ? "▶" : "  ")} {i + 1}. {styles[i].name} ({styles[i].koName}){star}", label,
-                    sel ? Color.white : new Color(0.65f, 0.65f, 0.65f));
+                "1-5   Spawn Pawn / Knight / Bishop / Rook / Queen",
+                "X     Clear pieces          C   Reset arena",
+                $"G     Invincible: {(arena.Invincible ? "ON" : "OFF")}",
+                $"I     Infinite stamina: {(arena.InfiniteStamina ? "ON" : "OFF")}",
+                $"H     Hit-stop: {(g.HitStopEnabled ? "ON" : "OFF")}",
+            };
+            Fill(new Rect(x, y, w, (rows.Length + 1.6f) * line + 16 * scale), new Color(0f, 0f, 0f, 0.6f));
+            x += 14 * scale;
+            y += 8 * scale;
+            Text(new Rect(x, y, w, line), "PRACTICE  —  Royal Ensemble", label, Gold);
+            y += line * 1.4f;
+            var row = new GUIStyle(label) { fontStyle = FontStyle.Normal };
+            foreach (var r in rows)
+            {
+                Text(new Rect(x, y, w, line), r, row, new Color(0.85f, 0.82f, 0.75f));
                 y += line;
             }
-            var s = lab.Style;
-            y += line * 0.4f;
-            var desc = new GUIStyle(label) { wordWrap = true, fontStyle = FontStyle.Normal, alignment = TextAnchor.UpperLeft };
-            Text(new Rect(x, y, w - 28 * scale, line * 2.2f), s.description, desc, new Color(0.85f, 0.82f, 0.75f));
-            y += line * 2.3f;
-            var light = s.lights[0];
-            Text(new Rect(x, y, w, line),
-                $"Light ×{s.lights.Length}: startup {light.FirstHit:0.00}s  reach {light.Reach:0.0}  arc {light.Coverage:0}°  DPS {s.ComboDps:0}",
-                desc, new Color(0.75f, 0.85f, 0.75f));
-            y += line;
-            Text(new Rect(x, y, w, line),
-                $"Heavy: startup {s.heavy.FirstHit:0.00}s  reach {s.heavy.Reach:0.0}  dmg {s.heavy.TotalDamage:0}  arc {s.heavy.Coverage:0}°",
-                desc, new Color(0.85f, 0.75f, 0.7f));
         }
 
         void DrawJustDodge(GameManager g)
