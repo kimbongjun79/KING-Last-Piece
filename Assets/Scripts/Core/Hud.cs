@@ -6,7 +6,7 @@ namespace KingLastPiece
     public class Hud : MonoBehaviour
     {
         GUIStyle big, mid, small, label;
-        float hpTrail = 100f, bossTrail = 1f;
+        float hpTrail = 100f, bossTrail = 1f, rollAlpha = 1f;
         float scale;
 
         static readonly Color Gold = new Color(0.95f, 0.78f, 0.35f);
@@ -58,6 +58,7 @@ namespace KingLastPiece
             }
 
             DrawPlayerBars(g.Player);
+            DrawRollCharges(g);
             DrawEnemyBars(g);
             DrawBossBar(g);
             DrawLockMarker(g);
@@ -76,26 +77,27 @@ namespace KingLastPiece
 
         void DrawPlayerBars(PlayerController p)
         {
+            float u = scale * 1.25f;  // a touch larger than the base HUD scale so it reads mid-fight
             float x = 32 * scale, y = 28 * scale;
-            float panelW = 520 * scale, panelH = 150 * scale;
+            float panelW = 500 * u, panelH = 118 * u;
 
             // Backing plate with a gold hairline, and a chess-tile emblem with the King's crown.
             Fill(new Rect(x - 12 * scale, y - 12 * scale, panelW, panelH), new Color(0f, 0f, 0f, 0.45f));
             Fill(new Rect(x - 12 * scale, y - 12 * scale, panelW, 2 * scale), new Color(Gold.r, Gold.g, Gold.b, 0.6f));
-            float em = 66 * scale;
+            float em = 66 * u;
             DrawEmblem(new Rect(x, y, em, em));
 
-            float bx = x + em + 14 * scale;
+            float bx = x + em + 14 * u;
 
             // Health.
-            float w = 400 * scale, h = 20 * scale;
-            Gauge(new Rect(bx, y + 2 * scale, w, h), p.Health / p.MaxHealth, hpTrail / p.MaxHealth,
+            float w = 380 * u, h = 20 * u;
+            Gauge(new Rect(bx, y + 2 * u, w, h), p.Health / p.MaxHealth, hpTrail / p.MaxHealth,
                 new Color(0.62f, 0.07f, 0.06f), new Color(0.95f, 0.3f, 0.22f));
-            SmallText(new Rect(bx + 8 * scale, y + 2 * scale, w - 16 * scale, h), $"{Mathf.CeilToInt(p.Health)} / {Mathf.RoundToInt(p.MaxHealth)}",
-                TextAnchor.MiddleRight);
+            SmallText(new Rect(bx + 8 * u, y + 2 * u, w - 16 * u, h), $"{Mathf.CeilToInt(p.Health)} / {Mathf.RoundToInt(p.MaxHealth)}",
+                TextAnchor.MiddleRight, 15);
 
             // Stamina (pulses amber when nearly empty).
-            float sy = y + h + 10 * scale, sw = 330 * scale, sh = 12 * scale;
+            float sy = y + h + 10 * u, sw = 320 * u, sh = 13 * u;
             float st = p.Stamina / PlayerController.MaxStamina;
             bool low = st < 0.25f;
             float pulse = low ? 0.5f + 0.5f * Mathf.Sin(Time.unscaledTime * 10f) : 0f;
@@ -103,24 +105,41 @@ namespace KingLastPiece
             Color stHi = Color.Lerp(new Color(0.45f, 0.9f, 0.5f), new Color(1f, 0.8f, 0.35f), pulse);
             Gauge(new Rect(bx, sy, sw, sh), st, st, stMain, stHi);
 
-            // Roll charges: gold-rimmed diamonds; a recharging one grows from the middle.
-            float ry = sy + sh + 16 * scale, ds = 12 * scale;
-            SmallText(new Rect(bx, ry - 9 * scale, 60 * scale, 18 * scale), "ROLL", TextAnchor.MiddleLeft);
+            // Royal Flasks: little gold vials.
+            float fy = sy + sh + 8 * u;
+            for (int i = 0; i < PlayerController.MaxFlasks; i++)
+                DrawVial(new Rect(bx + i * 28 * u, fy, 19 * u, 30 * u), i < p.Flasks);
+            SmallText(new Rect(bx + PlayerController.MaxFlasks * 28 * u + 4 * u, fy + 6 * u, 120 * u, 22 * u),
+                $"FLASK  x{p.Flasks}", TextAnchor.MiddleLeft, 15);
+        }
+
+        /// <summary>
+        /// Roll charges float just under the King so they stay in view mid-fight: gold-rimmed diamonds, a recharging
+        /// one grows from the middle. They fade back when all charges are full and the King isn't fighting.
+        /// </summary>
+        void DrawRollCharges(GameManager g)
+        {
+            var p = g.Player;
+            if (p.IsDead) return;
+            Vector3 sp = g.Rig.Cam.WorldToScreenPoint(p.transform.position);
+            if (sp.z < 0f) return;
+            bool full = p.DodgeCharges >= PlayerController.MaxDodges;
+            float target = full ? 0.45f : 1f;
+            rollAlpha = Mathf.MoveTowards(rollAlpha, target, Time.unscaledDeltaTime * 3f);
+
+            float ds = 9 * scale, gap = 24 * scale;
+            float cx = sp.x - (PlayerController.MaxDodges - 1) * gap / 2f;
+            float cy = Screen.height - sp.y + 34 * scale;
             for (int i = 0; i < PlayerController.MaxDodges; i++)
             {
-                var c = new Vector2(bx + 64 * scale + i * 26 * scale, ry);
-                Diamond(c, ds + 3 * scale, new Color(Gold.r, Gold.g, Gold.b, 0.9f));
-                Diamond(c, ds, new Color(0.04f, 0.05f, 0.08f, 0.95f));
-                if (i < p.DodgeCharges) Diamond(c, ds - 2 * scale, new Color(0.55f, 0.88f, 1f));
-                else if (i == p.DodgeCharges) Diamond(c, (ds - 2 * scale) * p.DodgeRechargeProgress, new Color(0.3f, 0.5f, 0.65f));
+                var c = new Vector2(cx + i * gap, cy);
+                Diamond(c, ds + 3 * scale, new Color(0f, 0f, 0f, 0.6f * rollAlpha));
+                Diamond(c, ds + 2 * scale, new Color(Gold.r, Gold.g, Gold.b, 0.95f * rollAlpha));
+                Diamond(c, ds, new Color(0.04f, 0.05f, 0.08f, 0.95f * rollAlpha));
+                if (i < p.DodgeCharges) Diamond(c, ds - 2 * scale, new Color(0.55f, 0.88f, 1f, rollAlpha));
+                else if (i == p.DodgeCharges)
+                    Diamond(c, (ds - 2 * scale) * p.DodgeRechargeProgress, new Color(0.3f, 0.5f, 0.65f, rollAlpha));
             }
-
-            // Royal Flasks: little gold vials.
-            float fx = bx + 160 * scale, fy = ry - 13 * scale;
-            for (int i = 0; i < PlayerController.MaxFlasks; i++)
-                DrawVial(new Rect(fx + i * 24 * scale, fy, 16 * scale, 26 * scale), i < p.Flasks);
-            SmallText(new Rect(fx + PlayerController.MaxFlasks * 24 * scale + 4 * scale, ry - 9 * scale, 120 * scale, 18 * scale),
-                "FLASK", TextAnchor.MiddleLeft);
         }
 
         // ---------------------------------------------------------------- styled primitives
@@ -197,9 +216,9 @@ namespace KingLastPiece
             Fill(new Rect(liquid.x, liquid.y, liquid.width * 0.35f, liquid.height), new Color(1f, 0.9f, 0.6f, 0.6f));
         }
 
-        void SmallText(Rect r, string text, TextAnchor anchor)
+        void SmallText(Rect r, string text, TextAnchor anchor, int size = 13)
         {
-            var st = new GUIStyle(label) { fontSize = Mathf.RoundToInt(13 * scale), alignment = anchor };
+            var st = new GUIStyle(label) { fontSize = Mathf.RoundToInt(size * scale), alignment = anchor };
             Text(r, text, st, new Color(0.95f, 0.92f, 0.85f, 0.95f));
         }
 

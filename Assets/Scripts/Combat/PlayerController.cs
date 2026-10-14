@@ -89,7 +89,7 @@ namespace KingLastPiece
         readonly List<EnemyBase> assistNearby = new List<EnemyBase>();
         readonly List<Vector3> assistCandidates = new List<Vector3>();
         Vector3 counterFrom, counterTo;
-        float counterAngle0;
+        float counterAngle0, counterSpin = 1f;  // spin: +1 clockwise, -1 counter-clockwise (random per throw)
         bool counterReleased;
         readonly HashSet<EnemyBase> counterHits = new HashSet<EnemyBase>();
 
@@ -466,8 +466,8 @@ namespace KingLastPiece
 
         /// <summary>
         /// Picks the facing that makes the current attack hit the most pieces in assist range.
-        /// Candidates: toward each nearby piece, between every pair of them, and the player's own aim
-        /// (which only breaks ties). Returns false when nothing is close enough to assist.
+        /// Candidates: toward each nearby piece and between every pair of them; the player's own aim
+        /// only breaks ties. Returns false when nothing is close enough to assist.
         /// </summary>
         bool TryFindAssistDirection(Vector3 preferred, out Vector3 best)
         {
@@ -481,7 +481,6 @@ namespace KingLastPiece
 
             assistCandidates.Clear();
             preferred.y = 0f;
-            assistCandidates.Add(preferred.normalized);
             for (int i = 0; i < assistNearby.Count; i++)
             {
                 Vector3 a = (assistNearby[i].FlatPos - FlatPos).normalized;
@@ -499,9 +498,16 @@ namespace KingLastPiece
             {
                 if (c.sqrMagnitude < 0.01f) continue;
                 int hits = 0;
+                float off = 0f;
                 foreach (var e in Game.Enemies)
-                    if (e != null && !e.IsDead && e.Targetable && atk.WouldHit(FlatPos, c, e.FlatPos, e.Radius)) hits++;
-                float score = hits * 1000f - Vector3.Angle(c, preferred);
+                    if (e != null && !e.IsDead && e.Targetable && atk.WouldHit(FlatPos, c, e.FlatPos, e.Radius))
+                    {
+                        hits++;
+                        off += Vector3.Angle(c, e.FlatPos - FlatPos);
+                    }
+                // Most pieces first; then the facing most centred on the pieces it hits (so a lone piece is faced
+                // squarely), with the player's own aim only as a faint tie-break.
+                float score = hits * 1000f - (hits > 0 ? off / hits : 0f) - 0.02f * Vector3.Angle(c, preferred);
                 if (score > bestScore) { bestScore = score; bestHits = hits; best = c; }
             }
 
@@ -636,6 +642,7 @@ namespace KingLastPiece
                     Game.ReportDamage(e, w.damage);
                     Vector3 toE = (e.FlatPos - FlatPos).normalized;
                     Vfx.Hit(e.transform.position + Vector3.up * 1.0f - toE * e.Radius, toE, atk.heavy);
+                    if (w.launch) e.ForceLaunch(transform.position);
                 }
             }
             if (landed)
@@ -818,6 +825,7 @@ namespace KingLastPiece
             counterFrom = FlatPos;
             counterTo = counterTarget.FlatPos - to.normalized * SwingRadius;
             counterAngle0 = Vector3.SignedAngle(Vector3.forward, to, Vector3.up);
+            counterSpin = Random.value < 0.5f ? 1f : -1f;
             transform.rotation = Quaternion.LookRotation(to);
             Enter(State.Counter);
         }
@@ -847,7 +855,7 @@ namespace KingLastPiece
             {
                 // Swing the piece around twice, accelerating, hitting everything it sweeps through.
                 float p = (t - CounterApproach) / (CounterRelease - CounterApproach);
-                float angle = counterAngle0 + 720f * Mathf.Pow(p, 1.7f);
+                float angle = counterAngle0 + counterSpin * 720f * Mathf.Pow(p, 1.7f);
                 Vector3 dir = Quaternion.Euler(0f, angle, 0f) * Vector3.forward;
                 Vector3 piecePos = FlatPos + dir * SwingRadius;
                 counterTarget.SetGrabbedPose(piecePos, dir, 75f, 0.7f + 0.3f * Mathf.Sin(p * Mathf.PI));

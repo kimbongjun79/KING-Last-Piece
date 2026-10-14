@@ -579,8 +579,9 @@ namespace KingLastPiece
 
         // ---------------------------------------------------------------- stagger reactions
 
-        static readonly Color VulnerableColor = new Color(1f, 0.85f, 0.25f);
-        const float AirGravity = 22f, AirLiftFalloff = 0.6f, GetupLie = 0.45f, GetupRise = 0.4f;
+        static readonly Color VulnerableColor = new Color(1f, 0.98f, 0.94f);
+        const float AirGravity = 22f, AirLiftFalloff = 0.6f, GetupLie = 0.45f, GetupRise = 0.4f, ForcedLaunchLie = 0.9f;
+        float bonusLie;  // extra time lying down after a forced launch
 
         /// <summary>Cancels whatever the piece was doing (attack, telegraph, glow) — frees its attack token too.</summary>
         void CancelAction()
@@ -596,6 +597,18 @@ namespace KingLastPiece
             Vector3 away = FlatPos - new Vector3(source.x, 0f, source.z);
             flinchPush = away.sqrMagnitude > 0.001f ? away.normalized * 2.5f : Vector3.zero;
             Enter(EState.Stagger);
+        }
+
+        /// <summary>
+        /// Heavy launcher: pops a non-boss piece into the air whatever its gauge or armor, and keeps it down a while longer
+        /// after it lands (neutralized). Bosses shrug it off.
+        /// </summary>
+        public void ForceLaunch(Vector3 source)
+        {
+            if (stagger == null || IsDead) return;
+            if (state == EState.Spawning || state == EState.Grabbed || state == EState.Launched) return;
+            bonusLie = ForcedLaunchLie;
+            if (state != EState.Airborne) LaunchUp(source);
         }
 
         /// <summary>Knock the piece into the air. Each further air hit lifts less (no infinite juggles).</summary>
@@ -645,10 +658,12 @@ namespace KingLastPiece
         void UpdateGetup()
         {
             float t = stateTime;
-            float lie = t < GetupLie ? 1f : 1f - PoseTrack.Curve(Ease.InOut, (t - GetupLie) / GetupRise);
+            float lieTime = GetupLie + bonusLie;
+            float lie = t < lieTime ? 1f : 1f - PoseTrack.Curve(Ease.InOut, (t - lieTime) / GetupRise);
             modelTilt = Quaternion.Euler(-85f * lie, 0f, 0f);
-            if (t >= GetupLie + GetupRise)
+            if (t >= lieTime + GetupRise)
             {
+                bonusLie = 0f;
                 stagger?.ResetGauge();
                 airHits = 0;
                 Enter(EState.Move);
@@ -666,7 +681,7 @@ namespace KingLastPiece
             Game.Rig.Shake(0.15f);
         }
 
-        /// <summary>While Vulnerable: dizzy wobble and golden sparks circling the head.</summary>
+        /// <summary>While Vulnerable: dizzy wobble and white sparks circling the head.</summary>
         void AnimateVulnerable(float dt)
         {
             float w = Time.time * 9f;

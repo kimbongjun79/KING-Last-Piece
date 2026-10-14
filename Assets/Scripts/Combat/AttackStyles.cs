@@ -108,6 +108,7 @@ namespace KingLastPiece
         public bool sweep;             // Arc only: hits land progressively from sweepFrom to sweepTo (degrees, + = right)
         public float sweepFrom, sweepTo;
         public bool slash;             // draw a ground crescent along the sweep (shows the real reach)
+        public bool launch;            // knock non-boss pieces airborne regardless of their stagger gauge (and armor)
         public float kick;             // camera zoom punch on window start
         public bool sparkTrail;        // spray sparks from the crown while the window is active
         // Authored slash effect (NamuFX) played when the window starts, aligned with the King's facing.
@@ -366,7 +367,7 @@ namespace KingLastPiece
                 {
                     start = 0.52f, end = 0.57f, shape = HitShape.Circle, range = 3.2f, damage = 20f, poise = 32f,
                     hitStop = 0.09f, shake = 0.45f, impact = true, kick = 0.6f,
-                    dust = true, slash = true, sweepFrom = 0f, sweepTo = 360f,
+                    dust = true,
                 },
             },
             moves = new[] { new MoveSeg(0.14f, 0.52f, 1.6f, Ease.InOut) },
@@ -403,7 +404,7 @@ namespace KingLastPiece
             {
                 new HitWindow { start = 0.82f, end = 0.9f, shape = HitShape.Circle, range = 4.3f, damage = 46f, poise = 65f,
                     hitStop = 0.12f, shake = 0.65f, impact = true, kick = 1f,
-                    dust = true, slash = true, sweepFrom = 0f, sweepTo = 360f },
+                    dust = true, launch = true },
             },
             moves = new[] { new MoveSeg(0.42f, 0.82f, 3.0f, Ease.InOut) },
             // Top-to-bottom slash while the King somersaults down onto the board.
