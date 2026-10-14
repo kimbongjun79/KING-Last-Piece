@@ -131,7 +131,7 @@ namespace KingLastPiece
         }
 
         /// <summary>World-yaw correction applied to directional NamuFX slashes (calibrated in Effects Lab E6).</summary>
-        public static float SlashYawFix = 270f;
+        public static float SlashYawFix = 180f;
 
         static readonly Color DustColor = new Color(0.55f, 0.5f, 0.45f);
 
@@ -160,7 +160,7 @@ namespace KingLastPiece
         static readonly int UseCustomColorId = Shader.PropertyToID("_UseCustomdata_Color");
 
         /// <summary>Copy of a NamuFX material that takes its color from particle color instead of custom data.</summary>
-        static Material VertexColored(Material src)
+        public static Material VertexColored(Material src)
         {
             if (src == null || !src.HasProperty(UseCustomColorId)) return src;
             if (vertexColored.TryGetValue(src, out var m) && m != null) return m;

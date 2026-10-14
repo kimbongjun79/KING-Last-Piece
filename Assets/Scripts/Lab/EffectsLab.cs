@@ -186,6 +186,7 @@ namespace KingLastPiece
                 i => (Station(i) + new Vector3(3.5f, 4f, -6.5f), Station(i) + new Vector3(0f, 0.6f, 1f)));
 
             // E6: top-down whip check — King faces +Z (up in the image), dummy ahead; row 0 = hit 1, row 1 = hit 2.
+            yield return CalibrateSlashYaw(Path.Combine(dir, "slash_calibration.tsv"));
             yield return WhipTopDown(Path.Combine(dir, "E6_Whip_TopDown.png"));
 
             // E5: NamuFX slash prefabs as authored (identity rotation, at chest height) — rows = prefabs.
@@ -197,6 +198,71 @@ namespace KingLastPiece
             }
 
             Application.Quit();
+        }
+
+        /// <summary>
+        /// Measures where the whip slash actually shows up: for each yaw correction (30° steps) and both whips,
+        /// sums the gold pixels over the slash's life and reports their weighted direction from the King on screen
+        /// (top-down camera, 0° = King's forward, + = to his right). The correction with ~0° is the right one.
+        /// </summary>
+        IEnumerator CalibrateSlashYaw(string path)
+        {
+            var player = game.Player;
+            Vector3 start = Station(1) - new Vector3(0f, 0f, 1.2f);
+            game.Rig.OverridePosition = start + new Vector3(0f, 9f, -0.01f);
+            game.Rig.OverrideLookAt = start;
+            var sb = new System.Text.StringBuilder("yaw_fix\twhip\tangle_deg\tweight\n");
+            float keep = Vfx.SlashYawFix;
+            for (int fix = 0; fix < 360; fix += 30)
+            {
+                Vfx.SlashYawFix = fix;
+                for (int whip = 0; whip < 2; whip++)
+                {
+                    // No pieces anywhere: otherwise the mid-range dash opener can replace the whip.
+                    game.ClearEnemies();
+                    player.ResetForWave(start, 0f);
+                    for (int f = 0; f < 70; f++) yield return null;
+                    player.Press(PlayerController.Buffered.Light);
+                    yield return null;
+                    if (whip == 1)
+                    {
+                        var first = player.CurrentAttack;
+                        while (first != null && player.StateTime < first.cancelAt) yield return null;
+                        player.Press(PlayerController.Buffered.Light);
+                        yield return null;
+                    }
+                    Vector3 kingScreen = game.Rig.Cam.WorldToScreenPoint(start);
+                    float facing = Vector3.SignedAngle(Vector3.forward, player.transform.forward, Vector3.up);
+                    double sx = 0, sy = 0, total = 0;
+                    for (int f = 0; f < 24; f++)
+                    {
+                        yield return new WaitForEndOfFrame();
+                        if (f % 2 == 0)
+                        {
+                            var tex = ScreenCapture.CaptureScreenshotAsTexture();
+                            var px = tex.GetPixels32();
+                            for (int y = 0; y < tex.height; y += 2)
+                            for (int x = 0; x < tex.width; x += 2)
+                            {
+                                var c = px[y * tex.width + x];
+                                if (c.r > 150 && c.g > 110 && c.b < 110 && c.r - c.b > 80)
+                                {
+                                    sx += x - kingScreen.x;
+                                    sy += y - kingScreen.y;
+                                    total++;
+                                }
+                            }
+                            Destroy(tex);
+                        }
+                        yield return null;
+                    }
+                    float angle = total > 0 ? Mathf.Atan2((float)sx, (float)sy) * Mathf.Rad2Deg : float.NaN;
+                    sb.AppendLine($"{fix}\t{whip + 1}\t{angle:0}\t{total:0}\tking_facing={facing:0}");
+                }
+            }
+            Vfx.SlashYawFix = keep;
+            File.WriteAllText(path, sb.ToString());
+            for (int i = 0; i < dummies.Length; i++) SpawnDummy(i);
         }
 
         IEnumerator WhipTopDown(string path)
