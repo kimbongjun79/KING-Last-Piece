@@ -85,12 +85,11 @@ namespace KingLastPiece
             new WaveDef { name = "IX. The Vanguard", pieces = new[] {
                 (PieceType.Knight, "b8"), (PieceType.Knight, "g8"), (PieceType.Bishop, "c8"), (PieceType.Bishop, "f8"),
                 (PieceType.Rook, "a8"), (PieceType.Pawn, "d7"), (PieceType.Pawn, "e7") } },
-            // The whole black army: 8 pawns, 2 rooks, 2 knights, 2 bishops and the Queen.
+            // Final round: the Queen with 6 pawns and one rook, knight and bishop.
             new WaveDef { name = "X. The Black Army", pieces = new[] {
-                (PieceType.Pawn, "a7"), (PieceType.Pawn, "b7"), (PieceType.Pawn, "c7"), (PieceType.Pawn, "d7"),
-                (PieceType.Pawn, "e7"), (PieceType.Pawn, "f7"), (PieceType.Pawn, "g7"), (PieceType.Pawn, "h7"),
-                (PieceType.Rook, "a8"), (PieceType.Knight, "b8"), (PieceType.Bishop, "c8"), (PieceType.Queen, "d8"),
-                (PieceType.Bishop, "f8"), (PieceType.Knight, "g8"), (PieceType.Rook, "h8") } },
+                (PieceType.Pawn, "b7"), (PieceType.Pawn, "c7"), (PieceType.Pawn, "d7"),
+                (PieceType.Pawn, "e7"), (PieceType.Pawn, "f7"), (PieceType.Pawn, "g7"),
+                (PieceType.Knight, "b8"), (PieceType.Queen, "d8"), (PieceType.Bishop, "f8"), (PieceType.Rook, "h8") } },
         };
 
         public static Vector3 SquareToWorld(string sq)
