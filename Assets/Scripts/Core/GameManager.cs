@@ -311,7 +311,7 @@ namespace KingLastPiece
         IEnumerator HitStopRoutine(float duration)
         {
             hitStopping = true;
-            Time.timeScale = 0.05f;
+            Time.timeScale = 0.1f;
             yield return new WaitForSecondsRealtime(duration);
             if (!Paused) Time.timeScale = 1f;
             hitStopping = false;

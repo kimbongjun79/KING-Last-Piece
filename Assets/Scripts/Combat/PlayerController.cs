@@ -40,6 +40,7 @@ namespace KingLastPiece
         float stateTime, staminaDelay;
         AttackDef atk;
         int comboIndex;
+        bool hitStopUsed;
         bool healed;
         HashSet<EnemyBase>[] hitSets = new HashSet<EnemyBase>[0];
         bool[] windowStarted = new bool[0];
@@ -287,6 +288,7 @@ namespace KingLastPiece
                 atk = style.lights[comboIndex];
             }
             Consume(atk.cost);
+            hitStopUsed = false;
 
             if (hitSets.Length < atk.hits.Length)
             {
@@ -393,7 +395,9 @@ namespace KingLastPiece
             }
             if (landed)
             {
-                Game.HitStop(w.hitStop);
+                // One hit-stop per attack: sweeps hit enemies on successive frames and would otherwise stutter.
+                if (!hitStopUsed) Game.HitStop(w.hitStop);
+                hitStopUsed = true;
                 if (!w.impact) Game.Rig.Shake(w.shake);
             }
         }

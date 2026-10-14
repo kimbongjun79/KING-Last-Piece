@@ -89,6 +89,7 @@ namespace KingLastPiece
                 for (int i = 0; i < AttackStyles.All.Length && i < DigitKeys.Length; i++)
                     if (kb[DigitKeys[i]].wasPressedThisFrame) SelectStyle(i);
                 if (kb.cKey.wasPressedThisFrame) ResetLab();
+                if (kb.hKey.wasPressedThisFrame) game.HitStopEnabled = !game.HitStopEnabled;
                 if (kb.gKey.wasPressedThisFrame)
                     foreach (var sq in new[] { "c7", "e7", "g7" }) game.SpawnEnemy(PieceType.Pawn, GameManager.SquareToWorld(sq));
             }

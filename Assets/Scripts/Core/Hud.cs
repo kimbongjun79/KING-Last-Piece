@@ -171,13 +171,13 @@ namespace KingLastPiece
         {
             var lab = AttackLab.Instance;
             if (lab == null) return;
-            float w = 470 * scale, x = Screen.width - w - 24 * scale, y = 24 * scale, line = 26 * scale;
+            float w = 620 * scale, x = Screen.width - w - 24 * scale, y = 24 * scale, line = 26 * scale;
             var styles = AttackStyles.All;
             float h = (styles.Length + 7) * line + 20 * scale;
             Fill(new Rect(x, y, w, h), new Color(0f, 0f, 0f, 0.6f));
             x += 14 * scale;
             y += 10 * scale;
-            Text(new Rect(x, y, w, line), "ATTACK LAB  —  1-6 style · C reset · G pawns · Stamina ∞", label, Gold);
+            Text(new Rect(x, y, w, line), $"ATTACK LAB  —  1-6 style · C reset · G pawns · H hit-stop {(GameManager.Instance.HitStopEnabled ? "ON" : "OFF")} · Stamina ∞", label, Gold);
             y += line * 1.3f;
             for (int i = 0; i < styles.Length; i++)
             {
