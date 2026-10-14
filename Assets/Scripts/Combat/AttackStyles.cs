@@ -193,6 +193,13 @@ namespace KingLastPiece
         public AttackDef[] lights;
         public AttackDef heavy;
 
+        /// <summary>
+        /// Optional opener for mid-range targets: when the first combo hit can't reach but the target is within
+        /// <see cref="gapCloserMaxRange"/>, this attack (built for the distance to cover) comes before hit 1.
+        /// </summary>
+        public System.Func<float, AttackDef> gapCloser;
+        public float gapCloserMaxRange;
+
         /// <summary>Damage per second of chaining the full light combo at the earliest cancel points.</summary>
         public float ComboDps
         {
@@ -259,8 +266,9 @@ namespace KingLastPiece
                 new AttackStyle
                 {
                     name = "Royal Ensemble", koName = "왕의 연무",
-                    description = "Whip R→L, whip L→R, 360° cyclone, then an air somersault slam; heavy is a leaping topple with an aftershock.",
-                    lights = new[] { EnsembleSwing(1f), EnsembleSwing(-1f), EnsembleCyclone(), EnsembleMeteor() }, heavy = EnsembleTopple(),
+                    description = "Ram in from mid range, whip R→L, whip L→R, 360° cyclone, air somersault slam; heavy is a wide flipping stomp.",
+                    lights = new[] { EnsembleSwing(1f), EnsembleSwing(-1f), EnsembleCyclone(), EnsembleMeteor() }, heavy = EnsembleStomp(),
+                    gapCloser = EnsembleDash, gapCloserMaxRange = 7f,
                 },
             };
         }
@@ -341,25 +349,37 @@ namespace KingLastPiece
             moves = new[] { new MoveSeg(0.14f, 0.52f, 1.6f, Ease.InOut) },
         };
 
-        static AttackDef EnsembleTopple() => new AttackDef
+        /// <summary>Opener: leans in and rams across <paramref name="distance"/> (Royal Charge's light, sized to the gap).</summary>
+        static AttackDef EnsembleDash(float distance) => new AttackDef
         {
-            name = "Checkmate Topple", duration = 1.35f, cancelAt = 1.08f, cost = 30f, heavy = true,
+            name = "Royal Charge", duration = 0.52f, cancelAt = 0.34f, cost = 10f,
             pose = new PoseTrack()
                 .Key(0f, P())
-                .Key(0.38f, P(tilt: -32f, squash: -0.28f), Ease.Out)
-                .Key(0.54f, P(tilt: 24f, lift: 1.5f, squash: 0.14f), Ease.Out)
-                .Key(0.66f, P(tilt: 92f, squash: -0.05f), Ease.In)
-                .Key(0.86f, P(tilt: 89f), Ease.Linear)
-                .Key(1.02f, P(tilt: -20f, lift: 0.35f), Ease.Out)
-                .Key(1.35f, P(), Ease.OutBack),
+                .Key(0.1f, P(tilt: -12f, squash: -0.12f), Ease.Out)
+                .Key(0.17f, P(tilt: 38f), Ease.In)
+                .Key(0.34f, P(tilt: 32f), Ease.Linear)
+                .Key(0.52f, P(), Ease.OutBack),
+            hits = new[] { new HitWindow { start = 0.14f, end = 0.34f, shape = HitShape.Circle, forward = 0.9f, range = 0.95f, damage = 10f, poise = 12f } },
+            moves = new[] { new MoveSeg(0.12f, 0.34f, Mathf.Clamp(distance, 1.5f, 5.5f)) },
+        };
+
+        /// <summary>RMB heavy: Royal Stomp's flipping meteor with a wider landing blast (costs about half the stamina bar).</summary>
+        static AttackDef EnsembleStomp() => new AttackDef
+        {
+            name = "Meteor Stomp", duration = 1.3f, cancelAt = 1.05f, cost = 48f, heavy = true,
+            pose = new PoseTrack()
+                .Key(0f, P())
+                .Key(0.42f, P(squash: -0.25f), Ease.Out)
+                .Key(0.62f, P(flip: 180f, lift: 2.8f, squash: 0.1f), Ease.Out)
+                .Key(0.82f, P(flip: 360f), Ease.In)
+                .Key(0.92f, P(flip: 360f, squash: -0.3f), Ease.Out)
+                .Key(1.3f, P(flip: 360f), Ease.OutBack),
             hits = new[]
             {
-                new HitWindow { start = 0.62f, end = 0.7f, shape = HitShape.Circle, forward = 2.3f, range = 2.7f, damage = 42f, poise = 60f,
-                    hitStop = 0.12f, shake = 0.6f, impact = true, kick = 1f },
-                new HitWindow { start = 0.76f, end = 0.8f, shape = HitShape.Circle, forward = 2.3f, range = 3.8f, damage = 10f, poise = 20f,
-                    hitStop = 0.04f, shake = 0.3f, impact = true },
+                new HitWindow { start = 0.82f, end = 0.9f, shape = HitShape.Circle, range = 4.3f, damage = 46f, poise = 65f,
+                    hitStop = 0.12f, shake = 0.65f, impact = true, kick = 1f, slash = true, sweepFrom = 0f, sweepTo = 360f },
             },
-            moves = new[] { new MoveSeg(0.36f, 0.66f, 2.4f, Ease.InOut) },
+            moves = new[] { new MoveSeg(0.42f, 0.82f, 3.0f, Ease.InOut) },
         };
 
         // ---------------------------------------------------------------- spin

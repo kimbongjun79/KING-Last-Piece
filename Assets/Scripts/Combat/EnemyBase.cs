@@ -706,13 +706,7 @@ namespace KingLastPiece
                     return;
                 }
                 crumbled = true;
-                var rends = model.GetComponentsInChildren<Renderer>();
-                if (rends.Length > 0)
-                {
-                    var b = rends[0].bounds;
-                    foreach (var r in rends) b.Encapsulate(r.bounds);
-                    Crumble.Spawn(b, rends[0].sharedMaterial, deathAway);
-                }
+                Crumble.Spawn(model.GetComponentsInChildren<Renderer>(), deathAway);
                 model.gameObject.SetActive(false);
                 Game.Rig.Shake(IsBoss ? 0.6f : 0.2f);
             }

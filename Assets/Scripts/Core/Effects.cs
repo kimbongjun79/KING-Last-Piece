@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace KingLastPiece
@@ -149,61 +150,212 @@ namespace KingLastPiece
 namespace KingLastPiece
 {
     /// <summary>
-    /// Breaks a piece into stone chunks that collapse like a crumbling castle wall: the base gives way first,
-    /// upper chunks drop after it, everything tumbles outward, bounces, settles and sinks into the board.
+    /// Shatters a piece into fragments of its real mesh (shell shards with its own material) that collapse like a
+    /// crumbling castle wall: the base gives way first, upper shards follow, everything tumbles, bounces, settles
+    /// and sinks into the board. Fragment count scales with the piece's height, so the rubble matches its size.
+    /// Models whose meshes can't be read (or primitive-built pieces) fall back to a few small stone blocks.
     /// </summary>
     public static class Crumble
     {
-        public static void Spawn(Bounds b, Material mat, Vector3 away)
+        static readonly int CullId = Shader.PropertyToID("_Cull");
+        static readonly Dictionary<Material, Material> twoSided = new Dictionary<Material, Material>();
+
+        public static void Spawn(Renderer[] renderers, Vector3 away)
         {
+            if (renderers == null || renderers.Length == 0) return;
             away.y = 0f;
             if (away.sqrMagnitude > 0.001f) away.Normalize();
+
+            Bounds b = renderers[0].bounds;
+            foreach (var r in renderers) b.Encapsulate(r.bounds);
+
+            if (!SpawnShards(renderers, b, away)) SpawnBlocks(b, renderers[0].sharedMaterial, away);
+
+            var dust = new Color(0.22f, 0.2f, 0.18f);
+            float baseR = Mathf.Max(0.15f, Mathf.Min(b.extents.x, b.extents.z));
+            Effects.Shockwave(new Vector3(b.center.x, 0f, b.center.z), baseR * 1.6f, dust, 0.45f);
+            Effects.Sparks(new Vector3(b.center.x, b.min.y + 0.2f, b.center.z), dust, 18, 4f);
+        }
+
+        /// <summary>Splits the surface into Voronoi-like shards around seed points stacked in height layers.</summary>
+        static bool SpawnShards(Renderer[] renderers, Bounds b, Vector3 away)
+        {
+            var verts = new List<Vector3>();
+            var norms = new List<Vector3>();
+            var uvs = new List<Vector2>();
+            var tris = new List<int>();
+            Material mat = null;
+
+            foreach (var r in renderers)
+            {
+                var mf = r.GetComponent<MeshFilter>();
+                if (mf == null || mf.sharedMesh == null || !mf.sharedMesh.isReadable) continue;
+                var mesh = mf.sharedMesh;
+                var m = r.transform.localToWorldMatrix;
+                int baseIndex = verts.Count;
+                var mv = mesh.vertices;
+                var mn = mesh.normals;
+                var mu = mesh.uv;
+                for (int i = 0; i < mv.Length; i++)
+                {
+                    verts.Add(m.MultiplyPoint3x4(mv[i]));
+                    norms.Add(mn.Length == mv.Length ? m.MultiplyVector(mn[i]).normalized : Vector3.up);
+                    uvs.Add(mu.Length == mv.Length ? mu[i] : Vector2.zero);
+                }
+                for (int s = 0; s < mesh.subMeshCount; s++)
+                    foreach (int idx in mesh.GetTriangles(s)) tris.Add(baseIndex + idx);
+                if (mat == null) mat = r.sharedMaterial;
+            }
+            if (tris.Count < 30) return false;
+
+            // Seeds: a few per height layer, slightly inside the silhouette.
+            int layers = Mathf.Clamp(Mathf.RoundToInt(b.size.y / 0.45f), 3, 6);
+            int perLayer = b.extents.x > 0.6f ? 4 : 3;
+            var seeds = new List<Vector3>();
+            float r0 = Mathf.Min(b.extents.x, b.extents.z);
+            for (int l = 0; l < layers; l++)
+            {
+                float y = b.min.y + b.size.y * (l + Random.Range(0.25f, 0.75f)) / layers;
+                float offset = Random.value * 360f;
+                for (int k = 0; k < perLayer; k++)
+                {
+                    Vector3 dir = Quaternion.Euler(0f, offset + k * 360f / perLayer, 0f) * Vector3.forward;
+                    seeds.Add(new Vector3(b.center.x, y, b.center.z) + dir * r0 * Random.Range(0.3f, 0.8f));
+                }
+            }
+
+            // Assign each triangle to its nearest seed.
+            var buckets = new List<int>[seeds.Count];
+            for (int i = 0; i < buckets.Length; i++) buckets[i] = new List<int>();
+            for (int t = 0; t < tris.Count; t += 3)
+            {
+                Vector3 c = (verts[tris[t]] + verts[tris[t + 1]] + verts[tris[t + 2]]) / 3f;
+                int best = 0;
+                float bd = float.MaxValue;
+                for (int s = 0; s < seeds.Count; s++)
+                {
+                    float d = (c - seeds[s]).sqrMagnitude;
+                    if (d < bd) { bd = d; best = s; }
+                }
+                buckets[best].Add(t);
+            }
+
+            var shardMat = TwoSided(mat);
+            var remap = new Dictionary<int, int>();
+            for (int s = 0; s < seeds.Count; s++)
+            {
+                var bucket = buckets[s];
+                if (bucket.Count == 0) continue;
+                remap.Clear();
+                var sv = new List<Vector3>();
+                var sn = new List<Vector3>();
+                var su = new List<Vector2>();
+                var st = new List<int>(bucket.Count * 3);
+                Vector3 centroid = Vector3.zero;
+                foreach (int t in bucket)
+                {
+                    for (int k = 0; k < 3; k++)
+                    {
+                        int vi = tris[t + k];
+                        if (!remap.TryGetValue(vi, out int ni))
+                        {
+                            ni = sv.Count;
+                            remap[vi] = ni;
+                            sv.Add(verts[vi]);
+                            sn.Add(norms[vi]);
+                            su.Add(uvs[vi]);
+                            centroid += verts[vi];
+                        }
+                        st.Add(ni);
+                    }
+                }
+                centroid /= sv.Count;
+                for (int i = 0; i < sv.Count; i++) sv[i] -= centroid;
+
+                var shardMesh = new Mesh { name = "Shard" };
+                if (sv.Count > 65000) shardMesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
+                shardMesh.SetVertices(sv);
+                shardMesh.SetNormals(sn);
+                shardMesh.SetUVs(0, su);
+                shardMesh.SetTriangles(st, 0);
+                shardMesh.RecalculateBounds();
+                shardMesh.RecalculateTangents();
+
+                var go = new GameObject("Shard");
+                go.transform.position = centroid;
+                go.AddComponent<MeshFilter>().sharedMesh = shardMesh;
+                go.AddComponent<MeshRenderer>().sharedMaterial = shardMat;
+
+                float h = Mathf.Clamp01((centroid.y - b.min.y) / Mathf.Max(0.01f, b.size.y));
+                Vector3 outward = centroid - new Vector3(b.center.x, centroid.y, b.center.z);
+                outward.y = 0f;
+                outward = outward.sqrMagnitude > 0.0001f ? outward.normalized : Vector3.forward;
+
+                var chunk = go.AddComponent<CrumbleChunk>();
+                chunk.ownedMesh = shardMesh;
+                chunk.groundOffset = shardMesh.bounds.extents.magnitude * 0.35f;
+                // Lower shards give way first; the top follows as the support disappears.
+                chunk.delay = h * 0.12f + Random.Range(0f, 0.04f);
+                chunk.velocity = outward * Random.Range(0.5f, 2f) + away * Random.Range(0.2f, 1.4f) +
+                                 Vector3.up * Random.Range(-0.4f, 1.3f) * (1f - h * 0.5f);
+                chunk.spin = Random.onUnitSphere * Random.Range(100f, 420f);
+                chunk.settleTime = Random.Range(1.4f, 2.2f);
+            }
+            return true;
+        }
+
+        /// <summary>Shards are open shells, so draw both faces.</summary>
+        static Material TwoSided(Material src)
+        {
+            if (src == null) return MaterialLib.Get(PieceFactory.BlackPiece, 0.8f);
+            if (twoSided.TryGetValue(src, out var m) && m != null) return m;
+            m = new Material(src) { name = src.name + "_TwoSided" };
+            if (m.HasProperty(CullId)) m.SetFloat(CullId, 0f);
+            m.doubleSidedGI = true;
+            twoSided[src] = m;
+            return m;
+        }
+
+        /// <summary>Fallback for pieces without a readable mesh: a modest pile of small blocks.</summary>
+        static void SpawnBlocks(Bounds b, Material mat, Vector3 away)
+        {
             Vector3 c = b.center;
             float baseR = Mathf.Max(0.15f, Mathf.Min(b.extents.x, b.extents.z));
-            float sizeScale = Mathf.Clamp(baseR / 0.45f, 0.7f, 1.8f);
-            int layers = Mathf.Clamp(Mathf.RoundToInt(b.size.y / 0.2f), 5, 16);
-
+            int layers = Mathf.Clamp(Mathf.RoundToInt(b.size.y / 0.3f), 3, 10);
             for (int l = 0; l < layers; l++)
             {
                 float h = (l + 0.5f) / layers;
                 float y = b.min.y + b.size.y * h;
-                float r = baseR * Mathf.Lerp(0.85f, 0.55f, h);
-                int around = r > 0.35f ? 5 : 4;
-                float offset = Random.value * 360f;
-                for (int k = 0; k <= around; k++)
+                float r = baseR * Mathf.Lerp(0.7f, 0.45f, h);
+                for (int k = 0; k < 3; k++)
                 {
-                    // k == around: a core chunk in the middle of the layer.
-                    Vector3 dir = Quaternion.Euler(0f, offset + k * 360f / around + Random.Range(-15f, 15f), 0f) * Vector3.forward;
-                    Vector3 pos = new Vector3(c.x, y, c.z) + (k == around ? Vector3.zero : dir * r * Random.Range(0.45f, 0.8f));
-                    float s = Random.Range(0.13f, 0.27f) * sizeScale;
-                    var scale = new Vector3(s * Random.Range(0.8f, 1.5f), s * Random.Range(0.6f, 1.1f), s * Random.Range(0.8f, 1.5f));
-                    var t = PieceFactory.Part(PrimitiveType.Cube, null, pos, scale, mat, Random.rotation.eulerAngles);
-                    t.name = "Rubble";
+                    Vector3 dir = Quaternion.Euler(0f, Random.value * 360f, 0f) * Vector3.forward;
+                    float s = Random.Range(0.1f, 0.18f);
+                    var t = PieceFactory.Part(PrimitiveType.Cube, null, new Vector3(c.x, y, c.z) + dir * r * 0.6f,
+                        new Vector3(s, s * 0.8f, s), mat, Random.rotation.eulerAngles);
                     var chunk = t.gameObject.AddComponent<CrumbleChunk>();
-                    Vector3 outward = k == around ? Random.insideUnitSphere * 0.3f : dir;
-                    outward.y = 0f;
-                    // Lower layers give way first; the top follows as the support disappears.
-                    chunk.delay = h * 0.12f + Random.Range(0f, 0.04f);
-                    chunk.velocity = outward * Random.Range(0.6f, 2.4f) + away * Random.Range(0.3f, 1.8f) +
-                                     Vector3.up * Random.Range(-0.5f, 1.6f) * (1f - h * 0.5f);
-                    chunk.spin = Random.onUnitSphere * Random.Range(120f, 520f);
+                    chunk.groundOffset = s * 0.4f;
+                    chunk.delay = h * 0.12f;
+                    chunk.velocity = dir * Random.Range(0.5f, 2f) + away * Random.Range(0.2f, 1.4f) + Vector3.up * Random.Range(-0.4f, 1.2f);
+                    chunk.spin = Random.onUnitSphere * Random.Range(120f, 480f);
                     chunk.settleTime = Random.Range(1.4f, 2.2f);
                 }
             }
-
-            var dust = new Color(0.22f, 0.2f, 0.18f);
-            Effects.Shockwave(new Vector3(c.x, 0f, c.z), baseR * 1.6f, dust, 0.45f);
-            Effects.Sparks(new Vector3(c.x, b.min.y + 0.2f, c.z), dust, 22, 4f);
-            Effects.Sparks(new Vector3(c.x, b.center.y, c.z), dust, 14, 3f);
         }
     }
 
     /// <summary>One piece of rubble: waits, falls with gravity, bounces on the board, settles and sinks away.</summary>
     public class CrumbleChunk : MonoBehaviour
     {
-        public float delay, settleTime = 1.8f;
+        public float delay, settleTime = 1.8f, groundOffset = 0.1f;
         public Vector3 velocity, spin;
+        public Mesh ownedMesh;  // runtime shard mesh, freed with the chunk
         float age;
+
+        void OnDestroy()
+        {
+            if (ownedMesh != null) Destroy(ownedMesh);
+        }
         const float Gravity = 18f, SinkTime = 0.6f;
 
         void Update()
@@ -225,7 +377,7 @@ namespace KingLastPiece
             transform.position += velocity * dt;
             transform.Rotate(spin * dt, Space.World);
 
-            float ground = transform.localScale.y * 0.45f;
+            float ground = groundOffset;
             if (transform.position.y < ground)
             {
                 var p = transform.position;

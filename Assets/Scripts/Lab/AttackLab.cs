@@ -437,6 +437,56 @@ namespace KingLastPiece
             Destroy(sheet);
         }
 
+        /// <summary>Mid-range opener: a dummy 5 units ahead; holding light should dash in, then run hits 1-4.</summary>
+        IEnumerator GapCloserScenario(string dir, StringBuilder stats)
+        {
+            var hud = game.GetComponent<Hud>();
+            if (hud != null) hud.enabled = false;
+            game.ClearEnemies();
+            var player = game.Player;
+            player.ResetForWave(PlayerStart, 0f);
+            game.SpawnCustom<TrainingDummy>(PieceType.Pawn, PlayerStart + new Vector3(0f, 0f, 5f));
+            game.Rig.OverridePosition = PlayerStart + new Vector3(5.5f, 3.2f, 1.5f);
+            game.Rig.OverrideLookAt = PlayerStart + new Vector3(0f, 0.8f, 3f);
+            for (int f = 0; f < 50; f++) yield return null;
+
+            var seq = new StringBuilder();
+            AttackDef last = null;
+            int before = game.DamageEvents;
+            const int cols = 5, rows = 2;
+            Texture2D sheet = null;
+            int tileW = 0, tileH = 0, shot = 0;
+            for (int f = 0; f < 200; f++)
+            {
+                player.Press(PlayerController.Buffered.Light);  // like holding LMB
+                yield return null;
+                var cur = player.CurrentAttack;
+                if (cur != null && cur != last) { seq.Append(seq.Length > 0 ? " > " : "").Append(cur.name); last = cur; }
+                if (f % 18 == 4 && shot < cols * rows)
+                {
+                    yield return new WaitForEndOfFrame();
+                    var tex = ScreenCapture.CaptureScreenshotAsTexture();
+                    if (sheet == null)
+                    {
+                        tileW = tex.width;
+                        tileH = tex.height;
+                        sheet = new Texture2D(tileW * cols, tileH * rows, TextureFormat.RGB24, false);
+                    }
+                    if (tex.width == tileW && tex.height == tileH)
+                        sheet.SetPixels32((shot % cols) * tileW, (rows - 1 - shot / cols) * tileH, tileW, tileH, tex.GetPixels32());
+                    Destroy(tex);
+                    shot++;
+                }
+            }
+            stats.AppendLine($"GapCloser	sequence={seq}	hits={game.DamageEvents - before}");
+            if (sheet != null)
+            {
+                sheet.Apply();
+                File.WriteAllBytes(Path.Combine(dir, "12_Gap_Closer.png"), sheet.EncodeToPNG());
+                Destroy(sheet);
+            }
+        }
+
         static string GetArg(string name)
         {
             var args = System.Environment.GetCommandLineArgs();
@@ -543,6 +593,7 @@ namespace KingLastPiece
             yield return StaggerScenario(dir, stats);
             yield return AutoAssistScenario(dir, stats);
             yield return CrumbleScenario(dir);
+            yield return GapCloserScenario(dir, stats);
 
             File.WriteAllText(Path.Combine(dir, "stats.tsv"), stats.ToString());
             Application.Quit();

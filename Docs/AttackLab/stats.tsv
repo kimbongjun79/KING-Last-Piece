@@ -23,11 +23,12 @@ Royal Ensemble	Royal Whip R→L	0.13	0.29	0.56	0.36	4.4	220	14	3
 Royal Ensemble	Royal Whip L→R	0.13	0.29	0.56	0.36	4.4	220	14	2
 Royal Ensemble	Royal Cyclone	0.14	0.56	0.86	0.60	4.2	360	18	11
 Royal Ensemble	Royal Meteor	0.52	0.57	0.88	0.68	4.8	360	20	5
-Royal Ensemble	Checkmate Topple	0.62	0.80	1.35	1.08	8.5	360	52	6
+Royal Ensemble	Meteor Stomp	0.82	0.90	1.30	1.05	7.3	360	46	6
 Royal Ensemble	COMBO_DPS	33.0
 JustDodge	perfect=True	just_count=1	throws=1	damage_events=1	rook_dead=False
-Stagger	pawn_hp=100	launches=1	dead=True	timeline=mmmsssVVVUUUUUUUUVVVVVVVVVmmmx
+Stagger	pawn_hp=100	launches=1	dead=True	timeline=mmssssVVVUUUUUUUUVVVVVVVVVmmmx
 AutoDodge	Bishop	dashing=True	roll_vs_attack_angle=90	damage_taken=0
 AutoDodge	Rook	dashing=True	roll_vs_attack_angle=90	damage_taken=0
-AutoAim	cluster_facing=61deg(cluster 50-94, lone -70)	cluster_hits=3	behind_facing_err=0	far_facing_err=96(should stay ~90)
-DodgeCancel	during_light_windup=True	after_heavy_hit=True	at=0.73s_vs_old_cancel=1.08s
+AutoAim	cluster_facing=61deg(cluster 50-94, lone -70)	cluster_hits=3	behind_facing_err=0	far_facing_err=0(should stay ~90)
+DodgeCancel	during_light_windup=True	after_heavy_hit=True	at=0.93s_vs_old_cancel=1.05s
+GapCloser	sequence=Royal Charge > Royal Whip R→L > Royal Whip L→R > Royal Cyclone > Royal Meteor > Royal Whip R→L > Royal Whip L→R > Royal Cyclone	hits=9

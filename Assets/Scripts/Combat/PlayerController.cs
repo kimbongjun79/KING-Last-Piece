@@ -21,6 +21,8 @@ namespace KingLastPiece
         const float LightCostScale = 0.35f;
         // Auto-aim: only pieces within this range (scaled by the attack's reach) are considered.
         const float AssistMinRange = 2.5f, AssistMaxRange = 4.5f;
+        // Gap closer: a target within this angle of the aim, and where to stop in front of it.
+        const float GapAngle = 100f, GapStopDistance = 0.5f;
         const float DodgeDuration = 0.5f, IFrameStart = 0.03f, IFrameEnd = 0.36f, DodgeCancelAt = 0.4f;
 
         // Dodge charges replace stamina for rolling: a short burst of rolls, refilled quickly.
@@ -390,7 +392,14 @@ namespace KingLastPiece
         {
             var style = Style ?? AttackStyles.Default;
             bool chain = state == State.Attack && !atk.heavy && !heavy;
+            EnemyBase gapTarget = null;
             if (heavy) atk = style.heavy;
+            else if (!chain && style.gapCloser != null && TryFindGapTarget(style, out gapTarget, out float gap))
+            {
+                // Mid range: dash in first; the combo continues with hit 1 (index -1 + 1 = 0).
+                comboIndex = -1;
+                atk = style.gapCloser(gap);
+            }
             else
             {
                 comboIndex = chain ? (comboIndex + 1) % style.lights.Length : 0;
@@ -415,9 +424,40 @@ namespace KingLastPiece
             Vector3 dir = InputDirection();
             // Auto-aim (no visuals): with pieces close by, face the direction that hits the most of them —
             // regardless of where the player is moving. Far away it does nothing.
-            if (LockTarget != null) dir = LockTarget.FlatPos - FlatPos;
+            if (gapTarget != null) dir = gapTarget.FlatPos - FlatPos;
+            else if (LockTarget != null) dir = LockTarget.FlatPos - FlatPos;
             else if (TryFindAssistDirection(dir.sqrMagnitude > 0.01f ? dir : transform.forward, out var best)) dir = best;
             if (dir.sqrMagnitude > 0.01f) transform.rotation = Quaternion.LookRotation(new Vector3(dir.x, 0f, dir.z));
+        }
+
+        /// <summary>
+        /// A piece is in "mid range" when combo hit 1 can't reach anything from here, but one is within the style's
+        /// gap-closer range (the lock-on target, or the closest one roughly in the aimed direction).
+        /// </summary>
+        bool TryFindGapTarget(AttackStyle style, out EnemyBase target, out float gap)
+        {
+            target = null;
+            gap = 0f;
+            var first = style.lights[0];
+            Vector3 input = InputDirection();
+            Vector3 preferred = input.sqrMagnitude > 0.01f ? input : transform.forward;
+            float best = float.MaxValue;
+            foreach (var e in Game.Enemies)
+            {
+                if (e == null || e.IsDead || !e.Targetable) continue;
+                Vector3 to = e.FlatPos - FlatPos;
+                float d = to.magnitude;
+                if (d < 0.01f) return false;
+                if (first.WouldHit(FlatPos, to, e.FlatPos, e.Radius)) return false;  // hit 1 already reaches someone
+                if (d > style.gapCloserMaxRange + e.Radius) continue;
+                if (LockTarget != null ? e != LockTarget : Vector3.Angle(preferred, to) > GapAngle) continue;
+                if (d < best) { best = d; target = e; }
+            }
+            if (target == null) return false;
+            gap = best - (Radius + target.Radius + GapStopDistance);
+            if (gap > 0.5f) return true;
+            target = null;
+            return false;
         }
 
         /// <summary>
