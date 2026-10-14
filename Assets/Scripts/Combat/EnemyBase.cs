@@ -151,6 +151,7 @@ namespace KingLastPiece
 
         public bool IsVulnerable => stagger != null && stagger.Vulnerable;
         public bool IsAirborne => state == EState.Airborne;
+        public float AirHeight => state == EState.Airborne ? Mathf.Max(0f, airHeight) : 0f;
         /// <summary>One-letter state code for lab timelines.</summary>
         public char StateCode => state switch
         {
@@ -580,7 +581,13 @@ namespace KingLastPiece
         // ---------------------------------------------------------------- stagger reactions
 
         static readonly Color VulnerableColor = new Color(1f, 0.98f, 0.94f);
-        const float AirGravity = 22f, AirLiftFalloff = 0.6f, GetupLie = 0.45f, GetupRise = 0.4f, ForcedLaunchLie = 0.9f;
+        const float AirGravity = 22f, GetupLie = 0.45f, GetupRise = 0.4f, ForcedLaunchLie = 0.9f;
+        // Launch / juggle tuning: a Vulnerable hit pops the piece a little, the heavy launcher sends it high, and air hits
+        // keep it up with shrinking boosts (capped) plus a brief hover so the combo can follow.
+        const float VulnerablePopScale = 0.6f, ForcedLaunchScale = 1.15f;
+        const float JuggleLift = 4.6f, JuggleFalloff = 0.85f, JuggleCeiling = 2.6f, JuggleHover = 0.12f;
+        const int MaxJuggleHits = 7;
+        float airHover;  // seconds of reduced gravity after a juggle hit
         float bonusLie;  // extra time lying down after a forced launch
 
         /// <summary>Cancels whatever the piece was doing (attack, telegraph, glow) — frees its attack token too.</summary>
@@ -608,37 +615,54 @@ namespace KingLastPiece
             if (stagger == null || IsDead) return;
             if (state == EState.Spawning || state == EState.Grabbed || state == EState.Launched) return;
             bonusLie = ForcedLaunchLie;
-            if (state != EState.Airborne) LaunchUp(source);
+            if (state != EState.Airborne) LaunchUp(source, true);
         }
 
-        /// <summary>Knock the piece into the air. Each further air hit lifts less (no infinite juggles).</summary>
-        void LaunchUp(Vector3 source)
+        /// <summary>
+        /// Knock the piece into the air. A Vulnerable piece only pops up a little; the heavy launcher sends it high.
+        /// Hits while airborne juggle it: each one gives a small, shrinking lift (and a gentle hover at the top) so the
+        /// piece stays up a bit longer, up to <see cref="MaxJuggleHits"/> boosts — after that it just falls.
+        /// </summary>
+        void LaunchUp(Vector3 source, bool forced = false)
         {
             CancelAction();
             bool alreadyAirborne = state == EState.Airborne;
+            Vector3 away = FlatPos - new Vector3(source.x, 0f, source.z);
             if (!alreadyAirborne)
             {
                 airHits = 0;
                 airHeight = 0f;
+                airHover = 0f;
+                airVy = stagger.Profile.launchForce * (forced ? ForcedLaunchScale : VulnerablePopScale);
+                airKnock = away.sqrMagnitude > 0.001f ? away.normalized * (forced ? 2.2f : 1.4f) : Vector3.zero;
             }
-            float lift = stagger.Profile.launchForce * Mathf.Pow(AirLiftFalloff, airHits);
+            else if (airHits < MaxJuggleHits)
+            {
+                // Juggle: a small boost that shrinks per hit and lifts less the higher the piece already is.
+                float height = Mathf.Clamp01(1f - airHeight / JuggleCeiling);
+                float boost = JuggleLift * Mathf.Pow(JuggleFalloff, airHits) * (0.35f + 0.65f * height);
+                airVy = Mathf.Max(airVy, boost);
+                airHover = JuggleHover;
+                airKnock = away.sqrMagnitude > 0.001f ? away.normalized * 0.5f : Vector3.zero;  // stay in reach
+            }
             airHits++;
-            airVy = Mathf.Max(lift, alreadyAirborne ? airVy : 0f);
-            Vector3 away = FlatPos - new Vector3(source.x, 0f, source.z);
-            airKnock = away.sqrMagnitude > 0.001f ? away.normalized * (alreadyAirborne ? 1.2f : 2.2f) : Vector3.zero;
             Enter(EState.Airborne);
             Effects.Sparks(transform.position + Vector3.up * (airHeight + 1f), VulnerableColor, 10, 5f);
             if (!alreadyAirborne)
             {
-                Effects.Shockwave(FlatPos, 1.2f, VulnerableColor, 0.3f);
-                Vfx.Slash(SlashFxKind.SlashBVertical, transform.position + Vector3.up * 0.8f, Quaternion.LookRotation(airKnock.sqrMagnitude > 0.01f ? airKnock : transform.forward), 1.1f, Vfx.Accent);
+                Effects.Shockwave(FlatPos, forced ? 1.2f : 0.8f, VulnerableColor, 0.3f);
+                Vfx.Slash(SlashFxKind.SlashBVertical, transform.position + Vector3.up * 0.8f, Quaternion.LookRotation(airKnock.sqrMagnitude > 0.01f ? airKnock : transform.forward),
+                    forced ? 1.1f : 0.75f, Vfx.Accent);
             }
         }
 
         void UpdateAirborne(float dt)
         {
             airHeight += airVy * dt;
-            airVy -= AirGravity * dt;
+            // Brief hover after a juggle hit: gravity eases off so the piece hangs at the top of its pop.
+            float gravity = airHover > 0f ? AirGravity * 0.35f : AirGravity;
+            airHover -= dt;
+            airVy -= gravity * dt;
             transform.position += airKnock * dt;
             airKnock = Vector3.Lerp(airKnock, Vector3.zero, 1f - Mathf.Exp(-2f * dt));
             modelY = Mathf.Max(0f, airHeight);

@@ -249,7 +249,8 @@ namespace KingLastPiece
             Texture2D sheet = null;
             int tileW = 0, tileH = 0, shot = 0;
             float startHp = pawn.Health;
-            int launches = 0;
+            int launches = 0, airFrames = 0;
+            float maxAir = 0f;
             bool wasAir = false;
             for (int f = 0; f < frames && pawn != null; f++)
             {
@@ -258,6 +259,8 @@ namespace KingLastPiece
                 if (pawn == null) break;
                 if (pawn.IsAirborne && !wasAir) launches++;
                 wasAir = pawn.IsAirborne;
+                if (pawn.IsAirborne) airFrames++;
+                maxAir = Mathf.Max(maxAir, pawn.AirHeight);
                 if (f % 6 == 0) timeline.Append(pawn.IsAirborne ? 'U' : pawn.IsVulnerable ? 'V' : pawn.StateCode);
                 if (f % 30 == 15 && shot < cols * rows)
                 {
@@ -278,7 +281,7 @@ namespace KingLastPiece
                 if (pawn.IsDead) break;
             }
 
-            stats.AppendLine($"Stagger\tpawn_hp={startHp:0}\tlaunches={launches}\tdead={(pawn == null || pawn.IsDead)}\ttimeline={timeline}");
+            stats.AppendLine($"Stagger\tpawn_hp={startHp:0}\tlaunches={launches}\tair_time={airFrames / 60f:0.00}s\tmax_height={maxAir:0.00}\tdead={(pawn == null || pawn.IsDead)}\ttimeline={timeline}");
             if (sheet != null)
             {
                 sheet.Apply();

@@ -5,8 +5,8 @@ namespace KingLastPiece
     /// <summary>
     /// Stagger gauge for regular (non-boss) enemies. Bosses don't get this component (they keep their own poise).
     /// Normal: hits flinch and fill the gauge. Attacking (super armor): no reaction, gauge still fills.
-    /// Full gauge → Vulnerable: the next hit launches the enemy and cancels its action. Airborne: hits re-launch
-    /// with less lift each time. The gauge is frozen while Vulnerable/airborne and resets on get-up or timeout.
+    /// Full gauge → Vulnerable: each hit pops the enemy up a little and cancels its action. Airborne: hits juggle it
+    /// with shrinking, capped boosts. The gauge is frozen while Vulnerable/airborne and resets on get-up or timeout.
     /// </summary>
     [DisallowMultipleComponent]
     public class StaggerController : MonoBehaviour
