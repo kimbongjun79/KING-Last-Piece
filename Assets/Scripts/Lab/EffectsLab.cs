@@ -185,6 +185,9 @@ namespace KingLastPiece
                 },
                 i => (Station(i) + new Vector3(3.5f, 4f, -6.5f), Station(i) + new Vector3(0f, 0.6f, 1f)));
 
+            // E6: top-down whip check — King faces +Z (up in the image), dummy ahead; row 0 = hit 1, row 1 = hit 2.
+            yield return WhipTopDown(Path.Combine(dir, "E6_Whip_TopDown.png"));
+
             // E5: NamuFX slash prefabs as authored (identity rotation, at chest height) — rows = prefabs.
             var lib = FxLibrary.Instance;
             if (lib != null)
@@ -194,6 +197,53 @@ namespace KingLastPiece
             }
 
             Application.Quit();
+        }
+
+        IEnumerator WhipTopDown(string path)
+        {
+            var player = game.Player;
+            Vector3 start = Station(1) - new Vector3(0f, 0f, 1.2f);
+            game.Rig.OverridePosition = start + new Vector3(0f, 9f, -0.6f);
+            game.Rig.OverrideLookAt = start + new Vector3(0f, 0f, 0.4f);
+            int[] frames = { 8, 12, 16, 22, 30 };
+            const int rows = 2;
+            Texture2D sheet = null;
+            int tileW = 0, tileH = 0;
+            for (int row = 0; row < rows; row++)
+            {
+                if (dummies[1] != null) Destroy(dummies[1].gameObject);
+                SpawnDummy(1);
+                player.ResetForWave(start, 0f);
+                for (int f = 0; f < 90; f++) yield return null;
+                player.Press(PlayerController.Buffered.Light);
+                yield return null;
+                if (row == 1)
+                {
+                    var first = player.CurrentAttack;
+                    while (first != null && player.StateTime < first.cancelAt) yield return null;
+                    player.Press(PlayerController.Buffered.Light);
+                    yield return null;
+                }
+                int elapsed = 0;
+                for (int c = 0; c < frames.Length; c++)
+                {
+                    for (; elapsed < frames[c]; elapsed++) yield return null;
+                    yield return new WaitForEndOfFrame();
+                    var tex = ScreenCapture.CaptureScreenshotAsTexture();
+                    if (sheet == null)
+                    {
+                        tileW = tex.width;
+                        tileH = tex.height;
+                        sheet = new Texture2D(tileW * frames.Length, tileH * rows, TextureFormat.RGB24, false);
+                    }
+                    if (tex.width == tileW && tex.height == tileH)
+                        sheet.SetPixels32(c * tileW, (rows - 1 - row) * tileH, tileW, tileH, tex.GetPixels32());
+                    Destroy(tex);
+                }
+            }
+            sheet.Apply();
+            File.WriteAllBytes(path, sheet.EncodeToPNG());
+            Destroy(sheet);
         }
 
         /// <summary>Spawns each prefab at the middle station and captures it over time (one row per prefab).</summary>

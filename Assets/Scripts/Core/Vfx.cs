@@ -63,12 +63,15 @@ namespace KingLastPiece
         /// works; <paramref name="tint"/> recolors every system's start color (keeping alpha).
         /// Returns false when the asset isn't available (callers fall back to the primitive crescent).
         /// </summary>
-        public static bool Slash(SlashFxKind kind, Vector3 pos, Quaternion rot, float scale, Color? tint = null) =>
-            Slash(kind, pos, rot, scale, tint, null);
+        /// <param name="mirror">Mirror across the facing's left/right axis: the arc sweeps the other way.</param>
+        public static bool Slash(SlashFxKind kind, Vector3 pos, Quaternion rot, float scale, Color? tint = null, bool mirror = false) =>
+            Slash(kind, pos, rot, scale, tint, null, mirror);
 
         /// <param name="keep">When set, only particle systems whose (lower-case) name passes keep emitting.</param>
-        static bool Slash(SlashFxKind kind, Vector3 pos, Quaternion rot, float scale, Color? tint, System.Predicate<string> keep)
+        static bool Slash(SlashFxKind kind, Vector3 pos, Quaternion rot, float scale, Color? tint, System.Predicate<string> keep,
+                          bool mirror = false)
         {
+            Vector3 facingRight = rot * Vector3.right;
             var lib = FxLibrary.Instance;
             if (lib == null) return false;
             GameObject prefab = kind switch
@@ -84,8 +87,21 @@ namespace KingLastPiece
             };
             if (prefab == null) return false;
 
+            // NamuFX slashes animate a sweep that isn't centered on the prefab's +Z. Calibrated top-down
+            // (Effects Lab E6): this turn about the vertical makes the sweep run right → front → left of the facing.
+            if (kind != SlashFxKind.AoeA)
+                rot = Quaternion.AngleAxis(SlashYawFix, Vector3.up) * rot;
             var fx = Object.Instantiate(prefab, pos, rot);
-            fx.transform.localScale = Vector3.one * scale;
+            var s = Vector3.one * scale;
+            if (mirror)
+            {
+                // The slash meshes sit under rotated children, so the sweep's left/right is the prefab-local axis that
+                // lines up with the facing's *forward* (verified top-down in Effects Lab E6; the other axis flips it behind).
+                Vector3 local = Quaternion.Inverse(rot) * facingRight;
+                if (Mathf.Abs(local.x) >= Mathf.Abs(local.z)) s.z = -s.z;
+                else s.x = -s.x;
+            }
+            fx.transform.localScale = s;
             foreach (var ps in fx.GetComponentsInChildren<ParticleSystem>())
             {
                 string n = ps.name.ToLowerInvariant();
@@ -113,6 +129,9 @@ namespace KingLastPiece
             Object.Destroy(fx, 2.2f);
             return true;
         }
+
+        /// <summary>World-yaw correction applied to directional NamuFX slashes (calibrated in Effects Lab E6).</summary>
+        public static float SlashYawFix = 270f;
 
         static readonly Color DustColor = new Color(0.55f, 0.5f, 0.45f);
 

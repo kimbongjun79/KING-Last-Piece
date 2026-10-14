@@ -113,7 +113,7 @@ namespace KingLastPiece
         // Authored slash effect (NamuFX) played when the window starts, aligned with the King's facing.
         public SlashFxKind fx;
         public float fxScale = 1f, fxYaw, fxHeight = 0.9f;
-        public bool fxFlip;            // upside-down = the arc sweeps the other way
+        public bool fxFlip;            // mirrored (negative X scale) = the arc sweeps the other way
         public bool fxGold;            // recolor the prefab to the King's gold
         public bool dust;              // low dust burst around the impact (NamuFX smoke layers)
     }
