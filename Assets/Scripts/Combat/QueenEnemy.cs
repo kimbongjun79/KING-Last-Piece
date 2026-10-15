@@ -2,13 +2,15 @@ using UnityEngine;
 
 namespace KingLastPiece
 {
-    /// <summary>The Black Queen (boss): chained dashes in any direction, leaps, and a radial "Check" slam.
-    /// Below half health she summons pawns and attacks faster.</summary>
+    /// <summary>
+    /// The Black Queen (boss): takes a square on one of the King's 8 lines and charges along it (chained dashes stay
+    /// on chess lines), leaps onto the King's square from afar, and slams a radial "Check" up close.
+    /// Below half health she summons pawns and attacks faster.
+    /// </summary>
     public class QueenEnemy : EnemyBase
     {
         int dashesLeft;
         bool phase2;
-        float strafeSign = 1f;
 
         protected override void Configure()
         {
@@ -32,12 +34,13 @@ namespace KingLastPiece
                 Sfx.Play("QUEEN_Phase2");
                 Sfx.Play("QUEEN_Summon", transform.position);
                 Flash(new Color(2f, 0.2f, 0.1f), 0.4f);
-                Effects.Shockwave(transform.position, 5f, new Color(0.8f, 0.1f, 0.5f), 0.7f);
+                Effects.DarkWave(transform.position, 5f, 0.7f);
                 Game.Rig.Shake(0.5f);
                 Game.ShowBanner("The Queen summons her pawns");
                 Vector3 side = transform.right * 3f;
-                Game.SpawnEnemy(PieceType.Pawn, ClampPoint(FlatPos + side));
-                Game.SpawnEnemy(PieceType.Pawn, ClampPoint(FlatPos - side));
+                // Summoned pawns appear on the squares to either side of her.
+                Game.SpawnEnemy(PieceType.Pawn, BoardSlots.Center(BoardSlots.ToSquare(FlatPos + side)));
+                Game.SpawnEnemy(PieceType.Pawn, BoardSlots.Center(BoardSlots.ToSquare(FlatPos - side)));
                 cooldown = 1.2f;
                 return;
             }
@@ -45,10 +48,13 @@ namespace KingLastPiece
             Vector3 to = ToPlayer;
             float d = to.magnitude;
             FaceTowards(to, 360f);
+            UpdateSlot(BoardSlots.QueenSlots);
 
             if (cooldown <= 0f)
             {
+                // The Queen moves like a rook and a bishop together: she charges along whichever line she stands on.
                 float r = Random.value;
+                bool acted = true;
                 if (d < 3.6f && r < 0.5f)
                 {
                     BeginAttack(new AttackPlan
@@ -57,34 +63,38 @@ namespace KingLastPiece
                         damage = 26f, poise = 50f, radius = 3.8f
                     });
                 }
-                else if (d > 5f && r < 0.45f)
+                else if (ReadyAtAttackSlot)
+                {
+                    dashesLeft = phase2 ? 2 : 1;
+                    Dash(0.86f * Speed, BoardSlots.LineDirection(MySquare, KingSquare));
+                }
+                else if (d > 5f && r < 0.2f)
                 {
                     BeginAttack(new AttackPlan
                     {
-                        kind = AtkKind.Leap, target = Player.FlatPos, windup = 0.97f * Speed, active = 0.6f, recover = 1.0f,
+                        kind = AtkKind.Leap, target = BoardSlots.Center(KingSquare), windup = 0.97f * Speed, active = 0.6f, recover = 1.0f,
                         damage = 28f, poise = 45f, radius = 2.2f
                     });
                 }
-                else
+                else acted = false;
+
+                if (acted)
                 {
-                    dashesLeft = phase2 ? 2 : 1;
-                    Dash(0.86f * Speed);
+                    cooldown = Random.Range(1.4f, 2.2f) * Speed;
+                    return;
                 }
-                cooldown = Random.Range(1.4f, 2.2f) * Speed;
-                if (Random.value < 0.3f) strafeSign = -strafeSign;
-                return;
+                cooldown = 0.35f;   // nothing fit yet: keep heading for a line and decide again shortly
             }
 
-            if (d > 3.2f) MoveTowards(Player.FlatPos, moveSpeed, dt);
-            else Strafe(strafeSign, moveSpeed * 0.6f, dt);
+            if (!ReadyAtAttackSlot) MoveToSlot(Gait.Direct, moveSpeed, dt);
         }
 
-        void Dash(float windup)
+        void Dash(float windup, Vector3 dir)
         {
             Vector3 to = ToPlayer;
             BeginAttack(new AttackPlan
             {
-                kind = AtkKind.Dash, dir = to, windup = windup, recover = dashesLeft > 0 ? 0.25f : 1.1f,
+                kind = AtkKind.Dash, dir = dir, windup = windup, recover = dashesLeft > 0 ? 0.25f : 1.1f,
                 length = Mathf.Clamp(to.magnitude + 4f, 6f, 12f), speed = 19f, damage = 22f, poise = 40f, radius = 1.0f
             });
         }
@@ -93,7 +103,8 @@ namespace KingLastPiece
         {
             if (dashesLeft <= 0) return false;
             dashesLeft--;
-            Dash(0.48f * Speed);
+            // Follow-up dashes stay on chess lines too (nearest of the 8 directions).
+            Dash(0.48f * Speed, BoardSlots.Snap8(ToPlayer));
             return true;
         }
     }

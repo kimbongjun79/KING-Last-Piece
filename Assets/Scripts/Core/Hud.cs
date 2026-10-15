@@ -312,6 +312,7 @@ namespace KingLastPiece
                 $"G     Invincible: {(arena.Invincible ? "ON" : "OFF")}",
                 $"I     Infinite stamina: {(arena.InfiniteStamina ? "ON" : "OFF")}",
                 $"H     Hit-stop: {(g.HitStopEnabled ? "ON" : "OFF")}",
+                $"V     Board slots: {(arena.SlotViewOn ? "ON" : "OFF")}",
             };
             Fill(new Rect(x, y, w, (rows.Length + 1.6f) * line + 16 * scale), new Color(0f, 0f, 0f, 0.6f));
             x += 14 * scale;

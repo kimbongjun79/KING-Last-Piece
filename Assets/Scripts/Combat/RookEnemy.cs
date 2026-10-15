@@ -2,11 +2,13 @@ using UnityEngine;
 
 namespace KingLastPiece
 {
-    /// <summary>Rook: heavy, armored. Aligns on the King's rank/file and rams; slams when crowded.</summary>
+    /// <summary>
+    /// Rook: heavy, armored. Slides along ranks and files to a square 2–3 squares out on the King's rank or file,
+    /// then rams down that line. When the King steps next to it, it slams the squares around itself instead.
+    /// </summary>
     public class RookEnemy : EnemyBase
     {
-        float alignTimer;
-        bool wasAligned;
+        bool wasReady;
 
         protected override void Configure()
         {
@@ -22,12 +24,12 @@ namespace KingLastPiece
         protected override void Think(float dt)
         {
             Vector3 to = ToPlayer;
-            float d = to.magnitude;
             FaceTowards(to, 240f);
-            alignTimer += dt;
 
-            if (CanAttackNow && d < 2.4f)
+            // Crowded: the King is on a neighbouring square — hold ground and slam around itself.
+            if (BoardSlots.Chebyshev(MySquare, KingSquare) <= 1 && to.magnitude < 2.6f)
             {
+                if (!CanAttackNow) return;
                 BeginAttack(new AttackPlan
                 {
                     kind = AtkKind.Slam, windup = 0.98f, active = 0.14f, recover = 1.0f,
@@ -37,22 +39,25 @@ namespace KingLastPiece
                 return;
             }
 
-            Vector3 q = LineAligner.Nearest(FlatPos, Player.FlatPos, false);
-            bool aligned = (q - FlatPos).magnitude < 0.5f;
-            if (aligned && !wasAligned) Sfx.Play("ROOK_Align", transform.position);
-            wasAligned = aligned;
-            if (CanAttackNow && (aligned || alignTimer > 3.5f))
+            UpdateSlot(BoardSlots.RookSlots);
+            bool ready = ReadyAtAttackSlot;
+            if (ready && !wasReady) Sfx.Play("ROOK_Align", transform.position);
+            wasReady = ready;
+
+            if (ready)
             {
-                alignTimer = 0f;
-                Vector3 dir = aligned ? LineAligner.Snap(to, false) : to;
-                BeginAttack(new AttackPlan
+                if (CanAttackNow)
                 {
-                    kind = AtkKind.Dash, dir = dir, windup = 1.08f, recover = 1.1f,
-                    length = 14f, speed = 17f, damage = 26f, poise = 50f, radius = 0.9f
-                });
-                cooldown = Random.Range(2f, 3f);
+                    BeginAttack(new AttackPlan
+                    {
+                        kind = AtkKind.Dash, dir = BoardSlots.LineDirection(MySquare, KingSquare), windup = 1.08f, recover = 1.1f,
+                        length = 14f, speed = 17f, damage = 26f, poise = 50f, radius = 0.9f
+                    });
+                    cooldown = Random.Range(2f, 3f);
+                }
+                return;
             }
-            else MoveTowards(q, moveSpeed, dt);
+            MoveToSlot(Gait.Orthogonal, moveSpeed, dt);
         }
     }
 }

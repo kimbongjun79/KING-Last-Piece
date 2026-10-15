@@ -2,19 +2,17 @@ using UnityEngine;
 
 namespace KingLastPiece
 {
-    /// <summary>Knight: repositions with L-shaped hops, then leaps onto the King's square.</summary>
+    /// <summary>
+    /// Knight: hops square to square in real L-moves (2 + 1 squares) along the shortest knight route to an L-square
+    /// of the King, then leaps onto the King's square.
+    /// </summary>
     public class KnightEnemy : EnemyBase
     {
+        const float HopTime = 0.42f;
         float hopTimer;
         bool hopping;
         Vector3 hopFrom, hopTo;
         float hopT;
-
-        static readonly Vector2[] LMoves =
-        {
-            new Vector2(2, 1), new Vector2(1, 2), new Vector2(-1, 2), new Vector2(-2, 1),
-            new Vector2(-2, -1), new Vector2(-1, -2), new Vector2(1, -2), new Vector2(2, -1)
-        };
 
         protected override void Configure()
         {
@@ -22,7 +20,7 @@ namespace KingLastPiece
             SetHealth(265f);   // ~4 light-combo cycles
             SetRadius(0.5f);
             moveSpeed = 3f;
-            hopTimer = Random.Range(0.4f, 1f);
+            hopTimer = Random.Range(0.3f, 0.8f);
         }
 
         protected override StaggerProfile CreateStaggerProfile() =>
@@ -31,11 +29,10 @@ namespace KingLastPiece
         protected override void Think(float dt)
         {
             Vector3 to = ToPlayer;
-            float d = to.magnitude;
 
             if (hopping)
             {
-                hopT += dt / 0.42f;
+                hopT += dt / HopTime;
                 transform.position = Vector3.Lerp(hopFrom, hopTo, hopT);
                 moving = true;
                 FaceTowards(to, 500f);
@@ -43,39 +40,43 @@ namespace KingLastPiece
                 return;
             }
 
+            UpdateSlot(BoardSlots.KnightSlots);
             FaceTowards(to, 400f);
 
-            if (CanAttackNow && d < 9f)
+            if (ReadyAtAttackSlot)
             {
-                BeginAttack(new AttackPlan
+                if (CanAttackNow)
                 {
-                    kind = AtkKind.Leap, target = Player.FlatPos, windup = 0.88f, active = 0.55f, recover = 0.9f,
-                    damage = 20f, poise = 35f, radius = 1.5f
-                });
-                cooldown = Random.Range(3.4f, 4.6f);
+                    // The knight's capture: jump from the L-square onto the King's square.
+                    BeginAttack(new AttackPlan
+                    {
+                        kind = AtkKind.Leap, target = BoardSlots.Center(KingSquare), windup = 0.88f, active = 0.55f, recover = 0.9f,
+                        damage = 20f, poise = 35f, radius = 1.5f
+                    });
+                    cooldown = Random.Range(3.4f, 4.6f);
+                }
                 return;
             }
 
-            hopTimer -= dt;
-            if (hopTimer <= 0f)
+            if (!HasSlot) return;
+            // Off the square centre (knocked back, pushed): settle onto the square first.
+            if ((BoardSlots.Center(MySquare) - FlatPos).magnitude > 0.3f && MySquare != SlotSquare)
             {
-                hopTimer = Random.Range(0.9f, 1.5f);
-                // Pick the L-move that keeps a ~4.5u distance from the King.
-                Vector3 best = FlatPos;
-                float bestScore = float.MaxValue;
-                foreach (var m in LMoves)
-                {
-                    Vector3 c = FlatPos + new Vector3(m.x, 0f, m.y);
-                    if (Mathf.Abs(c.x) > GameManager.PlayableHalf || Mathf.Abs(c.z) > GameManager.PlayableHalf) continue;
-                    float score = Mathf.Abs((Player.FlatPos - c).magnitude - 4.5f) + Random.value * 0.5f;
-                    if (score < bestScore) { bestScore = score; best = c; }
-                }
+                MoveTowards(BoardSlots.Center(MySquare), moveSpeed, dt);
+                return;
+            }
+            hopTimer -= dt;
+            if (hopTimer > 0f) return;
+            if (BoardSlots.KnightStep(MySquare, SlotSquare, this, out var next))
+            {
+                hopTimer = Random.Range(0.25f, 0.5f);
                 hopFrom = FlatPos;
-                hopTo = best;
+                hopTo = BoardSlots.Center(next);
                 hopT = 0f;
                 hopping = true;
                 Sfx.Play("KNIGHT_Hop", transform.position);
             }
+            else MoveToSlot(Gait.Direct, moveSpeed, dt);   // no knight route (boxed in): just slide over
         }
     }
 }

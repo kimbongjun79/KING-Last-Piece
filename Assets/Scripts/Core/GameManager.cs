@@ -167,6 +167,7 @@ namespace KingLastPiece
 
             foreach (var e in Enemies) if (e != null) Destroy(e.gameObject);
             Enemies.Clear();
+            BoardSlots.Clear();
 
             bool keepPlayer = State == GameState.WaveClear;
             if (!keepPlayer)
@@ -240,6 +241,7 @@ namespace KingLastPiece
         {
             foreach (var e in Enemies) if (e != null) Destroy(e.gameObject);
             Enemies.Clear();
+            BoardSlots.Clear();
         }
 
         public int DamageEvents { get; private set; }
@@ -279,6 +281,15 @@ namespace KingLastPiece
             return n;
         }
 
+        /// <summary>No other (non-boss) piece has been waiting longer for its turn to strike.</summary>
+        public bool IsNextInLine(EnemyBase e)
+        {
+            float mine = e.ReadySince;
+            foreach (var o in Enemies)
+                if (o != null && o != e && !o.IsDead && !o.IsBoss && o.ReadySince < mine) return false;
+            return true;
+        }
+
         public EnemyBase Boss
         {
             get
@@ -299,6 +310,7 @@ namespace KingLastPiece
         void Update()
         {
             Enemies.RemoveAll(e => e == null);
+            if (Player != null) BoardSlots.UpdateKing(Player.FlatPos);
             if (!musicStarted)
             {
                 // First frame (listeners are attached by now): ambience and the opening music.

@@ -252,7 +252,26 @@ namespace KingLastPiece
         protected float DistToPlayer => ToPlayer.magnitude;
 
         /// <summary>Limits how many pieces press the attack at once (the boss ignores this).</summary>
-        protected bool CanAttackNow => cooldown <= 0f && (IsBoss || Game.ActiveAttackers(this) < 2);
+        // Fair turns: among the pieces ready to strike, the one that has waited longest goes first.
+        float readySince = float.MaxValue;
+        int readyFrame = -10;
+        /// <summary>When this piece started waiting for its turn to strike (∞ when it isn't waiting right now).</summary>
+        public float ReadySince => Time.frameCount - readyFrame <= 1 ? readySince : float.MaxValue;
+
+        /// <summary>
+        /// Ready to attack: off cooldown, and (the boss excepted) fewer than two pieces already attacking and no other
+        /// piece has been waiting longer. Ask only when actually in position — asking starts the wait.
+        /// </summary>
+        protected bool CanAttackNow
+        {
+            get
+            {
+                if (cooldown > 0f) { readyFrame = -10; return false; }
+                if (Time.frameCount - readyFrame > 1) readySince = Time.time;
+                readyFrame = Time.frameCount;
+                return IsBoss || (Game.ActiveAttackers(this) < 2 && Game.IsNextInLine(this));
+            }
+        }
 
         protected void MoveTowards(Vector3 target, float speed, float dt)
         {
@@ -262,15 +281,6 @@ namespace KingLastPiece
             if (dist < 0.05f) return;
             float step = Mathf.Min(dist, speed * dt);
             transform.position += d / dist * step;
-            moving = true;
-        }
-
-        protected void Strafe(float sign, float speed, float dt)
-        {
-            Vector3 to = ToPlayer;
-            if (to.sqrMagnitude < 0.01f) return;
-            Vector3 side = Vector3.Cross(Vector3.up, to.normalized) * sign;
-            transform.position += side * (speed * dt);
             moving = true;
         }
 
@@ -289,10 +299,95 @@ namespace KingLastPiece
             return new Vector3(Mathf.Clamp(p.x, -h, h), 0f, Mathf.Clamp(p.z, -h, h));
         }
 
+        // ---------------------------------------------------------------- board slots (see BoardSlots)
+
+        /// <summary>How a piece travels to its square: straight, along ranks/files (rook), or along diagonals (bishop).</summary>
+        protected enum Gait { Direct, Orthogonal, Diagonal }
+
+        int slotVersion = -1;
+        float slotRecheck;
+
+        protected bool HasSlot => BoardSlots.TryGet(this, out _);
+        /// <summary>True when the reserved square is one the piece attacks from (false: a waiting square).</summary>
+        protected bool SlotIsAttack { get; private set; }
+        protected Vector2Int SlotSquare => BoardSlots.TryGet(this, out var s) ? s : MySquare;
+        protected Vector2Int MySquare => BoardSlots.ToSquare(FlatPos);
+        protected Vector2Int KingSquare => BoardSlots.KingSquare;
+        protected bool AtSlot => HasSlot && (BoardSlots.Center(SlotSquare) - FlatPos).magnitude < 0.25f;
+        protected bool ReadyAtAttackSlot => AtSlot && SlotIsAttack;
+        /// <summary>Holds a square it attacks from (for the slot view).</summary>
+        public bool HoldsAttackSlot => HasSlot && SlotIsAttack;
+
+        /// <summary>
+        /// Keeps this piece's reserved square: the nearest free square its <paramref name="pattern"/> (offsets from the
+        /// King's square) attacks from, or — when those are all taken — a waiting square 3–4 squares out, re-checked
+        /// often so a freed slot is taken over. <paramref name="penalty"/> adds a cost per offset.
+        /// </summary>
+        protected void UpdateSlot(Vector2Int[] pattern, System.Func<Vector2Int, float> penalty = null)
+        {
+            slotRecheck -= Time.deltaTime;
+            bool waiting = HasSlot && !SlotIsAttack;
+            if (slotVersion == BoardSlots.Version && HasSlot && !(waiting && slotRecheck <= 0f)) return;
+            slotVersion = BoardSlots.Version;
+            slotRecheck = 0.3f;
+            var king = KingSquare;
+
+            // Keep the current attack square while it still is one.
+            if (HasSlot && SlotIsAttack && System.Array.IndexOf(pattern, SlotSquare - king) >= 0) return;
+
+            Vector2Int best = default;
+            float bestCost = float.MaxValue;
+            foreach (var o in pattern)
+            {
+                var s = king + o;
+                if (!BoardSlots.OnBoard(s) || !BoardSlots.IsFreeFor(s, this)) continue;
+                float cost = (BoardSlots.Center(s) - FlatPos).magnitude + (penalty != null ? penalty(o) : 0f);
+                if (cost < bestCost) { bestCost = cost; best = s; }
+            }
+            if (bestCost < float.MaxValue)
+            {
+                BoardSlots.Reserve(this, best);
+                SlotIsAttack = true;
+                return;
+            }
+
+            // Every attack square is taken: wait a few squares out, as close to where we are as possible.
+            for (int x = 0; x < BoardSlots.Size; x++)
+            for (int y = 0; y < BoardSlots.Size; y++)
+            {
+                var s = new Vector2Int(x, y);
+                int ring = BoardSlots.Chebyshev(s, king);
+                if (ring < 3 || ring > 4 || !BoardSlots.IsFreeFor(s, this)) continue;
+                float cost = (BoardSlots.Center(s) - FlatPos).magnitude;
+                if (cost < bestCost) { bestCost = cost; best = s; }
+            }
+            if (bestCost < float.MaxValue) BoardSlots.Reserve(this, best);
+            else BoardSlots.Release(this);
+            SlotIsAttack = false;
+        }
+
+        /// <summary>Travels toward the reserved square in this piece's gait.</summary>
+        protected void MoveToSlot(Gait gait, float speed, float dt)
+        {
+            if (!HasSlot) return;
+            Vector3 target = BoardSlots.Center(SlotSquare);
+            Vector3 d = target - FlatPos;
+            bool both = Mathf.Abs(d.x) > 0.05f && Mathf.Abs(d.z) > 0.05f;
+            if (gait == Gait.Orthogonal && both)
+                target = FlatPos + new Vector3(d.x, 0f, 0f);                       // along the rank first, then the file
+            else if (gait == Gait.Diagonal && both)
+            {
+                float step = Mathf.Min(Mathf.Abs(d.x), Mathf.Abs(d.z));
+                target = FlatPos + new Vector3(Mathf.Sign(d.x) * step, 0f, Mathf.Sign(d.z) * step);   // along the diagonal
+            }
+            MoveTowards(target, speed, dt);
+        }
+
         // ---------------------------------------------------------------- attacks
 
         protected void BeginAttack(AttackPlan p)
         {
+            readyFrame = -10;
             ClearTelegraph();
             plan = p;
             atkStart = FlatPos;
@@ -383,6 +478,8 @@ namespace KingLastPiece
             {
                 ClearTelegraph();
                 Enter(EState.Attack);
+                // The piece leaves its square (a slam stays put): free the slot for the others.
+                if (plan.kind != AtkKind.Slam) BoardSlots.Release(this);
                 Sfx.Play(ReleaseSfx, transform.position);
             }
         }
@@ -483,6 +580,7 @@ namespace KingLastPiece
 
         public void BeginGrab()
         {
+            BoardSlots.Release(this);
             ClearTelegraph();
             SetGlow(Color.black);
             grabTilt = 0f;
@@ -766,6 +864,7 @@ namespace KingLastPiece
         void Die(Vector3 source)
         {
             IsDead = true;
+            BoardSlots.Release(this);
             ClearTelegraph();
             SetGlow(Color.black);
             Vector3 away = FlatPos - new Vector3(source.x, 0f, source.z);
@@ -820,6 +919,10 @@ namespace KingLastPiece
             }
         }
 
-        protected virtual void OnDestroy() => ClearTelegraph();
+        protected virtual void OnDestroy()
+        {
+            ClearTelegraph();
+            BoardSlots.Release(this);
+        }
     }
 }

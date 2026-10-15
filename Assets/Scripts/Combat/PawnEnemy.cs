@@ -2,18 +2,18 @@ using UnityEngine;
 
 namespace KingLastPiece
 {
-    /// <summary>Pawn: slow, approaches and thrusts forward. Fodder that punishes greed in groups.</summary>
+    /// <summary>
+    /// Pawn: walks to a square diagonally in front of the King (black pawns capture toward rank 1, so the squares
+    /// above him come first) and thrusts along that diagonal — straight through the King's square, no tracking.
+    /// </summary>
     public class PawnEnemy : EnemyBase
     {
-        float strafeSign;
-
         protected override void Configure()
         {
             DisplayName = "Black Pawn";
             SetHealth(100f);   // ~1.5 light-combo cycles (one cycle = 66)
             SetRadius(0.45f);
             moveSpeed = 2.6f;
-            strafeSign = Random.value < 0.5f ? -1f : 1f;
         }
 
         protected override StaggerProfile CreateStaggerProfile() =>
@@ -21,21 +21,26 @@ namespace KingLastPiece
 
         protected override void Think(float dt)
         {
-            Vector3 to = ToPlayer;
-            float d = to.magnitude;
-            FaceTowards(to, 300f);
+            UpdateSlot(BoardSlots.PawnSlots, o => o.y < 0 ? 2.5f : 0f);
+            FaceTowards(ToPlayer, 300f);
 
-            if (d > 2.1f) MoveTowards(Player.FlatPos - to.normalized * 1.7f, moveSpeed, dt);
-            else if (CanAttackNow)
+            if (ReadyAtAttackSlot)
             {
-                BeginAttack(new AttackPlan
+                if (CanAttackNow)
                 {
-                    kind = AtkKind.Lunge, dir = to, windup = 0.95f, active = 0.18f, recover = 0.8f,
-                    length = 1.7f, damage = 12f, poise = 15f, radius = 0.7f, trackUntil = 0.7f
-                });
-                cooldown = Random.Range(2.6f, 3.8f);
+                    // Diagonal capture: from this square through the King's square.
+                    Vector3 dir = BoardSlots.LineDirection(MySquare, KingSquare);
+                    float length = (BoardSlots.Center(KingSquare) - FlatPos).magnitude + 0.6f;
+                    BeginAttack(new AttackPlan
+                    {
+                        kind = AtkKind.Lunge, dir = dir, windup = 0.95f, active = 0.24f, recover = 0.8f,
+                        length = length, damage = 12f, poise = 15f, radius = 0.7f, trackUntil = 0f
+                    });
+                    cooldown = Random.Range(2.6f, 3.8f);
+                }
+                return;
             }
-            else Strafe(strafeSign, moveSpeed * 0.5f, dt);
+            MoveToSlot(Gait.Direct, moveSpeed, dt);
         }
     }
 }

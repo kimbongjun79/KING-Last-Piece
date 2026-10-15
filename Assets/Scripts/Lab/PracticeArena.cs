@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using UnityEngine;
@@ -71,6 +72,16 @@ namespace KingLastPiece
             game.Player.Style = Style;
         }
 
+        /// <summary>V: show the board slots (attack squares red, waiting squares grey, the King's square gold).</summary>
+        public bool SlotViewOn { get { var v = GetComponent<SlotDebugView>(); return v != null && v.enabled; } }
+
+        void ToggleSlotView()
+        {
+            var view = GetComponent<SlotDebugView>();
+            if (view == null) gameObject.AddComponent<SlotDebugView>();
+            else view.enabled = !view.enabled;
+        }
+
         void ResetLab()
         {
             game.ClearEnemies();
@@ -114,6 +125,7 @@ namespace KingLastPiece
                 if (kb.hKey.wasPressedThisFrame) game.HitStopEnabled = !game.HitStopEnabled;
                 if (kb.gKey.wasPressedThisFrame) game.Player.GodMode = Invincible = !Invincible;
                 if (kb.iKey.wasPressedThisFrame) game.Player.InfiniteStamina = InfiniteStamina = !InfiniteStamina;
+                if (kb.vKey.wasPressedThisFrame) ToggleSlotView();
                 if (kb.xKey.wasPressedThisFrame || kb.cKey.wasPressedThisFrame || kb.hKey.wasPressedThisFrame ||
                     kb.gKey.wasPressedThisFrame || kb.iKey.wasPressedThisFrame) Sfx.Play("UI_Confirm");
             }
@@ -148,7 +160,12 @@ namespace KingLastPiece
             int justBefore = player.JustDodgeCount, throwsBefore = player.ThrowCount, hitsBefore = game.DamageEvents;
 
             // Roll ~0.12s before the attack would connect.
-            for (int f = 0; f < 600 && attacker != null && attacker.TimeToImpact > 0.12f; f++) yield return null;
+            var rookLine = new StringBuilder();
+            for (int f = 0; f < 600 && attacker != null && attacker.TimeToImpact > 0.12f; f++)
+            {
+                if (f % 6 == 0) rookLine.Append(attacker.StateCode);
+                yield return null;
+            }
             player.Press(PlayerController.Buffered.Dodge);
             for (int f = 0; f < 60 && !player.CounterReady; f++) yield return null;
             bool perfect = player.CounterReady;
@@ -179,7 +196,7 @@ namespace KingLastPiece
 
             stats.AppendLine($"JustDodge\tperfect={perfect}\tjust_count={player.JustDodgeCount - justBefore}\t" +
                              $"throws={player.ThrowCount - throwsBefore}\tdamage_events={game.DamageEvents - hitsBefore}\t" +
-                             $"rook_dead={(attacker == null || attacker.IsDead)}");
+                             $"rook_dead={(attacker == null || attacker.IsDead)}\trook={rookLine}");
             if (sheet != null)
             {
                 sheet.Apply();
@@ -533,6 +550,105 @@ namespace KingLastPiece
             return null;
         }
 
+        /// <summary>
+        /// Board slots: the final round's army against a still King (invincible, on e4, moving to c3 halfway).
+        /// Logs every attack with the square it started from relative to the King's square, checks it against the
+        /// piece's move pattern, and captures a top-down 5×2 sheet with the slot view on.
+        /// </summary>
+        IEnumerator SlotScenario(string dir, StringBuilder stats)
+        {
+            var hud = game.GetComponent<Hud>();
+            if (hud != null) hud.enabled = false;
+            game.ClearEnemies();
+            var player = game.Player;
+            player.ResetForWave(GameManager.SquareToWorld("e4"), 0f);
+            player.GodMode = true;
+            (PieceType, string)[] army =
+            {
+                (PieceType.Pawn, "b7"), (PieceType.Pawn, "c7"), (PieceType.Pawn, "d7"), (PieceType.Pawn, "e7"),
+                (PieceType.Pawn, "f7"), (PieceType.Pawn, "g7"), (PieceType.Knight, "b8"), (PieceType.Queen, "d8"),
+                (PieceType.Bishop, "f8"), (PieceType.Rook, "h8"),
+            };
+            foreach (var (type, sq) in army) game.SpawnEnemy(type, GameManager.SquareToWorld(sq));
+            var view = gameObject.AddComponent<SlotDebugView>();
+            game.Rig.OverridePosition = new Vector3(0f, 15.5f, -8.5f);
+            game.Rig.OverrideLookAt = new Vector3(0f, 0f, -0.5f);
+
+            var attacking = new Dictionary<EnemyBase, bool>();
+            var byType = new Dictionary<PieceType, (int ok, int bad)>();
+            var bad = new StringBuilder();
+            int maxWaiting = 0;
+            const int cols = 5, rows = 2, frames = 900;
+            Texture2D sheet = null;
+            int tileW = 0, tileH = 0, shot = 0;
+            for (int f = 0; f < frames; f++)
+            {
+                if (f == frames / 2) player.ResetForWave(GameManager.SquareToWorld("c3"), 0f);
+                yield return null;
+
+                int waiting = 0;
+                foreach (var e in game.Enemies)
+                {
+                    if (e == null || e.IsDead) continue;
+                    if (!e.HoldsAttackSlot && BoardSlots.TryGet(e, out _)) waiting++;
+                    bool now = e.IsAttacking;
+                    attacking.TryGetValue(e, out bool was);
+                    attacking[e] = now;
+                    if (!now || was || e.WindupProgress > 0.2f || (f >= frames / 2 && f < frames / 2 + 3)) continue;   // skip the teleport frames
+                    var off = BoardSlots.ToSquare(e.FlatPos) - BoardSlots.KingSquare;
+                    bool ok = FitsPattern(e.Type, off);
+                    byType.TryGetValue(e.Type, out var c);
+                    byType[e.Type] = ok ? (c.ok + 1, c.bad) : (c.ok, c.bad + 1);
+                    if (!ok) bad.Append($" {e.Type}{off}");
+                }
+                maxWaiting = Mathf.Max(maxWaiting, waiting);
+
+                if (f % 90 == 45 && shot < cols * rows)
+                {
+                    yield return new WaitForEndOfFrame();
+                    var tex = ScreenCapture.CaptureScreenshotAsTexture();
+                    if (sheet == null)
+                    {
+                        tileW = tex.width;
+                        tileH = tex.height;
+                        sheet = new Texture2D(tileW * cols, tileH * rows, TextureFormat.RGB24, false);
+                    }
+                    int c = shot % cols, r = shot / cols;
+                    if (tex.width == tileW && tex.height == tileH)
+                        sheet.SetPixels32(c * tileW, (rows - 1 - r) * tileH, tileW, tileH, tex.GetPixels32());
+                    Destroy(tex);
+                    shot++;
+                }
+            }
+
+            var line = new StringBuilder("Slots");
+            foreach (var kv in byType) line.Append($"\t{kv.Key}={kv.Value.ok}ok/{kv.Value.bad}bad");
+            line.Append($"\tmax_waiting={maxWaiting}\toff_pattern:{(bad.Length > 0 ? bad.ToString() : " none")}");
+            stats.AppendLine(line.ToString());
+            Destroy(view);
+            if (sheet != null)
+            {
+                sheet.Apply();
+                File.WriteAllBytes(Path.Combine(dir, "14_Board_Slots.png"), sheet.EncodeToPNG());
+                Destroy(sheet);
+            }
+        }
+
+        /// <summary>Does an attack starting <paramref name="o"/> squares from the King follow the piece's move?</summary>
+        static bool FitsPattern(PieceType type, Vector2Int o)
+        {
+            int ax = Mathf.Abs(o.x), ay = Mathf.Abs(o.y), m = Mathf.Max(ax, ay);
+            bool line = ax == 0 || ay == 0 || ax == ay;
+            switch (type)
+            {
+                case PieceType.Pawn: return ax == 1 && ay == 1;
+                case PieceType.Knight: return (ax == 1 && ay == 2) || (ax == 2 && ay == 1);
+                case PieceType.Bishop: return ax == ay && m >= 2 && m <= 3;
+                case PieceType.Rook: return ((ax == 0 || ay == 0) && m >= 2 && m <= 3) || m <= 1;   // ram, or slam when crowded
+                default: return true;                                                            // queen: lines, slam, or a leap from anywhere
+            }
+        }
+
         IEnumerator AutoShot(string dir)
         {
             automated = true;
@@ -632,6 +748,7 @@ namespace KingLastPiece
             yield return AutoAssistScenario(dir, stats);
             yield return CrumbleScenario(dir);
             yield return GapCloserScenario(dir, stats);
+            yield return SlotScenario(dir, stats);
 
             File.WriteAllText(Path.Combine(dir, "stats.tsv"), stats.ToString());
             Application.Quit();
