@@ -22,7 +22,7 @@ namespace KingLastPiece
         // Auto-aim: only pieces within this range (scaled by the attack's reach) are considered.
         const float AssistMinRange = 2.5f, AssistMaxRange = 4.5f;
         // Gap closer: a target within this angle of the aim, and where to stop in front of it.
-        const float GapAngle = 100f, GapStopDistance = 0.5f;
+        const float GapAngle = 100f, GapInputAngle = 35f, GapStopDistance = 0.5f;
         const float DodgeDuration = 0.5f, IFrameStart = 0.03f, IFrameEnd = 0.36f, DodgeCancelAt = 0.4f;
 
         // Dodge charges replace stamina for rolling: a short burst of rolls, refilled quickly.
@@ -475,11 +475,12 @@ namespace KingLastPiece
             Sfx.Play(atk.sfx, FlatPos);
 
             Vector3 dir = InputDirection();
-            // Auto-aim (no visuals): with pieces close by, face the direction that hits the most of them —
-            // regardless of where the player is moving. Far away it does nothing.
+            // Facing: the gap-closer's target, then the lock-on target, then the player's own input direction. Only with
+            // no input does auto-aim pick the direction that hits the most nearby pieces (far away it does nothing).
+            bool steering = dir.sqrMagnitude > 0.01f;
             if (gapTarget != null) dir = gapTarget.FlatPos - FlatPos;
             else if (LockTarget != null) dir = LockTarget.FlatPos - FlatPos;
-            else if (TryFindAssistDirection(dir.sqrMagnitude > 0.01f ? dir : transform.forward, out var best)) dir = best;
+            else if (!steering && TryFindAssistDirection(transform.forward, out var best)) dir = best;
             if (dir.sqrMagnitude > 0.01f) transform.rotation = Quaternion.LookRotation(new Vector3(dir.x, 0f, dir.z));
         }
 
@@ -503,7 +504,9 @@ namespace KingLastPiece
                 if (d < 0.01f) return false;
                 if (first.WouldHit(FlatPos, to, e.FlatPos, e.Radius)) return false;  // hit 1 already reaches someone
                 if (d > style.gapCloserMaxRange + e.Radius) continue;
-                if (LockTarget != null ? e != LockTarget : Vector3.Angle(preferred, to) > GapAngle) continue;
+                // With input, only dash at a piece roughly where the player is pointing.
+                float limit = input.sqrMagnitude > 0.01f ? GapInputAngle : GapAngle;
+                if (LockTarget != null ? e != LockTarget : Vector3.Angle(preferred, to) > limit) continue;
                 if (d < best) { best = d; target = e; }
             }
             if (target == null) return false;
@@ -596,7 +599,8 @@ namespace KingLastPiece
             {
                 if (LockTarget != null) FaceTowards(LockTarget.FlatPos - FlatPos, 540f);
                 // Leaping attacks (meteor, stomp) commit to the facing they started with: no auto-aim turning in the air.
-                else if (!atk.lockFacing && TryFindAssistDirection(transform.forward, out var best)) FaceTowards(best, 720f);
+                // Steering with the stick also keeps the facing the player chose.
+                else if (!atk.lockFacing && InputDirection().sqrMagnitude <= 0.01f && TryFindAssistDirection(transform.forward, out var best)) FaceTowards(best, 720f);
             }
 
             // Dodge can cancel the attack at any time except during its first active hit frames.

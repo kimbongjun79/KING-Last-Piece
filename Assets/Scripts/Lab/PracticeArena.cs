@@ -407,8 +407,19 @@ namespace KingLastPiece
             player.Press(PlayerController.Buffered.Light);
             for (int f = 0; f < 8; f++) yield return null;
             float farAngle = Vector3.Angle(player.transform.forward, far.FlatPos - player.FlatPos);
+
+            // 4) Input wins: a close piece behind, but the player steers right — the attack goes right.
+            game.ClearEnemies();
+            player.ResetForWave(PlayerStart, 0f);
+            game.SpawnCustom<TrainingDummy>(PieceType.Pawn, PlayerStart + new Vector3(0f, 0f, -2.2f));
+            for (int f = 0; f < 50; f++) yield return null;
+            player.DebugMove = Vector3.right;
+            player.Press(PlayerController.Buffered.Light);
+            for (int f = 0; f < 8; f++) yield return null;
+            float inputAngle = Vector3.Angle(player.transform.forward, Vector3.right);
+            player.DebugMove = Vector3.zero;
             stats.AppendLine($"AutoAim\tcluster_facing={facing:0}deg(cluster 50-94, lone -70)\tcluster_hits={clusterHits}" +
-                             $"\tbehind_facing_err={behindAngle:0}\tfar_facing_err={farAngle:0}(should stay ~90)");
+                             $"\tbehind_facing_err={behindAngle:0}\tfar_facing_err={farAngle:0}(should stay ~90)\tinput_facing_err={inputAngle:0}");
 
             // Dodge cancel: during a light wind-up, and right after the heavy's first hit (long before its old cancel point).
             game.ClearEnemies();
