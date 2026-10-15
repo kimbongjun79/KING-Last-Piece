@@ -693,6 +693,56 @@ namespace KingLastPiece
             for (int f = 0; f < 120; f++) yield return null;   // revive (practice mode) before the next scenario
         }
 
+        /// <summary>
+        /// Attack warnings, one piece at a time against the King on e4 (pawn d5, knight f6, bishop g6, rook e7,
+        /// queen b4): top row mid wind-up (lit squares filling in, arrow / L route / ghost), bottom row the final blink.
+        /// </summary>
+        IEnumerator TelegraphScenario(string dir)
+        {
+            var hud = game.GetComponent<Hud>();
+            if (hud != null) hud.enabled = false;
+            var player = game.Player;
+            (PieceType type, string square)[] cases =
+            {
+                (PieceType.Pawn, "d5"), (PieceType.Knight, "f6"), (PieceType.Bishop, "g6"), (PieceType.Rook, "e7"), (PieceType.Queen, "b4"),
+            };
+            game.Rig.OverridePosition = GameManager.SquareToWorld("e4") + new Vector3(2.5f, 11f, -9.5f);
+            game.Rig.OverrideLookAt = GameManager.SquareToWorld("e4") + new Vector3(-0.5f, 0f, 2.2f);
+            Texture2D sheet = null;
+            int tileW = 0, tileH = 0;
+            for (int c = 0; c < cases.Length; c++)
+            {
+                game.ClearEnemies();
+                player.ResetForWave(GameManager.SquareToWorld("e4"), 0f);
+                player.GodMode = true;
+                var e = game.SpawnEnemy(cases[c].type, GameManager.SquareToWorld(cases[c].square));
+                for (int f = 0; f < 900 && e != null && !(e.IsAttacking && e.WindupProgress >= 0.6f); f++) yield return null;
+                for (int row = 0; row < 2; row++)
+                {
+                    if (row == 1)
+                        for (int f = 0; f < 120 && e != null && e.IsAttacking && e.WindupProgress < 0.92f; f++) yield return null;
+                    yield return new WaitForEndOfFrame();
+                    var tex = ScreenCapture.CaptureScreenshotAsTexture();
+                    if (sheet == null)
+                    {
+                        tileW = tex.width;
+                        tileH = tex.height;
+                        sheet = new Texture2D(tileW * cases.Length, tileH * 2, TextureFormat.RGB24, false);
+                    }
+                    if (tex.width == tileW && tex.height == tileH)
+                        sheet.SetPixels32(c * tileW, (1 - row) * tileH, tileW, tileH, tex.GetPixels32());
+                    Destroy(tex);
+                }
+            }
+            game.ClearEnemies();
+            if (sheet != null)
+            {
+                sheet.Apply();
+                File.WriteAllBytes(Path.Combine(dir, "16_Telegraphs.png"), sheet.EncodeToPNG());
+                Destroy(sheet);
+            }
+        }
+
         IEnumerator AutoShot(string dir)
         {
             automated = true;
@@ -793,6 +843,7 @@ namespace KingLastPiece
             yield return CrumbleScenario(dir);
             yield return GapCloserScenario(dir, stats);
             yield return SlotScenario(dir, stats);
+            yield return TelegraphScenario(dir);
             yield return KingFallScenario(dir);
 
             File.WriteAllText(Path.Combine(dir, "stats.tsv"), stats.ToString());

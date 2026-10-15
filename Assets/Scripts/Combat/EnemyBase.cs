@@ -428,14 +428,17 @@ namespace KingLastPiece
                 case AtkKind.Dash:
                     plan.length = Mathf.Min(plan.length, DistanceToEdge(atkStart, plan.dir));
                     if (plan.kind == AtkKind.Dash) plan.active = Mathf.Max(0.12f, plan.length / Mathf.Max(1f, plan.speed));
-                    telegraph = Telegraph.Rect(atkStart, plan.dir, plan.length + plan.radius, plan.radius * 2f);
+                    telegraph = Telegraph.Line(atkStart, plan.dir, plan.length + plan.radius, plan.radius * 2f, plan.windup);
                     break;
                 case AtkKind.Leap:
                     plan.target = ClampPoint(plan.target);
-                    telegraph = Telegraph.Circle(plan.target, plan.radius);
+                    // Knights show their L route and a ghost on the landing square; the queen just the landing area.
+                    telegraph = Type == PieceType.Knight
+                        ? Telegraph.Leap(atkStart, plan.target, plan.radius, plan.windup, model)
+                        : Telegraph.Area(plan.target, plan.radius, plan.windup);
                     break;
                 case AtkKind.Slam:
-                    telegraph = Telegraph.Circle(atkStart, plan.radius);
+                    telegraph = Telegraph.Area(atkStart, plan.radius, plan.windup);
                     break;
             }
             Enter(EState.Windup);
@@ -473,7 +476,7 @@ namespace KingLastPiece
             {
                 Vector3 to = ToPlayer;
                 if (to.sqrMagnitude > 0.01f) plan.dir = to.normalized;
-                telegraph.SetRect(atkStart, plan.dir, plan.length + plan.radius, plan.radius * 2f);
+                telegraph.SetLine(atkStart, plan.dir, plan.length + plan.radius, plan.radius * 2f);
             }
 
             Vector3 faceDir = plan.kind == AtkKind.Leap ? plan.target - FlatPos : plan.dir;

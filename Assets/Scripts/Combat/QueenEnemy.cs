@@ -20,7 +20,7 @@ namespace KingLastPiece
             SetRadius(0.75f);
             SetModelScale(1.35f);
             moveSpeed = 3.2f;
-            maxPoise = 110f;
+            maxPoise = 220f;   // twice the rook's gauge: the hardest piece to stagger
             staggerDuration = 1.6f;
         }
 
