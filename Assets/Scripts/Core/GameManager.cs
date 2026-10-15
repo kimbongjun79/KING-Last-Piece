@@ -52,6 +52,7 @@ namespace KingLastPiece
 
 
         bool returnedToStart;
+        bool musicStarted;
 
         public void RevivePlayerInPlace()
         {
@@ -178,6 +179,10 @@ namespace KingLastPiece
                 SpawnEnemy(type, SquareToWorld(square));
 
             ShowBanner(Waves[index].name);
+            Sfx.Play("GAME_RoundStart");
+            bool final = index == Waves.Length - 1;
+            if (final) Sfx.Play("GAME_FinalRound");
+            Sfx.Play(final ? "BGM_Boss" : "BGM_Battle");
             EnterState(GameState.Playing);
         }
 
@@ -215,6 +220,7 @@ namespace KingLastPiece
         public void ReportDamage(EnemyBase e, float amount)
         {
             DamageEvents++;
+            Sfx.Play("UI_DamagePopup");
             Popups.Add(new DamagePopup
             {
                 position = e.transform.position + Vector3.up * (e.IsBoss ? 3.3f : 2.3f) + Random.insideUnitSphere * 0.3f,
@@ -233,6 +239,7 @@ namespace KingLastPiece
         public void OnPlayerDied()
         {
             Deaths++;
+            Sfx.Play("GAME_Defeat");
             ResetTime();
             EnterState(GameState.Dead);
         }
@@ -265,13 +272,21 @@ namespace KingLastPiece
         void Update()
         {
             Enemies.RemoveAll(e => e == null);
+            if (!musicStarted)
+            {
+                // First frame (listeners are attached by now): ambience and the opening music.
+                musicStarted = true;
+                Sfx.Play("AMB_Hall");
+                if (CurrentMode == Mode.Practice) Sfx.Play("BGM_Practice");
+                else if (State == GameState.Title) Sfx.Play("BGM_Title");
+            }
             StateTime += Time.unscaledDeltaTime;
             TickTime();
 
             switch (State)
             {
                 case GameState.Title:
-                    if (GameInput.Confirm) StartWave(0);
+                    if (GameInput.Confirm) { Sfx.Play("UI_Title_Start"); StartWave(0); }
                     break;
 
                 case GameState.Playing:
@@ -284,12 +299,14 @@ namespace KingLastPiece
                         if (WaveIndex >= Waves.Length - 1)
                         {
                             EnterState(GameState.Victory);
+                            Sfx.Play("GAME_Victory");
                         }
                         else
                         {
                             Player.Rest();
                             returnedToStart = false;
                             ShowBanner("Pieces Captured");
+                            Sfx.Play("GAME_RoundClear");
                             EnterState(GameState.WaveClear);
                         }
                     }
@@ -321,9 +338,22 @@ namespace KingLastPiece
             }
         }
 
+        // ---------------------------------------------------------------- lab automation hooks
+
+        /// <summary>Title → first round, as if Confirm was pressed (used by the sound-reference capture).</summary>
+        public void DebugStartGame()
+        {
+            Sfx.Play("UI_Title_Start");
+            StartWave(0);
+        }
+
+        public void DebugStartWave(int index) => StartWave(Mathf.Clamp(index, 0, Waves.Length - 1));
+        public void DebugTogglePause() => TogglePause();
+
         void TogglePause()
         {
             Paused = !Paused;
+            Sfx.Play(Paused ? "GAME_Pause" : "UI_Back");
             Cursor.lockState = Paused ? CursorLockMode.None : CursorLockMode.Locked;
             Cursor.visible = Paused;
             ApplyTimeScale();
@@ -362,6 +392,7 @@ namespace KingLastPiece
 
         public void SlowMo(float scale, float duration)
         {
+            Sfx.Play("PL_SlowMo_Loop");
             slowScale = scale;
             slowTimer = duration;
             ApplyTimeScale();
@@ -369,6 +400,7 @@ namespace KingLastPiece
 
         public void EndSlowMo()
         {
+            if (slowTimer > 0f) Sfx.Play("PL_SlowMo_End");
             slowTimer = 0f;
             ApplyTimeScale();
         }
@@ -384,7 +416,11 @@ namespace KingLastPiece
             if (Paused) return;
             float dt = RealDelta;
             if (hitStopTimer > 0f) hitStopTimer -= dt;
-            if (slowTimer > 0f) slowTimer -= dt;
+            if (slowTimer > 0f)
+            {
+                slowTimer -= dt;
+                if (slowTimer <= 0f) Sfx.Play("PL_SlowMo_End");
+            }
             ApplyTimeScale();
         }
 

@@ -178,6 +178,7 @@ namespace KingLastPiece
         /// </summary>
         public static void Dust(Vector3 center, float radius)
         {
+            Sfx.Play("IMP_Dust", center);
             center.y = 0.15f;
             bool any = false;
             System.Predicate<string> dustOnly = n => n.Contains("smoke") || n.Contains("dust");
@@ -256,6 +257,8 @@ namespace KingLastPiece
         public static void GroundImpact(VfxStyle style, Vector3 center, float radius, float strength, bool hostile = false)
         {
             center.y = 0f;
+            Sfx.Play("IMP_GroundCrack", center);
+            if (style == VfxStyle.BoardRipple) Sfx.Play("IMP_BoardRipple", center);
             Color accent = hostile ? Ember : Accent;
             switch (style)
             {

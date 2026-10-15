@@ -117,6 +117,7 @@ namespace KingLastPiece
         public bool fxFlip;            // mirrored (negative X scale) = the arc sweeps the other way
         public bool fxGold;            // recolor the prefab to the King's accent (white)
         public bool dust;              // low dust burst around the impact (NamuFX smoke layers)
+        public string sfx;             // sound id played when the window starts (Docs/Sound/sounds.json)
     }
 
     /// <summary>An authored effect played at a fixed time into an attack, aligned with the King's facing.</summary>
@@ -127,6 +128,7 @@ namespace KingLastPiece
         public float scale, height, yaw;
         public float roll;         // about the facing axis: 180 turns a bottom-to-top sweep into top-to-bottom
         public bool gold, mirror;
+        public string sfx;         // sound id played at this time (kind may be None for a sound-only cue)
     }
 
     public struct MoveSeg
@@ -149,6 +151,8 @@ namespace KingLastPiece
         public MoveSeg[] moves;
         /// <summary>Timed effects that don't belong to a hit window (e.g. a slash during a slam's descent).</summary>
         public FxCue[] cues;
+        /// <summary>Sound id played when the attack starts.</summary>
+        public string sfx;
 
         public float FirstHit => hits.Length > 0 ? hits[0].start : 0f;
         public float LastHit => hits.Length > 0 ? hits[hits.Length - 1].end : 0f;
@@ -314,6 +318,7 @@ namespace KingLastPiece
                     // Plays in place of the crown trail, at the height the crown sweeps through.
                     fx = SlashFxKind.SlashB, fxScale = 1.7f, fxHeight = 1.2f, fxFlip = side > 0f, fxGold = true,
                     fxYaw = side > 0f ? 180f : 0f,  // the mirrored 1st whip faces backwards otherwise
+                    sfx = side > 0f ? "ATK_Whip_1" : "ATK_Whip_2",
                 },
             },
             moves = new[] { new MoveSeg(0.04f, 0.3f, 1.0f) },
@@ -340,6 +345,7 @@ namespace KingLastPiece
                     start = 0.14f, end = 0.34f, shape = HitShape.Circle, range = 3.4f, damage = 9f, poise = 12f, shake = 0.25f,
                     slash = true, sweepFrom = 0f, sweepTo = 360f, sparkTrail = true,
                     fx = SlashFxKind.AoeA, fxScale = 1.05f, fxHeight = 0.9f, fxGold = true,
+                    sfx = "ATK_Cyclone",
                 },
                 new HitWindow
                 {
@@ -353,7 +359,7 @@ namespace KingLastPiece
         /// <summary>4th hit: leaps, somersaults once in the air and slams down with a shockwave.</summary>
         static AttackDef EnsembleMeteor() => new AttackDef
         {
-            name = "Royal Meteor", duration = 0.88f, cancelAt = 0.68f, cost = 17f,
+            name = "Royal Meteor", duration = 0.88f, cancelAt = 0.68f, cost = 17f, sfx = "ATK_Meteor_Jump",
             pose = new PoseTrack()
                 .Key(0f, P())
                 .Key(0.14f, P(squash: -0.26f), Ease.Out)
@@ -367,7 +373,7 @@ namespace KingLastPiece
                 {
                     start = 0.52f, end = 0.57f, shape = HitShape.Circle, range = 3.2f, damage = 20f, poise = 32f,
                     hitStop = 0.09f, shake = 0.45f, impact = true, kick = 0.6f,
-                    dust = true,
+                    dust = true, sfx = "ATK_Meteor_Slam",
                 },
             },
             moves = new[] { new MoveSeg(0.14f, 0.52f, 1.6f, Ease.InOut) },
@@ -378,7 +384,7 @@ namespace KingLastPiece
         /// <summary>Opener: leans in and rams across <paramref name="distance"/> (Royal Charge's light, sized to the gap).</summary>
         static AttackDef EnsembleDash(float distance) => new AttackDef
         {
-            name = "Royal Charge", duration = 0.52f, cancelAt = 0.34f, cost = 10f,
+            name = "Royal Charge", duration = 0.52f, cancelAt = 0.34f, cost = 10f, sfx = "ATK_Charge",
             pose = new PoseTrack()
                 .Key(0f, P())
                 .Key(0.1f, P(tilt: -12f, squash: -0.12f), Ease.Out)
@@ -392,7 +398,7 @@ namespace KingLastPiece
         /// <summary>RMB heavy: Royal Stomp's flipping meteor with a wider landing blast (costs about half the stamina bar).</summary>
         static AttackDef EnsembleStomp() => new AttackDef
         {
-            name = "Meteor Stomp", duration = 1.3f, cancelAt = 1.05f, cost = 48f, heavy = true,
+            name = "Meteor Stomp", duration = 1.3f, cancelAt = 1.05f, cost = 48f, heavy = true, sfx = "ATK_Stomp_Charge",
             pose = new PoseTrack()
                 .Key(0f, P())
                 .Key(0.42f, P(squash: -0.25f), Ease.Out)
@@ -404,11 +410,11 @@ namespace KingLastPiece
             {
                 new HitWindow { start = 0.82f, end = 0.9f, shape = HitShape.Circle, range = 4.3f, damage = 46f, poise = 65f,
                     hitStop = 0.12f, shake = 0.65f, impact = true, kick = 1f,
-                    dust = true, launch = true },
+                    dust = true, launch = true, sfx = "ATK_Stomp_Slam" },
             },
             moves = new[] { new MoveSeg(0.42f, 0.82f, 3.0f, Ease.InOut) },
             // Top-to-bottom slash while the King somersaults down onto the board.
-            cues = new[] { new FxCue { time = 0.64f, kind = SlashFxKind.SlashBVertical, scale = 2.0f, height = 1.8f, roll = 180f, gold = true } },
+            cues = new[] { new FxCue { time = 0.42f, sfx = "ATK_Stomp_Jump" }, new FxCue { time = 0.64f, kind = SlashFxKind.SlashBVertical, scale = 2.0f, height = 1.8f, roll = 180f, gold = true } },
         };
 
         // ---------------------------------------------------------------- spin

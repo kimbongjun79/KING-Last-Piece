@@ -111,6 +111,7 @@ namespace KingLastPiece
                 hopTo = best;
                 hopT = 0f;
                 hopping = true;
+                Sfx.Play("KNIGHT_Hop", transform.position);
             }
         }
     }
@@ -119,6 +120,7 @@ namespace KingLastPiece
     public class BishopEnemy : EnemyBase
     {
         float alignTimer;
+        bool wasAligned;
 
         protected override void Configure()
         {
@@ -139,6 +141,8 @@ namespace KingLastPiece
 
             Vector3 q = LineAligner.Nearest(FlatPos, Player.FlatPos, true);
             bool aligned = (q - FlatPos).magnitude < 0.45f;
+            if (aligned && !wasAligned) Sfx.Play("BISHOP_Align", transform.position);
+            wasAligned = aligned;
 
             if (CanAttackNow && (aligned || alignTimer > 3f))
             {
@@ -159,6 +163,7 @@ namespace KingLastPiece
     public class RookEnemy : EnemyBase
     {
         float alignTimer;
+        bool wasAligned;
 
         protected override void Configure()
         {
@@ -191,6 +196,8 @@ namespace KingLastPiece
 
             Vector3 q = LineAligner.Nearest(FlatPos, Player.FlatPos, false);
             bool aligned = (q - FlatPos).magnitude < 0.5f;
+            if (aligned && !wasAligned) Sfx.Play("ROOK_Align", transform.position);
+            wasAligned = aligned;
             if (CanAttackNow && (aligned || alignTimer > 3.5f))
             {
                 alignTimer = 0f;
@@ -233,6 +240,8 @@ namespace KingLastPiece
             if (!phase2 && Health < MaxHealth * 0.5f)
             {
                 phase2 = true;
+                Sfx.Play("QUEEN_Phase2");
+                Sfx.Play("QUEEN_Summon", transform.position);
                 Flash(new Color(2f, 0.2f, 0.1f), 0.4f);
                 Effects.Shockwave(transform.position, 5f, new Color(0.8f, 0.1f, 0.5f), 0.7f);
                 Game.Rig.Shake(0.5f);

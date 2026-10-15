@@ -108,6 +108,7 @@ namespace KingLastPiece
         StaggerController stagger;
         float currentStagger, airHeight, airVy, vulnFxTimer;
         int airHits;
+        bool wasMoving;  // for the slide sound when a piece starts moving
         float modelHeight = 1.5f;
         Vector3 flinchPush, airKnock;
         static readonly Color WindupGlow = new Color(1.6f, 0.12f, 0.04f);
@@ -225,6 +226,8 @@ namespace KingLastPiece
                     break;
             }
 
+            if (moving && !wasMoving) Sfx.Play("EN_Move_Slide", transform.position);
+            wasMoving = moving;
             if (moving)
             {
                 hopPhase += dt * 9f;
@@ -316,7 +319,31 @@ namespace KingLastPiece
                     break;
             }
             Enter(EState.Windup);
+            Sfx.Play("EN_Windup", transform.position);
+            Sfx.Play("EN_Telegraph", plan.kind == AtkKind.Leap ? plan.target : atkStart);
+            if (Type == PieceType.Queen && plan.kind == AtkKind.Slam) Sfx.Play("QUEEN_Check_Windup", transform.position);
         }
+
+        // Sound ids (Docs/Sound/sounds.json) for this piece's attack release and landing.
+        string ReleaseSfx => (Type, plan.kind) switch
+        {
+            (PieceType.Pawn, _) => "PAWN_Thrust",
+            (PieceType.Knight, AtkKind.Leap) => "KNIGHT_Leap",
+            (PieceType.Bishop, _) => "BISHOP_Charge",
+            (PieceType.Rook, AtkKind.Dash) => "ROOK_Ram",
+            (PieceType.Queen, AtkKind.Dash) => "QUEEN_Dash",
+            (PieceType.Queen, AtkKind.Leap) => "QUEEN_Leap",
+            _ => null,
+        };
+
+        string LandSfx => (Type, plan.kind) switch
+        {
+            (PieceType.Knight, AtkKind.Leap) => "KNIGHT_Land",
+            (PieceType.Queen, AtkKind.Leap) => "QUEEN_Land",
+            (PieceType.Rook, AtkKind.Slam) => "ROOK_Slam",
+            (PieceType.Queen, AtkKind.Slam) => "QUEEN_Check_Slam",
+            _ => null,
+        };
 
         void UpdateWindup()
         {
@@ -356,6 +383,7 @@ namespace KingLastPiece
             {
                 ClearTelegraph();
                 Enter(EState.Attack);
+                Sfx.Play(ReleaseSfx, transform.position);
             }
         }
 
@@ -391,6 +419,7 @@ namespace KingLastPiece
                         {
                             landed = true;
                             transform.position = plan.target;
+                            Sfx.Play(LandSfx, plan.target);
                             Vfx.GroundImpact(plan.target, plan.radius, 0.9f, hostile: true);
                             Game.Rig.Shake(0.25f);
                         }
@@ -407,6 +436,7 @@ namespace KingLastPiece
                         {
                             landed = true;
                             Vfx.GroundImpact(atkStart, plan.radius, 1.1f, hostile: true);
+                            Sfx.Play(LandSfx, atkStart);
                             Game.Rig.Shake(0.4f);
                         }
                         squash = 0.75f;
@@ -419,6 +449,9 @@ namespace KingLastPiece
 
         void FinishAttack()
         {
+            // A rook ram that ran all the way into the board's edge.
+            if (Type == PieceType.Rook && plan.kind == AtkKind.Dash && DistanceToEdge(FlatPos, plan.dir) < 0.5f)
+                Sfx.Play("ROOK_WallHit", transform.position);
             SetGlow(Color.black);
             Enter(EState.Recover);
         }
@@ -513,6 +546,7 @@ namespace KingLastPiece
                 if (e.TakeHit(22f, 45f, transform.position))
                 {
                     Game.ReportDamage(e, 22f);
+                    Sfx.Play("HIT_Heavy", e.transform.position + Vector3.up);
                     Effects.Sparks(e.transform.position + Vector3.up, Vfx.Accent, 12, 6f);
                     Game.Rig.Shake(0.25f);
                 }
@@ -522,6 +556,7 @@ namespace KingLastPiece
             {
                 modelY = 0f;
                 Vfx.GroundImpact(FlatPos, 2f, 1f);
+                Sfx.Play("THR_Land", transform.position);
                 Game.Rig.Shake(0.4f);
                 // Crash down and lie on the board before getting up (damage only, no stagger reaction).
                 Enter(EState.Getup);
@@ -555,6 +590,7 @@ namespace KingLastPiece
                 bool superArmor = state == EState.Windup || state == EState.Attack;
                 var reaction = stagger.OnHit(poiseDamage, superArmor, state == EState.Airborne);
                 if (stagger.JustBecameVulnerable) VulnerableBurst();
+                else if (superArmor && reaction == StaggerController.Reaction.None) Sfx.Play("HIT_Armor", transform.position + Vector3.up);
                 if (reaction == StaggerController.Reaction.Launch) LaunchUp(source);
                 else if (reaction == StaggerController.Reaction.Flinch) Flinch(source, stagger.Profile.flinchDuration);
                 return true;
@@ -599,6 +635,7 @@ namespace KingLastPiece
 
         void Flinch(Vector3 source, float duration)
         {
+            Sfx.Play(IsBoss ? "QUEEN_Stagger" : "STG_Flinch", transform.position);
             CancelAction();
             currentStagger = duration;
             Vector3 away = FlatPos - new Vector3(source.x, 0f, source.z);
@@ -631,6 +668,7 @@ namespace KingLastPiece
             if (!alreadyAirborne)
             {
                 airHits = 0;
+                Sfx.Play(forced ? "STG_Launch" : "STG_Pop", transform.position);
                 airHeight = 0f;
                 airHover = 0f;
                 airVy = stagger.Profile.launchForce * (forced ? ForcedLaunchScale : VulnerablePopScale);
@@ -638,6 +676,7 @@ namespace KingLastPiece
             }
             else if (airHits < MaxJuggleHits)
             {
+                Sfx.Play("STG_Juggle", transform.position + Vector3.up * (airHeight + 0.8f));
                 // Juggle: a small boost that shrinks per hit and lifts less the higher the piece already is.
                 float height = Mathf.Clamp01(1f - airHeight / JuggleCeiling);
                 float boost = JuggleLift * Mathf.Pow(JuggleFalloff, airHits) * (0.35f + 0.65f * height);
@@ -673,6 +712,7 @@ namespace KingLastPiece
             {
                 modelY = 0f;
                 Effects.Shockwave(FlatPos, 1.4f, new Color(0.7f, 0.65f, 0.55f), 0.35f);
+                Sfx.Play("STG_AirLand", transform.position);
                 Effects.Sparks(transform.position + Vector3.up * 0.2f, new Color(0.6f, 0.55f, 0.5f), 8, 3f);
                 Enter(EState.Getup);
             }
@@ -684,6 +724,7 @@ namespace KingLastPiece
             float t = stateTime;
             float lieTime = GetupLie + bonusLie;
             float lie = t < lieTime ? 1f : 1f - PoseTrack.Curve(Ease.InOut, (t - lieTime) / GetupRise);
+            if (t >= lieTime && t - Time.deltaTime < lieTime) Sfx.Play("STG_Getup", transform.position);
             modelTilt = Quaternion.Euler(-85f * lie, 0f, 0f);
             if (t >= lieTime + GetupRise)
             {
@@ -698,6 +739,8 @@ namespace KingLastPiece
         /// <summary>The gauge just filled: hidden gauge, so make Vulnerable obvious with a burst.</summary>
         void VulnerableBurst()
         {
+            Sfx.Play("STG_Vulnerable", transform.position + Vector3.up * modelHeight);
+            Sfx.Play("STG_Vulnerable_Loop", transform.position + Vector3.up * modelHeight);
             Flash(VulnerableColor * 2.2f, 0.18f);
             Effects.Shockwave(FlatPos, 1.6f, VulnerableColor, 0.35f);
             Vfx.Burst(SlashFxKind.SlashC, transform.position + Vector3.up * (modelHeight + 0.2f), Quaternion.identity, 0.9f, VulnerableColor, "flare", "spark");
@@ -731,6 +774,8 @@ namespace KingLastPiece
             crumbled = false;
             Enter(EState.Dead);
             Flash(new Color(1.8f, 1.7f, 1.5f), CrackTime);
+            Sfx.Play("EN_Death_Crack", transform.position);
+            if (IsBoss) Sfx.Play("QUEEN_Death", transform.position);
             Effects.Sparks(transform.position + Vector3.up, new Color(0.4f, 0.4f, 0.45f), 18, 6f);
         }
 
@@ -751,6 +796,8 @@ namespace KingLastPiece
                 }
                 crumbled = true;
                 Crumble.Spawn(model.GetComponentsInChildren<Renderer>(), deathAway);
+                Sfx.Play("EN_Crumble", transform.position);
+                Sfx.Play("EN_Debris", transform.position);
                 model.gameObject.SetActive(false);
                 Game.Rig.Shake(IsBoss ? 0.6f : 0.2f);
             }
@@ -766,6 +813,8 @@ namespace KingLastPiece
             {
                 model.localPosition = Vector3.zero;
                 Effects.DarkWave(transform.position, 2.4f);
+                Sfx.Play("EN_Spawn", transform.position);
+                if (IsBoss) Sfx.Play("QUEEN_Intro");
                 Vfx.Dust(transform.position, 1.1f);  // set down on the board like a chess move
                 Enter(EState.Move);
             }

@@ -112,6 +112,8 @@ namespace KingLastPiece
                 if (kb.hKey.wasPressedThisFrame) game.HitStopEnabled = !game.HitStopEnabled;
                 if (kb.gKey.wasPressedThisFrame) game.Player.GodMode = Invincible = !Invincible;
                 if (kb.iKey.wasPressedThisFrame) game.Player.InfiniteStamina = InfiniteStamina = !InfiniteStamina;
+                if (kb.xKey.wasPressedThisFrame || kb.cKey.wasPressedThisFrame || kb.hKey.wasPressedThisFrame ||
+                    kb.gKey.wasPressedThisFrame || kb.iKey.wasPressedThisFrame) Sfx.Play("UI_Confirm");
             }
 
             if (game.Player.Health < game.Player.MaxHealth * 0.3f) game.Player.RefillForLab();

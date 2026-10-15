@@ -68,6 +68,9 @@ namespace KingLastPiece
         public bool GodMode { get; set; }
         /// <summary>Attack Lab: actions cost no stamina.</summary>
         public bool InfiniteStamina { get; set; }
+        /// <summary>Movement injected by lab automation (world space, length ≤ 1); used instead of the stick when set.</summary>
+        public Vector3 DebugMove { get; set; }
+        public bool DebugSprint { get; set; }
 
         State state;
         float stateTime, staminaDelay;
@@ -90,6 +93,10 @@ namespace KingLastPiece
         readonly List<Vector3> assistCandidates = new List<Vector3>();
         Vector3 counterFrom, counterTo;
         float counterAngle0, counterSpin = 1f;  // spin: +1 clockwise, -1 counter-clockwise (random per throw)
+        // Sound-event bookkeeping (footstep phase, edge-triggered warnings, lock changes).
+        int lastStep;
+        bool prevSprint, lowHpWarned, lowStaminaWarned, swingSfx;
+        EnemyBase prevLock;
         bool counterReleased;
         readonly HashSet<EnemyBase> counterHits = new HashSet<EnemyBase>();
 
@@ -166,6 +173,7 @@ namespace KingLastPiece
         public void ReturnToStart(Vector3 pos, float yaw)
         {
             var gold = new Color(1f, 0.85f, 0.45f);
+            Sfx.Play("PL_ReturnToStart", transform.position);
             Effects.Sparks(transform.position + Vector3.up, gold, 14, 3f);
             transform.SetPositionAndRotation(new Vector3(pos.x, 0f, pos.z), Quaternion.Euler(0f, yaw, 0f));
             if (!IsDead) Enter(State.Normal);
@@ -185,8 +193,16 @@ namespace KingLastPiece
         }
 
         /// <summary>Queue an action as if the button had been pressed (used by the Attack Lab automation).</summary>
-        public void Press(Buffered action)
+        /// <param name="held">Re-queued by a held button (no "denied" feedback sound for those).</param>
+        public void Press(Buffered action, bool held = false)
         {
+            if (!held)
+            {
+                // Denied presses get their own feedback sound.
+                if ((action == Buffered.Light || action == Buffered.Heavy) && Stamina < 1f && !CounterReady) Sfx.Play("ATK_NoStamina");
+                if (action == Buffered.Dodge && DodgeCharges <= 0) Sfx.Play("PL_Dodge_Empty");
+                if (action == Buffered.Heal && Flasks <= 0) Sfx.Play("PL_Heal_Empty");
+            }
             buffer = action;
             bufferTimer = BufferWindow;
         }
@@ -217,6 +233,7 @@ namespace KingLastPiece
             UpdateDodgeCharges(dt);
             UpdateLockTarget();
             if (justTarget != null && !Game.SlowMoActive) justTarget = null;
+            UpdateWarnings();
 
             switch (state)
             {
@@ -244,8 +261,8 @@ namespace KingLastPiece
             // Holding an attack button keeps re-queuing it, so the combo continues at each cancel point.
             if (buffer == Buffered.None)
             {
-                if (GameInput.LightHeld) Press(Buffered.Light);
-                else if (GameInput.HeavyHeld) Press(Buffered.Heavy);
+                if (GameInput.LightHeld) Press(Buffered.Light, true);
+                else if (GameInput.HeavyHeld) Press(Buffered.Heavy, true);
             }
             if (GameInput.LockOn) ToggleLock();
 
@@ -285,6 +302,22 @@ namespace KingLastPiece
             staminaDelay = StaminaDelay;
         }
 
+        /// <summary>Edge-triggered sounds: lock-on changes, low health, low stamina.</summary>
+        void UpdateWarnings()
+        {
+            if (LockTarget != prevLock)
+            {
+                Sfx.Play(LockTarget == null ? "UI_LockOff" : prevLock == null ? "UI_LockOn" : "UI_LockSwitch");
+                prevLock = LockTarget;
+            }
+            bool lowHp = Health < MaxHealth * 0.3f;
+            if (lowHp && !lowHpWarned) Sfx.Play("PL_LowHP_Loop");
+            lowHpWarned = lowHp;
+            bool lowSt = Stamina < MaxStamina * 0.25f;
+            if (lowSt && !lowStaminaWarned) Sfx.Play("UI_StaminaLow");
+            lowStaminaWarned = lowSt;
+        }
+
         void UpdateDodgeCharges(float dt)
         {
             if (DodgeCharges >= MaxDodges) { dodgeRecharge = 0f; return; }
@@ -293,6 +326,7 @@ namespace KingLastPiece
             {
                 DodgeCharges++;
                 dodgeRecharge = 0f;
+                Sfx.Play("PL_Dodge_Recharge");
             }
         }
 
@@ -307,6 +341,7 @@ namespace KingLastPiece
         Vector3 InputDirection()
         {
             if (!InputEnabled) return Vector3.zero;
+            if (DebugMove.sqrMagnitude > 0.0001f) return DebugMove;
             Vector2 mi = GameInput.Move;
             var rig = Game.Rig;
             return rig.FlatRight * mi.x + rig.FlatForward * mi.y;
@@ -362,7 +397,7 @@ namespace KingLastPiece
             Vector3 dir = InputDirection();
             float m = dir.magnitude;
             // Sprint: hold Shift / L3 while moving. Drains stamina; stops when it runs out.
-            IsSprinting = GameInput.SprintHeld && m > 0.3f && Stamina > 0f && (!sprintExhausted || Stamina > SprintRecoverAt);
+            IsSprinting = (GameInput.SprintHeld || DebugSprint) && m > 0.3f && Stamina > 0f && (!sprintExhausted || Stamina > SprintRecoverAt);
             if (IsSprinting)
             {
                 sprintExhausted = false;
@@ -383,6 +418,12 @@ namespace KingLastPiece
             sprintBlend = Mathf.Lerp(sprintBlend, run, 1f - Mathf.Exp(-8f * dt));
             prevMove = Mathf.Lerp(prevMove, m, 1f - Mathf.Exp(-10f * dt));
             bobPhase += dt * Mathf.Lerp(10f, 15f, sprintBlend) * m;
+            // A footstep each time the hop touches down; a whoosh when a sprint starts.
+            int step = Mathf.FloorToInt(bobPhase / Mathf.PI);
+            if (m > 0.05f && step != lastStep) Sfx.Play(IsSprinting ? "PL_Step_Sprint" : "PL_Step", FlatPos);
+            lastStep = step;
+            if (IsSprinting && !prevSprint) Sfx.Play("PL_Sprint_Start", FlatPos);
+            prevSprint = IsSprinting;
             float hop = m > 0.05f ? Mathf.Abs(Mathf.Sin(bobPhase)) * Mathf.Lerp(0.12f, 0.22f, sprintBlend) : 0f;
             float heading = 0f;
             if (m > 0.05f) heading = Vector3.SignedAngle(transform.forward, dir, Vector3.up);
@@ -424,6 +465,7 @@ namespace KingLastPiece
                 windowStarted[i] = false;
             }
             Enter(State.Attack);
+            Sfx.Play(atk.sfx, FlatPos);
 
             Vector3 dir = InputDirection();
             // Auto-aim (no visuals): with pieces close by, face the direction that hits the most of them —
@@ -570,8 +612,11 @@ namespace KingLastPiece
             if (atk.cues != null)
                 foreach (var cue in atk.cues)
                     if (prevT < cue.time && t >= cue.time)
+                    {
+                        Sfx.Play(cue.sfx, FlatPos);
                         Vfx.Slash(cue.kind, transform.position + Vector3.up * cue.height, transform.rotation * Quaternion.Euler(0f, cue.yaw, cue.roll),
                             cue.scale, cue.gold ? Vfx.Accent : (Color?)null, cue.mirror);
+                    }
 
             bool trail = t >= atk.FirstHit - 0.07f && t <= atk.LastHit + 0.03f;
             // An authored slash replaces the crown trail for this attack.
@@ -585,6 +630,7 @@ namespace KingLastPiece
                 if (!windowStarted[i])
                 {
                     windowStarted[i] = true;
+                    Sfx.Play(w.sfx, FlatPos);
                     if (w.fx != SlashFxKind.None)
                         Vfx.Slash(w.fx, transform.position + Vector3.up * w.fxHeight, transform.rotation * Quaternion.Euler(0f, w.fxYaw, 0f),
                             w.fxScale, w.fxGold ? Vfx.Accent : (Color?)null, w.fxFlip);
@@ -617,6 +663,7 @@ namespace KingLastPiece
         void DoHits(HitWindow w, HashSet<EnemyBase> already, float progress)
         {
             bool landed = false;
+            int hitCount = 0;
             Vector3 center = FlatPos + transform.forward * w.forward;
             scratch.Clear();
             scratch.AddRange(Game.Enemies);
@@ -642,11 +689,14 @@ namespace KingLastPiece
                     Game.ReportDamage(e, w.damage);
                     Vector3 toE = (e.FlatPos - FlatPos).normalized;
                     Vfx.Hit(e.transform.position + Vector3.up * 1.0f - toE * e.Radius, toE, atk.heavy);
+                    Sfx.Play(e.IsBoss ? "HIT_Boss" : atk.heavy ? "HIT_Heavy" : "HIT_Light", e.transform.position + Vector3.up);
+                    hitCount++;
                     if (w.launch) e.ForceLaunch(transform.position);
                 }
             }
             if (landed)
             {
+                if (hitCount >= 3) Sfx.Play("HIT_Multi", center);
                 // One hit-stop per attack: sweeps hit enemies on successive frames and would otherwise stutter.
                 if (!hitStopUsed) Game.HitStop(w.hitStop);
                 hitStopUsed = true;
@@ -664,6 +714,7 @@ namespace KingLastPiece
             bool backstep = dir.sqrMagnitude <= 0.01f;
             dodgeDir = backstep ? -transform.forward : dir.normalized;
             LastDodgeDirection = dodgeDir;
+            Sfx.Play("PL_Dodge", FlatPos);
             if (!backstep) transform.rotation = Quaternion.LookRotation(dodgeDir);
             Enter(State.Dodge);
         }
@@ -720,6 +771,7 @@ namespace KingLastPiece
             if (stateTime >= cancelAt && (buffer == Buffered.Light || buffer == Buffered.Heavy) && TryAct()) return;
             if (p >= 1f)
             {
+                if (!backstep) Sfx.Play("PL_Land", FlatPos);
                 ApplyPose(default);
                 Enter(State.Normal);
             }
@@ -745,6 +797,7 @@ namespace KingLastPiece
             {
                 healed = true;
                 Health = Mathf.Min(MaxHealth, Health + HealAmount);
+                Sfx.Play("PL_Heal", FlatPos);
                 Flash(new Color(1f, 0.8f, 0.3f) * 2f, 0.25f);
                 Effects.Sparks(transform.position + Vector3.up * 1.2f, new Color(1f, 0.8f, 0.3f), 14, 3f);
                 Vfx.Slash(SlashFxKind.SlashD, transform.position + Vector3.up * 0.3f, transform.rotation, 0.9f, new Color(1f, 0.8f, 0.4f));
@@ -796,6 +849,7 @@ namespace KingLastPiece
             justThisDodge = true;
             justTarget = attacker;
             JustDodgeCount++;
+            Sfx.Play("PL_PerfectDodge");
             DodgeCharges = Mathf.Min(MaxDodges, DodgeCharges + 1);
             Game.SlowMo(SlowScale, SlowDuration);
             Game.Rig.Kick(0.45f);
@@ -826,6 +880,8 @@ namespace KingLastPiece
             counterTo = counterTarget.FlatPos - to.normalized * SwingRadius;
             counterAngle0 = Vector3.SignedAngle(Vector3.forward, to, Vector3.up);
             counterSpin = Random.value < 0.5f ? 1f : -1f;
+            swingSfx = false;
+            Sfx.Play("THR_Grab", counterTarget.FlatPos);
             transform.rotation = Quaternion.LookRotation(to);
             Enter(State.Counter);
         }
@@ -854,6 +910,7 @@ namespace KingLastPiece
             else if (t < CounterRelease)
             {
                 // Swing the piece around twice, accelerating, hitting everything it sweeps through.
+                if (!swingSfx) { swingSfx = true; Sfx.Play("THR_Swing_Loop", FlatPos); }
                 float p = (t - CounterApproach) / (CounterRelease - CounterApproach);
                 float angle = counterAngle0 + counterSpin * 720f * Mathf.Pow(p, 1.7f);
                 Vector3 dir = Quaternion.Euler(0f, angle, 0f) * Vector3.forward;
@@ -874,6 +931,7 @@ namespace KingLastPiece
                     if (e.TakeHit(SwingHitDamage, 50f, piecePos))
                     {
                         Game.ReportDamage(e, SwingHitDamage);
+                        Sfx.Play("THR_SwingHit", e.transform.position + Vector3.up);
                         Effects.Sparks(e.transform.position + Vector3.up, Vfx.Accent, 14, 6f);
                         Game.Rig.Shake(0.3f);
                     }
@@ -886,6 +944,8 @@ namespace KingLastPiece
                     // Hurl it outward.
                     counterReleased = true;
                     ThrowCount++;
+                    Sfx.Play("THR_Release", FlatPos);
+                    Sfx.Play("THR_Fly", counterTarget.transform.position + Vector3.up);
                     Vector3 dir = counterTarget.FlatPos - FlatPos;
                     Game.EndSlowMo();
                     counterTarget.Launch(dir, 17f, 7f, ThrowLandingDamage);
@@ -930,6 +990,7 @@ namespace KingLastPiece
                 Health = 0f;
                 IsDead = true;
                 LockTarget = null;
+                Sfx.Play("PL_Death");
                 transform.rotation = Quaternion.LookRotation(-away);
                 Enter(State.Dead);
                 Game.OnPlayerDied();
@@ -937,6 +998,7 @@ namespace KingLastPiece
             else
             {
                 knockback = away * (4f + poiseDamage * 0.06f);
+                Sfx.Play(damage >= 24f ? "PL_Hurt_Heavy" : "PL_Hurt", FlatPos);
                 Enter(State.Stagger);
             }
             return true;
