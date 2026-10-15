@@ -493,7 +493,10 @@ namespace KingLastPiece
                 case AtkKind.Dash:
                     plan.length = Mathf.Min(plan.length, DistanceToEdge(atkStart, plan.dir));
                     if (plan.kind == AtkKind.Dash) plan.active = Mathf.Max(0.12f, plan.length / Mathf.Max(1f, plan.speed));
-                    telegraph = Telegraph.Line(atkStart, plan.dir, plan.length + plan.radius, plan.radius * 2f, plan.windup);
+                    // Pawns keep the classic strip; the line pieces light the board squares along their charge.
+                    telegraph = Type == PieceType.Pawn
+                        ? Telegraph.Strip(atkStart, plan.dir, plan.length + plan.radius, plan.radius * 2f, plan.windup)
+                        : Telegraph.Line(atkStart, plan.dir, plan.length + plan.radius, plan.radius * 2f, plan.windup);
                     break;
                 case AtkKind.Leap:
                     plan.target = ClampPoint(plan.target);

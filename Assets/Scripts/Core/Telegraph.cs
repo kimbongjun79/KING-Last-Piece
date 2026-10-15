@@ -21,7 +21,7 @@ namespace KingLastPiece
     {
         public const float FlashTime = 0.2f;
 
-        enum Kind { Line, Area, Leap }
+        enum Kind { Line, Area, Leap, Strip }
 
         class Cell
         {
@@ -39,6 +39,10 @@ namespace KingLastPiece
         readonly List<Vector2Int> squares = new List<Vector2Int>();
         readonly List<Vector2Int> scratch = new List<Vector2Int>();
         Transform cellRoot, routeRoot, ghost;
+        // Pawn strip parts.
+        Transform stripBase, stripFill, stripFront;
+        Transform[] stripRails;
+        float stripWidth;
         readonly List<Transform> dots = new List<Transform>();
         Vector3 routeStart, routeDir;
         float routeLength = -1f;
@@ -58,6 +62,66 @@ namespace KingLastPiece
             var t = Create("Telegraph_Line", Kind.Line, windup);
             t.SetLine(start, dir, length, width);
             return t;
+        }
+
+        /// <summary>
+        /// A pawn's thrust: the classic strip along the line (not tied to the board squares) — a translucent lane with
+        /// thin glowing side rails and end line, filling from the pawn toward the tip behind a bright leading edge.
+        /// </summary>
+        public static Telegraph Strip(Vector3 start, Vector3 dir, float length, float width, float windup)
+        {
+            var t = Create("Telegraph_Strip", Kind.Strip, windup);
+            t.start = Flat(start);
+            t.dir = dir.sqrMagnitude > 0.0001f ? Flat(dir).normalized : Vector3.forward;
+            t.length = Mathf.Max(0.3f, length);
+            t.stripWidth = width;
+            var root = t.cellRoot;
+            t.stripBase = PieceFactory.Part(PrimitiveType.Cube, root, Vector3.zero, Vector3.one, t.baseMat);
+            t.stripFill = PieceFactory.Part(PrimitiveType.Cube, root, Vector3.zero, Vector3.one, t.fillMat);
+            t.stripFront = PieceFactory.Part(PrimitiveType.Cube, root, Vector3.zero, Vector3.one, EdgeMat);
+            t.stripRails = new[]
+            {
+                PieceFactory.Part(PrimitiveType.Cube, root, Vector3.zero, Vector3.one, EdgeMat),
+                PieceFactory.Part(PrimitiveType.Cube, root, Vector3.zero, Vector3.one, EdgeMat),
+                PieceFactory.Part(PrimitiveType.Cube, root, Vector3.zero, Vector3.one, EdgeMat),
+            };
+            foreach (var r in root.GetComponentsInChildren<Renderer>()) r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            return t;
+        }
+
+        void UpdateStrip(float p, bool white)
+        {
+            var rot = Quaternion.LookRotation(dir);
+            Vector3 side = Vector3.Cross(Vector3.up, dir);
+            float w = stripWidth, len = length;
+            Vector3 mid = start + dir * (len * 0.5f);
+            stripBase.SetPositionAndRotation(mid + Vector3.up * 0.022f, rot);
+            stripBase.localScale = new Vector3(w, 0.01f, len);
+
+            // Fill from the pawn to the tip, eased so it surges at the end.
+            float fl = Mathf.Max(0.01f, len * PoseTrack.Curve(Ease.In, p) * 0.85f + len * 0.15f * p);
+            stripFill.SetPositionAndRotation(start + dir * (fl * 0.5f) + Vector3.up * 0.028f, rot);
+            stripFill.localScale = new Vector3(w * 0.92f, 0.01f, fl);
+            stripFront.SetPositionAndRotation(start + dir * fl + Vector3.up * 0.036f, rot);
+            stripFront.localScale = new Vector3(w * 0.96f, 0.012f, 0.07f);
+
+            // Thin rails along both sides and a line across the tip.
+            const float rail = 0.05f;
+            stripRails[0].SetPositionAndRotation(mid + side * (w * 0.5f) + Vector3.up * 0.034f, rot);
+            stripRails[0].localScale = new Vector3(rail, 0.012f, len);
+            stripRails[1].SetPositionAndRotation(mid - side * (w * 0.5f) + Vector3.up * 0.034f, rot);
+            stripRails[1].localScale = new Vector3(rail, 0.012f, len);
+            stripRails[2].SetPositionAndRotation(start + dir * len + Vector3.up * 0.034f, rot);
+            stripRails[2].localScale = new Vector3(w + rail, 0.012f, rail);
+
+            var m = white ? FlashMat : EdgeMat;
+            foreach (var t in stripRails)
+            {
+                var r = t.GetComponent<Renderer>();
+                if (r.sharedMaterial != m) r.sharedMaterial = m;
+            }
+            var fr = stripFront.GetComponent<Renderer>();
+            if (fr.sharedMaterial != m) fr.sharedMaterial = m;
         }
 
         /// <summary>A blast around a point (slams; the queen's leap), plus the attacker's own square at <paramref name="origin"/>.</summary>
@@ -284,12 +348,25 @@ namespace KingLastPiece
 
         // ---------------------------------------------------------------- animation
 
+        void SetFillAlpha(float p)
+        {
+            var col = fillMat.GetColor("_BaseColor");
+            col.a = Mathf.Lerp(0.35f, 0.65f, p);
+            fillMat.SetColor("_BaseColor", col);
+        }
+
         void Update()
         {
             float p = progress;
             float timeLeft = windup * (1f - p);
             // Blink fast in the final moment: white on/off.
             bool white = timeLeft <= FlashTime && Mathf.Repeat(timeLeft * 30f, 2f) < 1.2f;
+            if (kind == Kind.Strip)
+            {
+                UpdateStrip(p, white);
+                SetFillAlpha(p);
+                return;
+            }
 
             float size = Tile * 0.96f;
             int n = cells.Count;
@@ -323,9 +400,7 @@ namespace KingLastPiece
                 }
             }
 
-            var col = fillMat.GetColor("_BaseColor");
-            col.a = Mathf.Lerp(0.35f, 0.65f, p);
-            fillMat.SetColor("_BaseColor", col);
+            SetFillAlpha(p);
 
             // Route dots light up in sequence, toward the target, quicker as the wind-up runs out.
             float speed = Mathf.Lerp(2f, 4.5f, p);
