@@ -57,6 +57,7 @@ namespace KingLastPiece
                     return;
             }
 
+            DrawLowHealthVignette(g.Player);
             DrawPlayerBars(g.Player);
             DrawRollCharges(g);
             DrawEnemyBars(g);
@@ -413,6 +414,54 @@ namespace KingLastPiece
         }
 
         // ---------------------------------------------------------------- primitives
+
+        // ---------------------------------------------------------------- low health
+
+        static Texture2D vignette;
+        float vignetteLevel;
+
+        /// <summary>Radial mask: clear in the middle, opaque at the edges (soft falloff).</summary>
+        static Texture2D Vignette
+        {
+            get
+            {
+                if (vignette != null) return vignette;
+                const int N = 128;
+                vignette = new Texture2D(N, N, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp, name = "Vignette" };
+                var px = new Color32[N * N];
+                for (int y = 0; y < N; y++)
+                for (int x = 0; x < N; x++)
+                {
+                    float dx = (x + 0.5f) / N * 2f - 1f, dy = (y + 0.5f) / N * 2f - 1f;
+                    float d = Mathf.Sqrt(dx * dx + dy * dy) / 1.41421f;
+                    float a = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.42f, 1f, d));
+                    px[y * N + x] = new Color32(255, 255, 255, (byte)(a * 255f));
+                }
+                vignette.SetPixels32(px);
+                vignette.Apply();
+                return vignette;
+            }
+        }
+
+        /// <summary>
+        /// Below 35% health the screen edges close in with a pulsing blood-red vignette: the lower the health, the
+        /// further it reaches toward the centre and the harder it beats.
+        /// </summary>
+        void DrawLowHealthVignette(PlayerController p)
+        {
+            float frac = p.MaxHealth > 0f ? p.Health / p.MaxHealth : 1f;
+            float target = p.IsDead ? 0f : Mathf.Clamp01((0.35f - frac) / 0.3f);
+            vignetteLevel = Mathf.MoveTowards(vignetteLevel, target, Time.unscaledDeltaTime * 1.5f);
+            if (vignetteLevel <= 0.001f) return;
+            float beat = Mathf.Pow(Mathf.Abs(Mathf.Sin(Time.unscaledTime * Mathf.Lerp(3.2f, 5.5f, vignetteLevel))), 6f);
+            // Draw the mask oversized when mild (edges only), at screen size when critical (closing in).
+            float grow = Mathf.Lerp(0.45f, 0.02f, vignetteLevel) - 0.06f * beat * vignetteLevel;
+            var r = new Rect(-Screen.width * grow, -Screen.height * grow, Screen.width * (1f + 2f * grow), Screen.height * (1f + 2f * grow));
+            var old = GUI.color;
+            GUI.color = new Color(0.55f, 0.02f, 0.02f, Mathf.Lerp(0.55f, 0.9f, vignetteLevel) * (0.85f + 0.15f * beat));
+            GUI.DrawTexture(r, Vignette, ScaleMode.StretchToFill, true);
+            GUI.color = old;
+        }
 
         static void Fill(Rect r, Color c)
         {

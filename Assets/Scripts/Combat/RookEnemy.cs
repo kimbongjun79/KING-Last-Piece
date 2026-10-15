@@ -32,7 +32,7 @@ namespace KingLastPiece
                 if (!CanAttackNow) return;
                 BeginAttack(new AttackPlan
                 {
-                    kind = AtkKind.Slam, windup = 0.98f, active = 0.14f, recover = 1.0f,
+                    kind = AtkKind.Slam, windup = 0.82f, active = 0.14f, recover = 1.0f,
                     damage = 22f, poise = 40f, radius = 2.6f
                 });
                 cooldown = Random.Range(1.6f, 2.4f);
@@ -50,7 +50,7 @@ namespace KingLastPiece
                 {
                     BeginAttack(new AttackPlan
                     {
-                        kind = AtkKind.Dash, dir = BoardSlots.LineDirection(MySquare, KingSquare), windup = 1.08f, recover = 1.1f,
+                        kind = AtkKind.Dash, dir = BoardSlots.LineDirection(MySquare, KingSquare), windup = 0.82f, recover = 1.1f,
                         length = 14f, speed = 17f, damage = 26f, poise = 50f, radius = 0.9f
                     });
                     cooldown = Random.Range(2f, 3f);

@@ -122,6 +122,7 @@ namespace KingLastPiece
                 board = WorldBuilder.BuildArena();
                 WorldBuilder.ApplyLighting();
             }
+            WorldBuilder.EnsureColliders(board);
             BoardFx.Register(board.Grid);
 
             Player = FindFirstObjectByType<PlayerController>();

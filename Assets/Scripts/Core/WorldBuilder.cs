@@ -65,7 +65,26 @@ namespace KingLastPiece
                     lg.intensity = 4f;
                 }
             }
+            EnsureColliders(board);
             return board;
+        }
+
+        /// <summary>
+        /// Static colliders for physics rubble: the board top (y = 0), the frame rails and the hall floor. Pieces and the
+        /// King never use colliders; only shards do. Idempotent, so older baked scenes get them at runtime.
+        /// </summary>
+        public static void EnsureColliders(ArenaBoard board)
+        {
+            var root = board.transform;
+            if (root.Find("Board Collider") != null) return;
+            var top = new GameObject("Board Collider").AddComponent<BoxCollider>();
+            top.transform.SetParent(root, false);
+            float size = GameManager.BoardHalf * 2f;
+            top.center = new Vector3(0f, -0.5f, 0f);
+            top.size = new Vector3(size, 1f, size);
+            foreach (var t in root.GetComponentsInChildren<Transform>(true))
+                if ((t.name.StartsWith("Frame ") || t.name == "Hall Floor") && t.GetComponent<Collider>() == null)
+                    t.gameObject.AddComponent<BoxCollider>();
         }
 
         /// <summary>Moonlit key light, flat purple ambient and the dark hall fog.</summary>

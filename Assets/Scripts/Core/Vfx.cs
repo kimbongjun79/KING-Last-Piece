@@ -34,7 +34,22 @@ namespace KingLastPiece
 
         // ---------------------------------------------------------------- hit (King strikes a piece)
 
-        public static void Hit(Vector3 pos, Vector3 dir, bool heavy) => Hit(Style, pos, dir, heavy);
+        static Transform followTarget;
+
+        /// <param name="follow">The struck piece's model: the flash, sparks and debris ride along with it (a launched piece
+        /// carries its hit effects instead of leaving them hanging in the air).</param>
+        public static void Hit(Vector3 pos, Vector3 dir, bool heavy, Transform follow = null)
+        {
+            followTarget = follow;
+            try { Hit(Style, pos, dir, heavy); }
+            finally { followTarget = null; }
+        }
+
+        /// <summary>Effects spawned during a <see cref="Hit(Vector3, Vector3, bool, Transform)"/> on a piece follow that piece.</summary>
+        public static void Track(GameObject go)
+        {
+            if (followTarget != null) FollowTarget.Attach(go, followTarget);
+        }
 
         public static void Hit(VfxStyle style, Vector3 pos, Vector3 dir, bool heavy)
         {
@@ -97,6 +112,16 @@ namespace KingLastPiece
             if (kind != SlashFxKind.AoeA)
                 rot = Quaternion.AngleAxis(SlashYawFix, Vector3.up) * rot;
             var fx = Object.Instantiate(prefab, pos, rot);
+            if (followTarget != null)
+            {
+                // Riding along with a piece: simulate in local space so live particles move with it.
+                foreach (var ps in fx.GetComponentsInChildren<ParticleSystem>())
+                {
+                    var m = ps.main;
+                    m.simulationSpace = ParticleSystemSimulationSpace.Local;
+                }
+                Track(fx);
+            }
             var s = Vector3.one * scale;
             if (mirror)
             {
@@ -302,6 +327,7 @@ namespace KingLastPiece
                 float s = size * Random.Range(0.6f, 1.3f);
                 var t = PieceFactory.Part(PrimitiveType.Cube, null, pos + Random.insideUnitSphere * 0.1f,
                     new Vector3(s, s * 0.3f, s * Random.Range(0.6f, 1.2f)), i % 2 == 0 ? ma : mb, Random.rotation.eulerAngles);
+                Track(t.gameObject);
                 var p = t.gameObject.AddComponent<SparkParticle>();
                 Vector3 v = Random.onUnitSphere;
                 v.y = Mathf.Abs(v.y) + 0.5f;
@@ -320,6 +346,7 @@ namespace KingLastPiece
                 float s = Random.Range(0.08f, 0.14f);
                 var t = PieceFactory.Part(PrimitiveType.Cube, null, pos + Random.insideUnitSphere * 0.1f,
                     new Vector3(s, 0.01f, s), i % 2 == 0 ? white : black, Random.rotation.eulerAngles);
+                Track(t.gameObject);
                 var p = t.gameObject.AddComponent<FlutterParticle>();
                 Vector3 v = Random.onUnitSphere;
                 v.y = Mathf.Abs(v.y) + 0.6f;
@@ -574,6 +601,28 @@ namespace KingLastPiece
 namespace KingLastPiece
 {
     /// <summary>A brief bright burst at the point of impact (pops out, then collapses).</summary>
+    /// <summary>Moves an effect by however much its target moved since last frame, so hit effects stay on the piece.</summary>
+    public class FollowTarget : MonoBehaviour
+    {
+        Transform target;
+        Vector3 last;
+
+        public static void Attach(GameObject go, Transform t)
+        {
+            var f = go.AddComponent<FollowTarget>();
+            f.target = t;
+            f.last = t.position;
+        }
+
+        void LateUpdate()
+        {
+            if (target == null || !target.gameObject.activeInHierarchy) { enabled = false; return; }
+            Vector3 p = target.position;
+            transform.position += p - last;
+            last = p;
+        }
+    }
+
     public class HitFlashFx : MonoBehaviour
     {
         const float Life = 0.13f;
@@ -584,6 +633,7 @@ namespace KingLastPiece
             var tr = PieceFactory.Part(PrimitiveType.Sphere, null, pos, Vector3.one * 0.05f, MaterialLib.Emissive(color, 6f));
             tr.name = "HitFlash";
             tr.gameObject.AddComponent<HitFlashFx>().size = size;
+            Vfx.Track(tr.gameObject);
         }
 
         void Update()

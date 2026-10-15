@@ -5,11 +5,11 @@ namespace KingLastPiece
 {
     /// <summary>
     /// Chessboard slot system. Instead of swarming the King, every piece reserves a square to attack from — the
-    /// squares its own move pattern reaches the King's square from (pawn: forward diagonals, knight: the L squares,
+    /// squares its own move pattern reaches the King's square from (pawn: the squares around him, knight: the L squares,
     /// bishop/rook/queen: their lines) — walks there in its own gait, and strikes along that move. One piece per
-    /// square. When every attack square of its pattern is taken, a piece waits on an outer square (3–4 squares out)
-    /// and takes over a slot as soon as one frees up. Squares off the board simply don't exist, so a King with his
-    /// back to the edge can only be surrounded from the open side.
+    /// square (queen > rook > bishop > knight > pawn when they compete). When every attack square of its pattern is
+    /// taken, a piece waits on a square 2–3 squares out and takes over a slot as soon as one frees up. Squares off
+    /// the board simply don't exist, so a King with his back to the edge can only be surrounded from the open side.
     /// </summary>
     public static class BoardSlots
     {
@@ -72,11 +72,37 @@ namespace KingLastPiece
             return o == null || o == e;
         }
 
+        /// <summary>
+        /// Slot priority when two kinds of piece want the same square: queen > rook > bishop > knight > pawn.
+        /// A higher-priority piece may take a square from a lower one that is not mid-attack.
+        /// </summary>
+        public static int Priority(PieceType t) => t switch
+        {
+            PieceType.Queen => 5, PieceType.Rook => 4, PieceType.Bishop => 3, PieceType.Knight => 2, _ => 1,
+        };
+
+        /// <summary>Free, or held by a lower-priority piece that can be bumped (<paramref name="bumps"/>).</summary>
+        public static bool CanTake(Vector2Int s, EnemyBase e, out bool bumps)
+        {
+            var o = Owner(s);
+            bumps = false;
+            if (o == null || o == e) return true;
+            if (o.IsAttacking || Priority(o.Type) >= Priority(e.Type)) return false;
+            bumps = true;
+            return true;
+        }
+
         public static bool TryGet(EnemyBase e, out Vector2Int square) => byPiece.TryGetValue(e, out square);
 
+        /// <summary>Reserves a square, bumping a lower-priority holder (which then re-plans).</summary>
         public static void Reserve(EnemyBase e, Vector2Int s)
         {
             Release(e, false);
+            if (owners.TryGetValue(s, out var prev) && prev != null && prev != e)
+            {
+                byPiece.Remove(prev);
+                Version++;
+            }
             owners[s] = e;
             byPiece[e] = s;
         }
@@ -101,10 +127,14 @@ namespace KingLastPiece
 
         // ---------------------------------------------------------------- move patterns (offsets from the King's square)
 
-        /// <summary>Black pawns capture diagonally toward rank 1, so the squares above the King come first.</summary>
+        /// <summary>
+        /// Pawns strike from the squares around the King: the diagonals (their capture) and the straight neighbours
+        /// (their push). Black pawns face rank 1, so the squares above the King come first.
+        /// </summary>
         public static readonly Vector2Int[] PawnSlots =
         {
             new Vector2Int(-1, 1), new Vector2Int(1, 1), new Vector2Int(-1, -1), new Vector2Int(1, -1),
+            new Vector2Int(0, 1), new Vector2Int(-1, 0), new Vector2Int(1, 0), new Vector2Int(0, -1),
         };
 
         public static readonly Vector2Int[] KnightSlots =

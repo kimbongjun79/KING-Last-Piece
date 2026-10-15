@@ -641,12 +641,56 @@ namespace KingLastPiece
             bool line = ax == 0 || ay == 0 || ax == ay;
             switch (type)
             {
-                case PieceType.Pawn: return ax == 1 && ay == 1;
+                case PieceType.Pawn: return m == 1;                                               // diagonal capture or straight push
                 case PieceType.Knight: return (ax == 1 && ay == 2) || (ax == 2 && ay == 1);
                 case PieceType.Bishop: return ax == ay && m >= 2 && m <= 3;
                 case PieceType.Rook: return ((ax == 0 || ay == 0) && m >= 2 && m <= 3) || m <= 1;   // ram, or slam when crowded
                 default: return true;                                                            // queen: lines, slam, or a leap from anywhere
             }
+        }
+
+        /// <summary>
+        /// The King at low health (red vignette closing in), then killed by a blow from the front: he shatters into
+        /// physics rubble with white insides. 5 frames.
+        /// </summary>
+        IEnumerator KingFallScenario(string dir)
+        {
+            var hud = game.GetComponent<Hud>();
+            if (hud != null) hud.enabled = true;
+            game.ClearEnemies();
+            var player = game.Player;
+            player.ResetForWave(PlayerStart, 0f);
+            player.GodMode = false;
+            game.Rig.OverridePosition = PlayerStart + new Vector3(3.6f, 2.4f, 3.2f);
+            game.Rig.OverrideLookAt = PlayerStart + new Vector3(0f, 0.9f, -0.6f);
+            for (int f = 0; f < 20; f++) yield return null;
+            player.TakeHit(80f, 0f, player.transform.position + Vector3.forward);
+            Texture2D sheet = null;
+            int tileW = 0, tileH = 0;
+            int[] waits = { 70, 70, 12, 14, 30 };
+            for (int i = 0; i < waits.Length; i++)
+            {
+                if (i == 2) player.TakeHit(999f, 0f, player.transform.position + Vector3.forward * 1.5f);
+                for (int f = 0; f < waits[i]; f++) yield return null;
+                yield return new WaitForEndOfFrame();
+                var tex = ScreenCapture.CaptureScreenshotAsTexture();
+                if (sheet == null)
+                {
+                    tileW = tex.width;
+                    tileH = tex.height;
+                    sheet = new Texture2D(tileW * waits.Length, tileH, TextureFormat.RGB24, false);
+                }
+                if (tex.width == tileW && tex.height == tileH) sheet.SetPixels32(i * tileW, 0, tileW, tileH, tex.GetPixels32());
+                Destroy(tex);
+            }
+            player.GodMode = true;
+            if (sheet != null)
+            {
+                sheet.Apply();
+                File.WriteAllBytes(Path.Combine(dir, "15_King_Fall.png"), sheet.EncodeToPNG());
+                Destroy(sheet);
+            }
+            for (int f = 0; f < 120; f++) yield return null;   // revive (practice mode) before the next scenario
         }
 
         IEnumerator AutoShot(string dir)
@@ -749,6 +793,7 @@ namespace KingLastPiece
             yield return CrumbleScenario(dir);
             yield return GapCloserScenario(dir, stats);
             yield return SlotScenario(dir, stats);
+            yield return KingFallScenario(dir);
 
             File.WriteAllText(Path.Combine(dir, "stats.tsv"), stats.ToString());
             Application.Quit();

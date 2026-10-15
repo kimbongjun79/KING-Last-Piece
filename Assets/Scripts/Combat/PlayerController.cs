@@ -146,6 +146,9 @@ namespace KingLastPiece
 
         public void ResetForWave(Vector3 pos, float yaw)
         {
+            body.gameObject.SetActive(true);   // shattered on death
+            body.localPosition = Vector3.zero;
+            crumbled = false;
             InitActor(100f);
             Stamina = MaxStamina;
             Flasks = MaxFlasks;
@@ -220,8 +223,7 @@ namespace KingLastPiece
             if (state == State.Dead)
             {
                 stateTime += dt;
-                float p = PoseTrack.Curve(Ease.Out, stateTime / 0.9f);
-                ApplyPose(BodyPose.P(tilt: -90f * p + 6f * Mathf.Sin(Mathf.Clamp01(stateTime / 0.9f) * Mathf.PI)));
+                UpdateDeath();
                 return;
             }
             if (Game == null) return;
@@ -693,7 +695,7 @@ namespace KingLastPiece
                     landed = true;
                     Game.ReportDamage(e, w.damage);
                     Vector3 toE = (e.FlatPos - FlatPos).normalized;
-                    Vfx.Hit(e.transform.position + Vector3.up * 1.0f - toE * e.Radius, toE, atk.heavy);
+                    Vfx.Hit(e.Visual.position + Vector3.up * 1.0f - toE * e.Radius, toE, atk.heavy, e.Visual);
                     Sfx.Play(e.IsBoss ? "HIT_Boss" : atk.heavy ? "HIT_Heavy" : "HIT_Light", e.transform.position + Vector3.up);
                     hitCount++;
                     if (w.launch) e.ForceLaunch(transform.position);
@@ -973,6 +975,29 @@ namespace KingLastPiece
             }
         }
 
+        // ---------------------------------------------------------------- death
+
+        const float CrackTime = 0.14f;
+        Vector3 deathAway;
+        float deathForce = 1f;
+        bool crumbled;
+
+        /// <summary>Like the black pieces: a brief shudder, then the King shatters (white inside) along the killing blow.</summary>
+        void UpdateDeath()
+        {
+            if (crumbled) return;
+            if (stateTime < CrackTime)
+            {
+                body.localPosition = new Vector3(Random.Range(-0.05f, 0.05f), 0f, Random.Range(-0.05f, 0.05f));
+                return;
+            }
+            crumbled = true;
+            body.localPosition = Vector3.zero;
+            Crumble.Spawn(body.GetComponentsInChildren<MeshRenderer>(), deathAway, new Color(0.93f, 0.91f, 0.86f), deathForce);
+            body.gameObject.SetActive(false);
+            Game.Rig.Shake(0.5f);
+        }
+
         // ---------------------------------------------------------------- damage
 
         public override bool TakeHit(float damage, float poiseDamage, Vector3 source)
@@ -997,6 +1022,9 @@ namespace KingLastPiece
                 LockTarget = null;
                 Sfx.Play("PL_Death");
                 transform.rotation = Quaternion.LookRotation(-away);
+                deathAway = away;
+                deathForce = Mathf.Clamp(damage / 18f, 0.8f, 2.5f);
+                crumbled = false;
                 Enter(State.Dead);
                 Game.OnPlayerDied();
             }

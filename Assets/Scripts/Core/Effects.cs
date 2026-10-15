@@ -13,6 +13,7 @@ namespace KingLastPiece
             {
                 var t = PieceFactory.Part(PrimitiveType.Cube, null, pos, Vector3.one * Random.Range(0.06f, 0.13f), mat,
                     Random.rotation.eulerAngles);
+                Vfx.Track(t.gameObject);
                 var p = t.gameObject.AddComponent<SparkParticle>();
                 Vector3 dir = Random.onUnitSphere;
                 dir.y = Mathf.Abs(dir.y) + 0.3f;
@@ -248,26 +249,42 @@ namespace KingLastPiece
 namespace KingLastPiece
 {
     /// <summary>
-    /// Shatters a piece into fragments of its real mesh (shell shards with its own material) that collapse like a
-    /// crumbling castle wall: the base gives way first, upper shards follow, everything tumbles, bounces, settles
-    /// and sinks into the board. Fragment count scales with the piece's height, so the rubble matches its size.
-    /// Models whose meshes can't be read (or primitive-built pieces) fall back to a few small stone blocks.
+    /// Shatters a piece into fragments of its real mesh and throws them with physics: each shard is a rigid body
+    /// that flies off along the direction of the last blow (harder blows send it farther), tumbles, bounces on the
+    /// board, settles and sinks away. Shards are open shells, so their inside faces get a solid interior colour
+    /// (black for the black pieces, white for the King). Models whose meshes can't be read fall back to blocks.
     /// </summary>
     public static class Crumble
     {
-        static readonly int CullId = Shader.PropertyToID("_Cull");
-        static readonly Dictionary<Material, Material> twoSided = new Dictionary<Material, Material>();
+        static PhysicsMaterial rubble;
+        static readonly List<Collider> batch = new List<Collider>();
 
-        public static void Spawn(Renderer[] renderers, Vector3 away)
+        static PhysicsMaterial Rubble => rubble != null ? rubble : rubble = new PhysicsMaterial("Rubble")
+        {
+            bounciness = 0.25f, dynamicFriction = 0.6f, staticFriction = 0.7f,
+            bounceCombine = PhysicsMaterialCombine.Average, frictionCombine = PhysicsMaterialCombine.Average,
+        };
+
+        /// <param name="away">Direction of the killing blow (from the attacker through the piece).</param>
+        /// <param name="interior">Colour of the shards' inside faces.</param>
+        /// <param name="force">~1 for a normal hit, up to ~2.5 for a big finisher.</param>
+        public static void Spawn(Renderer[] renderers, Vector3 away, Color interior, float force = 1f)
         {
             if (renderers == null || renderers.Length == 0) return;
             away.y = 0f;
-            if (away.sqrMagnitude > 0.001f) away.Normalize();
+            away = away.sqrMagnitude > 0.001f ? away.normalized : Random.insideUnitSphere.normalized;
+            away.y = 0f;
 
             Bounds b = renderers[0].bounds;
             foreach (var r in renderers) b.Encapsulate(r.bounds);
+            var inside = MaterialLib.Get(interior, 0.15f);
 
-            if (!SpawnShards(renderers, b, away)) SpawnBlocks(b, renderers[0].sharedMaterial, away);
+            batch.Clear();
+            if (!SpawnShards(renderers, b, away, inside, force)) SpawnBlocks(b, renderers[0].sharedMaterial, away, force);
+            // Shards start interpenetrating: they only collide with the world, not with each other.
+            for (int i = 0; i < batch.Count; i++)
+                for (int j = i + 1; j < batch.Count; j++) Physics.IgnoreCollision(batch[i], batch[j]);
+            batch.Clear();
 
             var dust = new Color(0.22f, 0.2f, 0.18f);
             float baseR = Mathf.Max(0.15f, Mathf.Min(b.extents.x, b.extents.z));
@@ -276,7 +293,7 @@ namespace KingLastPiece
         }
 
         /// <summary>Splits the surface into Voronoi-like shards around seed points stacked in height layers.</summary>
-        static bool SpawnShards(Renderer[] renderers, Bounds b, Vector3 away)
+        static bool SpawnShards(Renderer[] renderers, Bounds b, Vector3 away, Material inside, float force)
         {
             var verts = new List<Vector3>();
             var norms = new List<Vector3>();
@@ -338,7 +355,6 @@ namespace KingLastPiece
                 buckets[best].Add(t);
             }
 
-            var shardMat = TwoSided(mat);
             var remap = new Dictionary<int, int>();
             for (int s = 0; s < seeds.Count; s++)
             {
@@ -370,52 +386,71 @@ namespace KingLastPiece
                 centroid /= sv.Count;
                 for (int i = 0; i < sv.Count; i++) sv[i] -= centroid;
 
-                var shardMesh = new Mesh { name = "Shard" };
-                if (sv.Count > 65000) shardMesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
-                shardMesh.SetVertices(sv);
-                shardMesh.SetNormals(sn);
-                shardMesh.SetUVs(0, su);
-                shardMesh.SetTriangles(st, 0);
-                shardMesh.RecalculateBounds();
-                shardMesh.RecalculateTangents();
+                var outer = BuildMesh("Shard", sv, sn, su, st);
+                // Inside faces: same shell, reversed winding and normals, in the interior colour.
+                var inNormals = new List<Vector3>(sn.Count);
+                foreach (var n in sn) inNormals.Add(-n);
+                var inTris = new List<int>(st.Count);
+                for (int i = 0; i < st.Count; i += 3) { inTris.Add(st[i]); inTris.Add(st[i + 2]); inTris.Add(st[i + 1]); }
+                var inner = BuildMesh("ShardInside", sv, inNormals, su, inTris);
 
                 var go = new GameObject("Shard");
                 go.transform.position = centroid;
-                go.AddComponent<MeshFilter>().sharedMesh = shardMesh;
-                go.AddComponent<MeshRenderer>().sharedMaterial = shardMat;
+                go.AddComponent<MeshFilter>().sharedMesh = outer;
+                go.AddComponent<MeshRenderer>().sharedMaterial = mat;
+                var back = new GameObject("Inside");
+                back.transform.SetParent(go.transform, false);
+                back.AddComponent<MeshFilter>().sharedMesh = inner;
+                back.AddComponent<MeshRenderer>().sharedMaterial = inside;
 
                 float h = Mathf.Clamp01((centroid.y - b.min.y) / Mathf.Max(0.01f, b.size.y));
                 Vector3 outward = centroid - new Vector3(b.center.x, centroid.y, b.center.z);
                 outward.y = 0f;
-                outward = outward.sqrMagnitude > 0.0001f ? outward.normalized : Vector3.forward;
+                outward = outward.sqrMagnitude > 0.0001f ? outward.normalized : away;
 
-                var chunk = go.AddComponent<CrumbleChunk>();
-                chunk.ownedMesh = shardMesh;
-                chunk.groundOffset = shardMesh.bounds.extents.magnitude * 0.35f;
-                // Lower shards give way first; the top follows as the support disappears.
-                chunk.delay = h * 0.12f + Random.Range(0f, 0.04f);
-                chunk.velocity = outward * Random.Range(0.5f, 2f) + away * Random.Range(0.2f, 1.4f) +
-                                 Vector3.up * Random.Range(-0.4f, 1.3f) * (1f - h * 0.5f);
-                chunk.spin = Random.onUnitSphere * Random.Range(100f, 420f);
-                chunk.settleTime = Random.Range(1.4f, 2.2f);
+                var box = go.AddComponent<BoxCollider>();
+                box.center = outer.bounds.center;
+                box.size = Vector3.Max(outer.bounds.size, Vector3.one * 0.06f);
+                // Higher shards catch more of the blow; everything bursts a little outward too.
+                Vector3 velocity = away * (Random.Range(3.5f, 6.5f) * force * Mathf.Lerp(0.6f, 1.15f, h)) +
+                                   outward * Random.Range(0.5f, 2f) + Vector3.up * Random.Range(1.5f, 4f) * Mathf.Lerp(0.7f, 1.2f, h);
+                Launch(go, box, velocity, outer.bounds.size.magnitude, outer, inner);
             }
             return true;
         }
 
-        /// <summary>Shards are open shells, so draw both faces.</summary>
-        static Material TwoSided(Material src)
+        static Mesh BuildMesh(string name, List<Vector3> v, List<Vector3> n, List<Vector2> uv, List<int> t)
         {
-            if (src == null) return MaterialLib.Get(PieceFactory.BlackPiece, 0.8f);
-            if (twoSided.TryGetValue(src, out var m) && m != null) return m;
-            m = new Material(src) { name = src.name + "_TwoSided" };
-            if (m.HasProperty(CullId)) m.SetFloat(CullId, 0f);
-            m.doubleSidedGI = true;
-            twoSided[src] = m;
-            return m;
+            var mesh = new Mesh { name = name };
+            if (v.Count > 65000) mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
+            mesh.SetVertices(v);
+            mesh.SetNormals(n);
+            mesh.SetUVs(0, uv);
+            mesh.SetTriangles(t, 0);
+            mesh.RecalculateBounds();
+            return mesh;
         }
 
-        /// <summary>Fallback for pieces without a readable mesh: a modest pile of small blocks.</summary>
-        static void SpawnBlocks(Bounds b, Material mat, Vector3 away)
+        /// <summary>Gives a piece of rubble a rigid body, sends it flying and schedules its clean-up.</summary>
+        static void Launch(GameObject go, Collider col, Vector3 velocity, float size, Mesh outer = null, Mesh inner = null)
+        {
+            col.sharedMaterial = Rubble;
+            batch.Add(col);
+            var rb = go.AddComponent<Rigidbody>();
+            rb.mass = Mathf.Clamp(size * 0.6f, 0.1f, 1.5f);
+            rb.linearDamping = 0.1f;
+            rb.angularDamping = 0.4f;
+            rb.interpolation = RigidbodyInterpolation.Interpolate;
+            rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
+            rb.linearVelocity = velocity;
+            rb.angularVelocity = Random.onUnitSphere * Random.Range(6f, 14f);
+            var chunk = go.AddComponent<CrumbleChunk>();
+            chunk.ownedMeshes = new[] { outer, inner };
+            chunk.settleTime = Random.Range(2.4f, 3.2f);
+        }
+
+        /// <summary>Fallback for pieces without a readable mesh: a modest burst of small blocks.</summary>
+        static void SpawnBlocks(Bounds b, Material mat, Vector3 away, float force)
         {
             Vector3 c = b.center;
             float baseR = Mathf.Max(0.15f, Mathf.Min(b.extents.x, b.extents.z));
@@ -431,70 +466,41 @@ namespace KingLastPiece
                     float s = Random.Range(0.1f, 0.18f);
                     var t = PieceFactory.Part(PrimitiveType.Cube, null, new Vector3(c.x, y, c.z) + dir * r * 0.6f,
                         new Vector3(s, s * 0.8f, s), mat, Random.rotation.eulerAngles);
-                    var chunk = t.gameObject.AddComponent<CrumbleChunk>();
-                    chunk.groundOffset = s * 0.4f;
-                    chunk.delay = h * 0.12f;
-                    chunk.velocity = dir * Random.Range(0.5f, 2f) + away * Random.Range(0.2f, 1.4f) + Vector3.up * Random.Range(-0.4f, 1.2f);
-                    chunk.spin = Random.onUnitSphere * Random.Range(120f, 480f);
-                    chunk.settleTime = Random.Range(1.4f, 2.2f);
+                    var box = t.gameObject.AddComponent<BoxCollider>();
+                    Launch(t.gameObject, box, away * Random.Range(3f, 6f) * force + dir * Random.Range(0.5f, 2f) + Vector3.up * Random.Range(1.5f, 4f), s);
                 }
             }
         }
     }
 
-    /// <summary>One piece of rubble: waits, falls with gravity, bounces on the board, settles and sinks away.</summary>
+    /// <summary>One piece of physics rubble: tumbles freely, then turns kinematic, sinks into the board and goes.</summary>
     public class CrumbleChunk : MonoBehaviour
     {
-        public float delay, settleTime = 1.8f, groundOffset = 0.1f;
-        public Vector3 velocity, spin;
-        public Mesh ownedMesh;  // runtime shard mesh, freed with the chunk
+        public float settleTime = 2.8f;
+        public Mesh[] ownedMeshes;  // runtime shard meshes, freed with the chunk
+        const float SinkTime = 0.6f;
         float age;
+        bool sinking;
 
         void OnDestroy()
         {
-            if (ownedMesh != null) Destroy(ownedMesh);
+            if (ownedMeshes == null) return;
+            foreach (var m in ownedMeshes) if (m != null) Destroy(m);
         }
-        const float Gravity = 18f, SinkTime = 0.6f;
 
         void Update()
         {
-            float dt = Time.deltaTime;
-            if (delay > 0f) { delay -= dt; return; }
-            age += dt;
-
-            if (age > settleTime)
+            age += Time.deltaTime;
+            if (age < settleTime) return;
+            if (!sinking)
             {
-                // Sink into the board and disappear.
-                float p = (age - settleTime) / SinkTime;
-                transform.position += Vector3.down * (0.5f * dt / SinkTime);
-                if (p >= 1f) Destroy(gameObject);
-                return;
+                sinking = true;
+                var rb = GetComponent<Rigidbody>();
+                if (rb != null) rb.isKinematic = true;
+                foreach (var c in GetComponentsInChildren<Collider>()) c.enabled = false;
             }
-
-            velocity.y -= Gravity * dt;
-            transform.position += velocity * dt;
-            transform.Rotate(spin * dt, Space.World);
-
-            float ground = groundOffset;
-            if (transform.position.y < ground)
-            {
-                var p = transform.position;
-                p.y = ground;
-                transform.position = p;
-                if (velocity.y < -1.2f)
-                {
-                    velocity.y = -velocity.y * 0.3f;
-                    velocity.x *= 0.55f;
-                    velocity.z *= 0.55f;
-                    spin *= 0.5f;
-                }
-                else
-                {
-                    velocity = Vector3.Lerp(velocity, Vector3.zero, 1f - Mathf.Exp(-10f * dt));
-                    velocity.y = 0f;
-                    spin = Vector3.Lerp(spin, Vector3.zero, 1f - Mathf.Exp(-8f * dt));
-                }
-            }
+            transform.position += Vector3.down * (0.5f * Time.deltaTime / SinkTime);
+            if (age >= settleTime + SinkTime) Destroy(gameObject);
         }
     }
 }

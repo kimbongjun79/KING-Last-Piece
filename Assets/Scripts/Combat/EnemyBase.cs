@@ -21,6 +21,8 @@ namespace KingLastPiece
         }
 
         public PieceType Type { get; private set; }
+        /// <summary>The piece's model (lifts, tilts and flies with it; hit effects follow this).</summary>
+        public Transform Visual => model != null ? model : transform;
         public string DisplayName { get; protected set; } = "Pawn";
         public bool IsBoss { get; protected set; }
         public float LastHitTime { get; private set; } = -100f;
@@ -97,6 +99,8 @@ namespace KingLastPiece
         protected AttackPlan plan;
         protected PlayerController Player => Game != null ? Game.Player : null;
         protected bool moving;
+        /// <summary>Raise the model this frame (e.g. a hop); the highest request wins.</summary>
+        protected float ModelLift { set => modelY = Mathf.Max(modelY, value); }
 
         Transform model;
         Vector3 modelBaseScale;
@@ -110,6 +114,11 @@ namespace KingLastPiece
         int airHits;
         bool wasMoving;  // for the slide sound when a piece starts moving
         float modelHeight = 1.5f;
+        float baseRadius = 0.4f;     // model base radius: a tilted piece pivots on its rim
+        float lastHitDamage;         // the killing blow sets how hard the rubble flies
+        // Fighting-game hit reel: the top snaps back (and twists) on each hit, then springs upright.
+        float reelPitch, reelPitchVel, reelYaw, reelYawVel;
+        readonly System.Collections.Generic.HashSet<EnemyBase> shoved = new System.Collections.Generic.HashSet<EnemyBase>();
         Vector3 flinchPush, airKnock;
         static readonly Color WindupGlow = new Color(1.6f, 0.12f, 0.04f);
 
@@ -130,6 +139,7 @@ namespace KingLastPiece
                 var b = rends[0].bounds;
                 foreach (var r in rends) b.Encapsulate(r.bounds);
                 modelHeight = b.size.y;
+                baseRadius = Mathf.Max(0.15f, Mathf.Min(b.extents.x, b.extents.z) * 0.85f);
             }
             InitActor(MaxHealth);
             poise = maxPoise;
@@ -234,6 +244,12 @@ namespace KingLastPiece
                 modelY = Mathf.Max(modelY, Mathf.Abs(Mathf.Sin(hopPhase)) * 0.14f);
             }
 
+            UpdateReel(dt);
+            modelTilt *= Quaternion.Euler(reelPitch, reelYaw, 0f);
+            // A tilted piece pivots on its base rim: lift it so it never sinks into the board.
+            float tilt = Quaternion.Angle(Quaternion.identity, modelTilt);
+            modelY += baseRadius * Mathf.Sin(Mathf.Min(tilt, 90f) * Mathf.Deg2Rad);
+
             model.localPosition = new Vector3(0f, modelY, 0f);
             model.localRotation = modelTilt * vulnWobble;
             model.localScale = new Vector3(modelBaseScale.x / Mathf.Sqrt(squash), modelBaseScale.y * squash, modelBaseScale.z / Mathf.Sqrt(squash));
@@ -320,7 +336,8 @@ namespace KingLastPiece
 
         /// <summary>
         /// Keeps this piece's reserved square: the nearest free square its <paramref name="pattern"/> (offsets from the
-        /// King's square) attacks from, or — when those are all taken — a waiting square 3–4 squares out, re-checked
+        /// King's square) attacks from — taking it from a lower-priority piece if need be — or, when those are all
+        /// taken, a waiting square 2–3 squares out, re-checked
         /// often so a freed slot is taken over. <paramref name="penalty"/> adds a cost per offset.
         /// </summary>
         protected void UpdateSlot(Vector2Int[] pattern, System.Func<Vector2Int, float> penalty = null)
@@ -340,8 +357,8 @@ namespace KingLastPiece
             foreach (var o in pattern)
             {
                 var s = king + o;
-                if (!BoardSlots.OnBoard(s) || !BoardSlots.IsFreeFor(s, this)) continue;
-                float cost = (BoardSlots.Center(s) - FlatPos).magnitude + (penalty != null ? penalty(o) : 0f);
+                if (!BoardSlots.OnBoard(s) || !BoardSlots.CanTake(s, this, out bool bumps)) continue;
+                float cost = (BoardSlots.Center(s) - FlatPos).magnitude + (penalty != null ? penalty(o) : 0f) + (bumps ? 1.5f : 0f);
                 if (cost < bestCost) { bestCost = cost; best = s; }
             }
             if (bestCost < float.MaxValue)
@@ -351,13 +368,13 @@ namespace KingLastPiece
                 return;
             }
 
-            // Every attack square is taken: wait a few squares out, as close to where we are as possible.
+            // Every attack square is taken: wait close by (2–3 squares out), as near to where we are as possible.
             for (int x = 0; x < BoardSlots.Size; x++)
             for (int y = 0; y < BoardSlots.Size; y++)
             {
                 var s = new Vector2Int(x, y);
                 int ring = BoardSlots.Chebyshev(s, king);
-                if (ring < 3 || ring > 4 || !BoardSlots.IsFreeFor(s, this)) continue;
+                if (ring < 2 || ring > 3 || !BoardSlots.IsFreeFor(s, this)) continue;
                 float cost = (BoardSlots.Center(s) - FlatPos).magnitude;
                 if (cost < bestCost) { bestCost = cost; best = s; }
             }
@@ -387,6 +404,7 @@ namespace KingLastPiece
 
         protected void BeginAttack(AttackPlan p)
         {
+            shoved.Clear();
             readyFrame = -10;
             ClearTelegraph();
             plan = p;
@@ -498,6 +516,7 @@ namespace KingLastPiece
                     transform.position = atkStart + plan.dir * (plan.length * e);
                     modelTilt = Quaternion.Euler(16f, 0f, 0f);
                     TryHitPlayer(FlatPos, plan.radius);
+                    if (Type == PieceType.Rook && plan.kind == AtkKind.Dash) ShovePawns();
                     if (plan.kind == AtkKind.Dash && Random.value < 0.5f)
                         Effects.Sparks(transform.position + Vector3.up * 0.1f, new Color(0.6f, 0.1f, 0.05f), 1, 2f);
                     if (p >= 1f) FinishAttack();
@@ -671,6 +690,7 @@ namespace KingLastPiece
             Health -= damage;
             LastHitTime = Time.time;
             Flash(new Color(1.6f, 1.5f, 1.3f), 0.09f);
+            lastHitDamage = damage;
 
             if (Health <= 0f)
             {
@@ -681,6 +701,9 @@ namespace KingLastPiece
 
             // Being swung, thrown or getting up: damage only, no reaction.
             if (state == EState.Grabbed || state == EState.Launched || state == EState.Getup) return true;
+
+            // Airborne (or about to be popped up): a big snap-back and twist; on the ground a smaller one.
+            Reel(state == EState.Airborne || (stagger != null && stagger.Vulnerable) ? 1f : 0.55f);
 
             if (stagger != null)
             {
@@ -816,14 +839,79 @@ namespace KingLastPiece
             }
         }
 
-        /// <summary>Lie on the board, then stand back up. Getting up resets the gauge.</summary>
+        /// <summary>Kicks the hit reel: the top snaps back away from the King and twists (stronger in the air).</summary>
+        void Reel(float strength)
+        {
+            reelPitchVel -= 950f * strength;
+            reelYawVel += Random.Range(-1f, 1f) * 800f * strength;
+        }
+
+        /// <summary>Damped springs that bring the reel back upright.</summary>
+        void UpdateReel(float dt)
+        {
+            const float Stiffness = 260f, Damping = 19f;
+            dt = Mathf.Min(dt, 0.05f);
+            reelPitchVel += (-Stiffness * reelPitch - Damping * reelPitchVel) * dt;
+            reelPitch += reelPitchVel * dt;
+            reelYawVel += (-Stiffness * reelYaw - Damping * reelYawVel) * dt;
+            reelYaw += reelYawVel * dt;
+        }
+
+        /// <summary>
+        /// A rook's ram shoulders pawns out of its way: any pawn just ahead on the line is knocked aside (to the side
+        /// it stands on) and the rook keeps charging.
+        /// </summary>
+        void ShovePawns()
+        {
+            Vector3 side = Vector3.Cross(Vector3.up, plan.dir);
+            foreach (var e in Game.Enemies)
+            {
+                if (e == null || e == this || e.GetType() != typeof(PawnEnemy) || shoved.Contains(e)) continue;
+                Vector3 rel = e.FlatPos - FlatPos;
+                float along = Vector3.Dot(rel, plan.dir), across = Vector3.Dot(rel, side);
+                if (along < -0.3f || along > Radius + e.Radius + 1.2f || Mathf.Abs(across) > plan.radius + e.Radius + 0.3f) continue;
+                shoved.Add(e);
+                float s = Mathf.Abs(across) > 0.05f ? Mathf.Sign(across) : (Random.value < 0.5f ? -1f : 1f);
+                e.Shove(side * (s * 16f) + plan.dir * 3f);
+            }
+        }
+
+        /// <summary>Knocked aside (by a charging rook): cancels what it was doing and slides off with a stagger.</summary>
+        public void Shove(Vector3 push)
+        {
+            if (IsDead || state == EState.Spawning || state == EState.Grabbed || state == EState.Launched ||
+                state == EState.Airborne || state == EState.Getup) return;
+            CancelAction();
+            BoardSlots.Release(this);
+            flinchPush = push;
+            currentStagger = 0.45f;
+            Enter(EState.Stagger);
+            Reel(0.8f);
+            Effects.Sparks(transform.position + Vector3.up * 0.6f, new Color(0.6f, 0.55f, 0.5f), 8, 4f);
+            Sfx.Play("STG_Flinch", transform.position);
+        }
+
+        /// <summary>
+        /// Lie on the board, then spring back up like a jump (the piece pops off the floor while it swings upright and
+        /// lands with a squash). Getting up resets the gauge.
+        /// </summary>
         void UpdateGetup()
         {
             float t = stateTime;
             float lieTime = GetupLie + bonusLie;
-            float lie = t < lieTime ? 1f : 1f - PoseTrack.Curve(Ease.InOut, (t - lieTime) / GetupRise);
             if (t >= lieTime && t - Time.deltaTime < lieTime) Sfx.Play("STG_Getup", transform.position);
-            modelTilt = Quaternion.Euler(-85f * lie, 0f, 0f);
+            if (t < lieTime)
+            {
+                modelTilt = Quaternion.Euler(-85f, 0f, 0f);
+            }
+            else
+            {
+                float p = Mathf.Clamp01((t - lieTime) / GetupRise);
+                float upright = PoseTrack.Curve(Ease.Out, Mathf.Clamp01(p / 0.6f));
+                modelTilt = Quaternion.Euler(-85f * (1f - upright), 0f, 0f);
+                modelY = Mathf.Sin(p * Mathf.PI) * 0.75f;
+                if (p > 0.8f) squash = Mathf.Lerp(0.8f, 1f, (p - 0.8f) / 0.2f);
+            }
             if (t >= lieTime + GetupRise)
             {
                 bonusLie = 0f;
@@ -894,7 +982,9 @@ namespace KingLastPiece
                     return;
                 }
                 crumbled = true;
-                Crumble.Spawn(model.GetComponentsInChildren<Renderer>(), deathAway);
+                // Rubble flies off along the killing blow; harder blows throw it farther. Black inside.
+                Crumble.Spawn(model.GetComponentsInChildren<Renderer>(), deathAway, new Color(0.02f, 0.02f, 0.025f),
+                    Mathf.Clamp(lastHitDamage / 18f, 0.8f, 2.5f));
                 Sfx.Play("EN_Crumble", transform.position);
                 Sfx.Play("EN_Debris", transform.position);
                 model.gameObject.SetActive(false);
