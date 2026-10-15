@@ -3,8 +3,8 @@ using UnityEngine;
 namespace KingLastPiece
 {
     /// <summary>
-    /// Rook: heavy, armored. Slides along ranks and files to a square 2–3 squares out on the King's rank or file,
-    /// then rams down that line. When the King steps next to it, it slams the squares around itself instead.
+    /// Rook: heavy, armored. Slides along ranks and files to the nearest square on the King's rank or file (2 squares
+    /// out or more), then rams down that line. When the King steps next to it, it slams the squares around itself.
     /// </summary>
     public class RookEnemy : EnemyBase
     {

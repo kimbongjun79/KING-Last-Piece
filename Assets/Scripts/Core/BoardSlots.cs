@@ -143,15 +143,17 @@ namespace KingLastPiece
             new Vector2Int(-1, -2), new Vector2Int(-2, -1), new Vector2Int(-2, 1), new Vector2Int(-1, 2),
         };
 
-        public static readonly Vector2Int[] BishopSlots = Lines(diagonal: true, orthogonal: false);
-        public static readonly Vector2Int[] RookSlots = Lines(diagonal: false, orthogonal: true);
-        public static readonly Vector2Int[] QueenSlots = Lines(diagonal: true, orthogonal: true);
+        // Rooks and bishops strike from anywhere on their lines (2 squares out up to the far edge): a piece already on the
+        // King's rank/file or diagonal charges from where it is. The queen keeps to 2–3 squares.
+        public static readonly Vector2Int[] BishopSlots = Lines(diagonal: true, orthogonal: false, 2, 7);
+        public static readonly Vector2Int[] RookSlots = Lines(diagonal: false, orthogonal: true, 2, 7);
+        public static readonly Vector2Int[] QueenSlots = Lines(diagonal: true, orthogonal: true, 2, 3);
 
-        /// <summary>Line pieces strike from 2–3 squares away (room to build up the charge).</summary>
-        static Vector2Int[] Lines(bool diagonal, bool orthogonal)
+        /// <summary>Squares on the lines through the King, <paramref name="minK"/>..<paramref name="maxK"/> squares out (at least 2: room to charge).</summary>
+        static Vector2Int[] Lines(bool diagonal, bool orthogonal, int minK, int maxK)
         {
             var list = new List<Vector2Int>();
-            for (int k = 2; k <= 3; k++)
+            for (int k = minK; k <= maxK; k++)
             {
                 if (orthogonal)
                 {

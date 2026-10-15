@@ -406,7 +406,39 @@ namespace KingLastPiece
                 target = FlatPos + new Vector3(Mathf.Sign(d.x) * step, 0f, Mathf.Sign(d.z) * step);   // along the diagonal
             }
             else if (gait == Gait.Direct && DetourAroundKing) target = AroundKing(target);
+            if (DetourAroundKing) target = AroundPieces(target);
             MoveTowards(target, speed, dt);
+        }
+
+        /// <summary>
+        /// Another piece standing in the way: step around it on the side away from the King instead of shoving into
+        /// it (and getting pushed back). Once past it, the piece heads for its target again.
+        /// </summary>
+        Vector3 AroundPieces(Vector3 target)
+        {
+            Vector3 pos = FlatPos, to = target - pos;
+            float len = to.magnitude;
+            if (len < 0.05f || Game == null) return target;
+            Vector3 dir = to / len;
+            EnemyBase block = null;
+            float nearest = float.MaxValue;
+            foreach (var o in Game.Enemies)
+            {
+                if (o == null || o == this || o.IsDead || o.IgnoresCollision) continue;
+                Vector3 rel = o.FlatPos - pos;
+                float along = Vector3.Dot(rel, dir);
+                if (along <= 0.05f || along > Mathf.Min(len + 0.3f, 2.5f)) continue;
+                float across = Mathf.Abs(Vector3.Cross(dir, rel).y);
+                if (across > Radius + o.Radius + 0.25f) continue;
+                if (along < nearest) { nearest = along; block = o; }
+            }
+            if (block == null) return target;
+
+            Vector3 side = Vector3.Cross(Vector3.up, dir);
+            float clear = Radius + block.Radius + 0.45f;
+            Vector3 a = block.FlatPos + side * clear, b = block.FlatPos - side * clear;
+            Vector3 king = Player != null ? Player.FlatPos : pos;
+            return (a - king).sqrMagnitude >= (b - king).sqrMagnitude ? a : b;   // the side farther from the King
         }
 
         /// <summary>

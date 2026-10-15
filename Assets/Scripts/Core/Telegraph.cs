@@ -6,9 +6,9 @@ namespace KingLastPiece
     /// <summary>
     /// Enemy attack warning, drawn on the chessboard itself while a piece winds up:
     /// <list type="bullet">
-    /// <item>Lit squares — the attacker's own square and every board square the attack will reach glow red and fills from its centre outward as the
-    /// wind-up runs; a fully red square means "now". Charges fill square by square from the attacker to the end of
-    /// the charge.</item>
+    /// <item>Lit squares — the attacker's own square (knights excepted) and every square the attack will reach glow
+    /// red and fill from the centre outward as the wind-up runs; a fully red square means "now". Charges fill square
+    /// by square from the attacker to the end of the charge; a knight's cross fills its centre, then the arms.</item>
     /// <item>Timing — for the last <see cref="FlashTime"/> seconds the square outlines and the route blink white: the
     /// cue for a perfect dodge.</item>
     /// <item>Route — a dotted path that lights up in sequence: along the line for charges and thrusts, the L for a
@@ -26,6 +26,7 @@ namespace KingLastPiece
         class Cell
         {
             public Vector2Int square;
+            public Vector2Int grow;   // zero: fill grows from the centre; else it grows from the edge facing -grow toward grow
             public Transform fill;
             public Transform[] edges;
         }
@@ -74,7 +75,10 @@ namespace KingLastPiece
             var t = Create("Telegraph_Leap", Kind.Leap, windup);
             t.start = Flat(from);
             t.center = Flat(target);
-            t.RebuildCells(WithSquare(CrossSquares(BoardSlots.ToSquare(t.center), t.scratch), BoardSlots.ToSquare(t.start)));
+            // The cross only (not the knight's own square): the centre fills first, then each arm grows outward from it.
+            var landing = BoardSlots.ToSquare(t.center);
+            t.RebuildCells(CrossSquares(landing, t.scratch));
+            foreach (var c in t.cells) c.grow = c.square - landing;
             t.BuildKnightRoute();
             if (ghostModel != null) t.BuildGhost(ghostModel);
             return t;
@@ -292,10 +296,25 @@ namespace KingLastPiece
             for (int i = 0; i < n; i++)
             {
                 var c = cells[i];
-                // Centre-out fill. A charge fills its squares one after another, from the attacker to the end.
-                float f = kind == Kind.Line ? Mathf.Clamp01(p * n - i) : p;
+                // Centre-out fill. A charge fills its squares one after another, from the attacker to the end; a knight's
+                // cross fills its centre first, then the arms outward.
+                float f = kind == Kind.Line ? Mathf.Clamp01(p * n - i)
+                        : kind == Kind.Leap ? (c.grow == Vector2Int.zero ? Mathf.Clamp01(p * 2f) : Mathf.Clamp01(p * 2f - 1f))
+                        : p;
                 float s = Mathf.Max(0.001f, size * PoseTrack.Curve(Ease.Out, f));
-                c.fill.localScale = new Vector3(s, 0.01f, s);
+                Vector3 sc = BoardSlots.Center(c.square) + Vector3.up * 0.028f;
+                if (c.grow == Vector2Int.zero)
+                {
+                    c.fill.position = sc;
+                    c.fill.localScale = new Vector3(s, 0.01f, s);
+                }
+                else
+                {
+                    // Anchored on the edge nearest the cross centre, growing outward.
+                    var g = new Vector3(c.grow.x, 0f, c.grow.y);
+                    c.fill.position = sc - g * (size * 0.5f) + g * (s * 0.5f);
+                    c.fill.localScale = c.grow.x != 0 ? new Vector3(s, 0.01f, size) : new Vector3(size, 0.01f, s);
+                }
                 foreach (var e in c.edges)
                 {
                     var r = e.GetComponent<Renderer>();

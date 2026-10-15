@@ -3,8 +3,8 @@ using UnityEngine;
 namespace KingLastPiece
 {
     /// <summary>
-    /// Bishop: glides along diagonals to a square 2–3 squares out on one of the King's diagonals, then charges
-    /// down that diagonal through the King's square to the board edge.
+    /// Bishop: glides along diagonals to the nearest square on one of the King's diagonals (from 2 squares out up to the
+    /// far edge), then charges down that diagonal through the King's square to the board edge.
     /// </summary>
     public class BishopEnemy : EnemyBase
     {
