@@ -4,9 +4,9 @@ namespace KingLastPiece
 {
     /// <summary>
     /// Pawn: foot soldier, outside the board-slot system. It walks straight at the King, stops about one square away,
-    /// and while it waits for its turn circles him at that distance; then it thrusts at him — the direction is fixed
-    /// the moment the wind-up starts. Pawns have their own attack turns (two at a time), so they keep pressing while the
-    /// bigger pieces take theirs. Slow wind-up: dangerous in numbers, punishable alone.
+    /// and while it waits for its turn circles him at that distance; then it thrusts along the nearest of the 8 chess
+    /// directions toward him — fixed the moment the wind-up starts. Pawns have their own attack turns (two at a time),
+    /// so they keep pressing while the bigger pieces take theirs. Slow wind-up: dangerous in numbers, punishable alone.
     /// </summary>
     public class PawnEnemy : EnemyBase
     {
@@ -40,9 +40,10 @@ namespace KingLastPiece
 
             if (CanAttackNow)
             {
+                // Thrust along the nearest of the 8 chess directions (straight or diagonal), fixed from here on.
                 BeginAttack(new AttackPlan
                 {
-                    kind = AtkKind.Lunge, dir = to, windup = Windup, active = 0.2f, recover = 0.8f,
+                    kind = AtkKind.Lunge, dir = BoardSlots.Snap8(to), windup = Windup, active = 0.2f, recover = 0.8f,
                     length = Mathf.Max(Reach, d + 0.4f), damage = 12f, poise = 15f, radius = 0.7f, trackUntil = 0f
                 });
                 cooldown = Random.Range(2.6f, 3.8f);

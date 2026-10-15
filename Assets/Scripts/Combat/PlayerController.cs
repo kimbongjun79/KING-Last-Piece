@@ -822,7 +822,9 @@ namespace KingLastPiece
             transform.position += knockback * dt;
             knockback = Vector3.Lerp(knockback, Vector3.zero, 1f - Mathf.Exp(-8f * dt));
             float p = Mathf.Clamp01(stateTime / 0.4f);
-            ApplyPose(BodyPose.P(tilt: -18f * Mathf.Sin(p * Mathf.PI)));
+            // Lean away from the blow (whichever way the King faces), then spring back.
+            float heading = Vector3.SignedAngle(transform.forward, hitAway, Vector3.up);
+            ApplyPose(BodyPose.P(tilt: 24f * Mathf.Sin(p * Mathf.PI), heading: heading));
             if (stateTime >= 0.4f)
             {
                 ApplyPose(default);
@@ -980,6 +982,7 @@ namespace KingLastPiece
 
         // ---------------------------------------------------------------- death
 
+        Vector3 hitAway = Vector3.back;   // direction of the last blow (the King leans and slides that way)
         const float CrackTime = 0.14f;
         Vector3 deathAway;
         float deathForce = 1f;
@@ -1033,7 +1036,8 @@ namespace KingLastPiece
             }
             else
             {
-                knockback = away * (4f + poiseDamage * 0.06f);
+                hitAway = away;
+                knockback = away * (5.5f + poiseDamage * 0.08f);   // shoved away from the blow
                 Sfx.Play(damage >= 24f ? "PL_Hurt_Heavy" : "PL_Hurt", FlatPos);
                 Enter(State.Stagger);
             }
