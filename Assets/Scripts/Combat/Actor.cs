@@ -25,8 +25,8 @@ namespace KingLastPiece
 
         readonly List<Renderer> tintable = new List<Renderer>();
         MaterialPropertyBlock mpb;
-        Color glow = Color.black, flashColor;
-        float flashTimer;
+        Color glow = Color.black, flashColor, queuedColor;
+        float flashTimer, queuedTimer;
         Color applied = new Color(-1f, 0f, 0f);
 
         protected void InitActor(float hp)
@@ -45,6 +45,15 @@ namespace KingLastPiece
         {
             flashColor = c;
             flashTimer = duration;
+            queuedTimer = 0f;
+        }
+
+        /// <summary>A second flash that starts when the current one ends (e.g. the struck flash, then a state flash).</summary>
+        public void FlashAfter(Color c, float duration)
+        {
+            if (flashTimer <= 0f) { Flash(c, duration); return; }
+            queuedColor = c;
+            queuedTimer = duration;
         }
 
         public void SetGlow(Color c) => glow = c;
@@ -53,6 +62,12 @@ namespace KingLastPiece
         {
             // Unscaled so flashes survive hit-stop; fixed step when frames are being captured.
             if (flashTimer > 0f) flashTimer -= Time.captureDeltaTime > 0f ? Time.captureDeltaTime : Time.unscaledDeltaTime;
+            if (flashTimer <= 0f && queuedTimer > 0f)
+            {
+                flashColor = queuedColor;
+                flashTimer = queuedTimer;
+                queuedTimer = 0f;
+            }
             Color c = flashTimer > 0f ? flashColor : glow;
             if (c == applied || mpb == null) return;
             applied = c;

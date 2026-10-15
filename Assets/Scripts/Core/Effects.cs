@@ -287,8 +287,6 @@ namespace KingLastPiece
             batch.Clear();
 
             var dust = new Color(0.22f, 0.2f, 0.18f);
-            float baseR = Mathf.Max(0.15f, Mathf.Min(b.extents.x, b.extents.z));
-            Effects.Shockwave(new Vector3(b.center.x, 0f, b.center.z), baseR * 1.6f, dust, 0.45f);
             Effects.Sparks(new Vector3(b.center.x, b.min.y + 0.2f, b.center.z), dust, 18, 4f);
         }
 

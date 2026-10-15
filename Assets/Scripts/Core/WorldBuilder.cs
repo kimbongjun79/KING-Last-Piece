@@ -9,6 +9,9 @@ namespace KingLastPiece
     /// </summary>
     public static class WorldBuilder
     {
+        /// <summary>Rendering layer the board squares add for decals (crack projectors target only this layer).</summary>
+        public const uint BoardDecalLayer = 1u << 1;
+
         public static ArenaBoard BuildArena()
         {
             var root = new GameObject("Arena").transform;
@@ -70,12 +73,17 @@ namespace KingLastPiece
         }
 
         /// <summary>
-        /// Static colliders for physics rubble: the board top (y = 0), the frame rails and the hall floor. Pieces and the
-        /// King never use colliders; only shards do. Idempotent, so older baked scenes get them at runtime.
+        /// Runtime board setup: static colliders for physics rubble (board top at y = 0, frame rails, hall floor — pieces
+        /// and the King never use colliders) and the decal layer on the squares. Idempotent, so older baked scenes get it.
         /// </summary>
         public static void EnsureColliders(ArenaBoard board)
         {
             var root = board.transform;
+            foreach (var sq in board.squares)
+            {
+                var r = sq != null ? sq.GetComponent<Renderer>() : null;
+                if (r != null) r.renderingLayerMask |= BoardDecalLayer;
+            }
             if (root.Find("Board Collider") != null) return;
             var top = new GameObject("Board Collider").AddComponent<BoxCollider>();
             top.transform.SetParent(root, false);

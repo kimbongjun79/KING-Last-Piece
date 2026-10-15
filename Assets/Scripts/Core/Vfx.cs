@@ -690,6 +690,8 @@ namespace KingLastPiece
             float s = size * Mathf.Lerp(0.85f, 1.15f, Random.value);
             dp.size = new Vector3(s, s, depth);
             dp.pivot = Vector3.zero;
+            // Decal layers: the cracks land on the board squares only, never on the King or the pieces.
+            dp.renderingLayerMask = WorldBuilder.BoardDecalLayer;
             // Only the board's flat top: steep surfaces (piece sides) are skipped.
             dp.startAngleFade = 25f;
             dp.endAngleFade = 45f;

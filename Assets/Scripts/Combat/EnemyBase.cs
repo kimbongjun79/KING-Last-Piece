@@ -121,6 +121,13 @@ namespace KingLastPiece
         readonly System.Collections.Generic.HashSet<EnemyBase> shoved = new System.Collections.Generic.HashSet<EnemyBase>();
         Vector3 flinchPush, airKnock;
         static readonly Color WindupGlow = new Color(1.6f, 0.12f, 0.04f);
+        /// <summary>
+        /// Flashes in a deep crimson — darker and cooler than the bright orange-red wind-up glow, so a struck or broken
+        /// piece never reads as one about to attack, and still stands out against the white hit effects.
+        /// Struck: a faint crimson pulse. Guard broken (Vulnerable): the full crimson flash right after it.
+        /// </summary>
+        static readonly Color HitFlash = new Color(0.5f, 0.02f, 0.06f);
+        static readonly Color VulnerableFlash = new Color(1.15f, 0.03f, 0.12f);
 
         public void Setup(PieceType type, Transform modelRoot)
         {
@@ -221,7 +228,7 @@ namespace KingLastPiece
                 case EState.Stagger:
                     transform.position += flinchPush * dt;
                     flinchPush = Vector3.Lerp(flinchPush, Vector3.zero, 1f - Mathf.Exp(-10f * dt));
-                    modelTilt = Quaternion.Euler(-20f * Mathf.Sin(Mathf.Clamp01(stateTime / currentStagger) * Mathf.PI), 0f, 0f);
+                    modelTilt = FallTilt(20f * Mathf.Sin(Mathf.Clamp01(stateTime / currentStagger) * Mathf.PI));
                     if (stateTime >= currentStagger)
                     {
                         Enter(EState.Move);
@@ -245,7 +252,7 @@ namespace KingLastPiece
             }
 
             UpdateReel(dt);
-            modelTilt *= Quaternion.Euler(reelPitch, reelYaw, 0f);
+            modelTilt *= FallTilt(reelPitch) * Quaternion.Euler(0f, reelYaw, 0f);
             // A tilted piece pivots on its base rim: lift it so it never sinks into the board.
             float tilt = Quaternion.Angle(Quaternion.identity, modelTilt);
             modelY += baseRadius * Mathf.Sin(Mathf.Min(tilt, 90f) * Mathf.Deg2Rad);
@@ -673,6 +680,7 @@ namespace KingLastPiece
             {
                 modelY = 0f;
                 Vfx.GroundImpact(FlatPos, 2f, 1f);
+                AimFallAwayFromKing();
                 Sfx.Play("THR_Land", transform.position);
                 Game.Rig.Shake(0.4f);
                 // Crash down and lie on the board before getting up (damage only, no stagger reaction).
@@ -690,7 +698,7 @@ namespace KingLastPiece
             hitFrame = Time.frameCount;
             Health -= damage;
             LastHitTime = Time.time;
-            Flash(new Color(1.6f, 1.5f, 1.3f), 0.09f);
+            Flash(HitFlash, 0.1f);
             lastHitDamage = damage;
 
             if (Health <= 0f)
@@ -757,6 +765,7 @@ namespace KingLastPiece
 
         void Flinch(Vector3 source, float duration)
         {
+            AimFallAwayFromKing();
             Sfx.Play(IsBoss ? "QUEEN_Stagger" : "STG_Flinch", transform.position);
             CancelAction();
             currentStagger = duration;
@@ -784,6 +793,7 @@ namespace KingLastPiece
         /// </summary>
         void LaunchUp(Vector3 source, bool forced = false)
         {
+            AimFallAwayFromKing();
             CancelAction();
             bool alreadyAirborne = state == EState.Airborne;
             Vector3 away = FlatPos - new Vector3(source.x, 0f, source.z);
@@ -830,7 +840,7 @@ namespace KingLastPiece
             airKnock = Vector3.Lerp(airKnock, Vector3.zero, 1f - Mathf.Exp(-2f * dt));
             modelY = Mathf.Max(0f, airHeight);
             // Tumble backwards while in the air.
-            modelTilt = Quaternion.Euler(Mathf.Clamp(-25f - 40f * airHits + airVy * 4f, -110f, 0f), 0f, 0f);
+            modelTilt = FallTilt(Mathf.Clamp(25f + 40f * airHits - airVy * 4f, 0f, 110f));
 
             if (airHeight <= 0f && airVy < 0f)
             {
@@ -841,6 +851,24 @@ namespace KingLastPiece
                 Enter(EState.Getup);
             }
         }
+
+        // Falls, reels and knock-downs always tip the piece away from the King: tilting about this axis (in the piece's
+        // own space, set when it is struck) moves the top away from him.
+        Vector3 fallAxis = Vector3.left;
+
+        void AimFallAwayFromKing()
+        {
+            Vector3 away = Player != null ? FlatPos - Player.FlatPos : -transform.forward;
+            away.y = 0f;
+            if (away.sqrMagnitude < 0.0001f) away = -transform.forward;
+            Vector3 local = transform.InverseTransformDirection(away.normalized);
+            local.y = 0f;
+            if (local.sqrMagnitude < 0.0001f) local = Vector3.back;
+            fallAxis = Vector3.Cross(Vector3.up, local.normalized);
+        }
+
+        /// <summary>Tilts the top <paramref name="degrees"/> away from the King (see <see cref="AimFallAwayFromKing"/>).</summary>
+        Quaternion FallTilt(float degrees) => Quaternion.AngleAxis(degrees, fallAxis);
 
         // One hit, one set of effects: a heavy that also breaks the guard and launches would otherwise stack them.
         int hitFrame = -1, diamondFrame = -1;
@@ -857,7 +885,8 @@ namespace KingLastPiece
         /// <summary>Kicks the hit reel: the top snaps back away from the King and twists (stronger in the air).</summary>
         void Reel(float strength)
         {
-            reelPitchVel -= 950f * strength;
+            AimFallAwayFromKing();
+            reelPitchVel += 950f * strength;
             reelYawVel += Random.Range(-1f, 1f) * 800f * strength;
         }
 
@@ -898,6 +927,7 @@ namespace KingLastPiece
                 state == EState.Airborne || state == EState.Getup) return;
             CancelAction();
             BoardSlots.Release(this);
+            AimFallAwayFromKing();
             flinchPush = push;
             currentStagger = 0.45f;
             Enter(EState.Stagger);
@@ -917,13 +947,13 @@ namespace KingLastPiece
             if (t >= lieTime && t - Time.deltaTime < lieTime) Sfx.Play("STG_Getup", transform.position);
             if (t < lieTime)
             {
-                modelTilt = Quaternion.Euler(-85f, 0f, 0f);
+                modelTilt = FallTilt(85f);
             }
             else
             {
                 float p = Mathf.Clamp01((t - lieTime) / GetupRise);
                 float upright = PoseTrack.Curve(Ease.Out, Mathf.Clamp01(p / 0.6f));
-                modelTilt = Quaternion.Euler(-85f * (1f - upright), 0f, 0f);
+                modelTilt = FallTilt(85f * (1f - upright));
                 modelY = Mathf.Sin(p * Mathf.PI) * 0.75f;
                 if (p > 0.8f) squash = Mathf.Lerp(0.8f, 1f, (p - 0.8f) / 0.2f);
             }
@@ -942,10 +972,10 @@ namespace KingLastPiece
         {
             Sfx.Play("STG_Vulnerable", transform.position + Vector3.up * modelHeight);
             Sfx.Play("STG_Vulnerable_Loop", transform.position + Vector3.up * modelHeight);
-            Flash(VulnerableColor * 2.2f, 0.18f);
+            FlashAfter(VulnerableFlash, 0.2f);   // after the struck flash, so both read
             GroundDiamond(1.6f, 0.35f);
-            if (!StruckThisFrame)
-                Vfx.Burst(SlashFxKind.SlashC, transform.position + Vector3.up * (modelHeight + 0.2f), Quaternion.identity, 0.9f, VulnerableColor, "flare", "spark");
+            // Always shown, even on top of the hit effect: it is the guard-break signal.
+            Vfx.Burst(SlashFxKind.SlashC, transform.position + Vector3.up * (modelHeight + 0.2f), Quaternion.identity, 0.9f, VulnerableColor, "flare", "spark");
             Effects.Sparks(transform.position + Vector3.up * 2f, VulnerableColor, 16, 4f);
             Game.Rig.Shake(0.15f);
         }
@@ -976,7 +1006,7 @@ namespace KingLastPiece
             deathAway = away.normalized;
             crumbled = false;
             Enter(EState.Dead);
-            Flash(new Color(1.8f, 1.7f, 1.5f), CrackTime);
+            Flash(HitFlash * 1.2f, CrackTime);
             Sfx.Play("EN_Death_Crack", transform.position);
             if (IsBoss) Sfx.Play("QUEEN_Death", transform.position);
             Effects.Sparks(transform.position + Vector3.up, new Color(0.4f, 0.4f, 0.45f), 18, 6f);

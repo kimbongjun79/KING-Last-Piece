@@ -167,10 +167,10 @@ namespace KingLastPiece
             SetGlow(Color.black);
         }
 
-        /// <summary>Between waves: refill flasks and recover some health.</summary>
+        /// <summary>Between waves: one flask back (up to the max) and some health.</summary>
         public void Rest()
         {
-            Flasks = MaxFlasks;
+            Flasks = Mathf.Min(MaxFlasks, Flasks + 1);
             Health = Mathf.Min(MaxHealth, Health + 35f);
             Stamina = MaxStamina;
             LockTarget = null;
@@ -857,6 +857,8 @@ namespace KingLastPiece
             justThisDodge = true;
             justTarget = attacker;
             JustDodgeCount++;
+            // Reward: half the stamina bar back.
+            Stamina = Mathf.Min(MaxStamina, Stamina + MaxStamina * 0.5f);
             Sfx.Play("PL_PerfectDodge");
             DodgeCharges = Mathf.Min(MaxDodges, DodgeCharges + 1);
             Game.SlowMo(SlowScale, SlowDuration);
