@@ -146,6 +146,8 @@ namespace KingLastPiece
         public string name;
         public float duration, cancelAt, cost;
         public bool heavy;
+        /// <summary>Leaping attacks keep the facing they started with (no auto-aim turning while airborne).</summary>
+        public bool lockFacing;
         public PoseTrack pose;
         public HitWindow[] hits;
         public MoveSeg[] moves;
@@ -359,7 +361,7 @@ namespace KingLastPiece
         /// <summary>4th hit: leaps, somersaults once in the air and slams down with a shockwave.</summary>
         static AttackDef EnsembleMeteor() => new AttackDef
         {
-            name = "Royal Meteor", duration = 0.88f, cancelAt = 0.68f, cost = 17f, sfx = "ATK_Meteor_Jump",
+            name = "Royal Meteor", duration = 0.88f, cancelAt = 0.68f, cost = 17f, sfx = "ATK_Meteor_Jump", lockFacing = true,
             pose = new PoseTrack()
                 .Key(0f, P())
                 .Key(0.14f, P(squash: -0.26f), Ease.Out)
@@ -398,7 +400,7 @@ namespace KingLastPiece
         /// <summary>RMB heavy: Royal Stomp's flipping meteor with a wider landing blast (costs about half the stamina bar).</summary>
         static AttackDef EnsembleStomp() => new AttackDef
         {
-            name = "Meteor Stomp", duration = 1.3f, cancelAt = 1.05f, cost = 48f, heavy = true, sfx = "ATK_Stomp_Charge",
+            name = "Meteor Stomp", duration = 1.3f, cancelAt = 1.05f, cost = 48f, heavy = true, sfx = "ATK_Stomp_Charge", lockFacing = true,
             pose = new PoseTrack()
                 .Key(0f, P())
                 .Key(0.42f, P(squash: -0.25f), Ease.Out)

@@ -595,8 +595,8 @@ namespace KingLastPiece
             if (t < atk.FirstHit)
             {
                 if (LockTarget != null) FaceTowards(LockTarget.FlatPos - FlatPos, 540f);
-                // The heavy commits to the facing it started with: no auto-aim turning while it is in the air.
-                else if (!atk.heavy && TryFindAssistDirection(transform.forward, out var best)) FaceTowards(best, 720f);
+                // Leaping attacks (meteor, stomp) commit to the facing they started with: no auto-aim turning in the air.
+                else if (!atk.lockFacing && TryFindAssistDirection(transform.forward, out var best)) FaceTowards(best, 720f);
             }
 
             // Dodge can cancel the attack at any time except during its first active hit frames.
