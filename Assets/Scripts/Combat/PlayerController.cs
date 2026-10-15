@@ -100,21 +100,26 @@ namespace KingLastPiece
         bool counterReleased;
         readonly HashSet<EnemyBase> counterHits = new HashSet<EnemyBase>();
 
-        Transform body;
+        // Built once (in edit mode by the world bake, or at runtime) and kept in the scene.
+        [SerializeField, HideInInspector] Transform body;
 
         protected override float DeltaTime => Game != null ? Game.PlayerDeltaTime : Time.deltaTime;
-        TrailRenderer crownTrail, baseTrail;
+        [SerializeField, HideInInspector] TrailRenderer crownTrail, baseTrail;
 
+        /// <summary>Builds the King's model and trails unless they are already there (baked into the scene).</summary>
         public void Build()
         {
-            body = new GameObject("Body").transform;
-            body.SetParent(transform, false);
+            if (body == null)
+            {
+                body = new GameObject("Body").transform;
+                body.SetParent(transform, false);
 
-            var model = PieceFactory.BuildPlayerKing(body, ModelHeight);
-            model.localPosition = new Vector3(0f, -CenterHeight, 0f);
+                var model = PieceFactory.BuildPlayerKing(body, ModelHeight);
+                model.localPosition = new Vector3(0f, -CenterHeight, 0f);
 
-            crownTrail = CreateTrail(new Vector3(0f, ModelHeight - CenterHeight - 0.05f, 0f), 0.42f, new Color(1f, 0.78f, 0.35f) * 3.5f);
-            baseTrail = CreateTrail(new Vector3(0f, -CenterHeight + 0.15f, 0f), 0.22f, new Color(1f, 0.85f, 0.6f) * 1.5f);
+                crownTrail = CreateTrail(new Vector3(0f, ModelHeight - CenterHeight - 0.05f, 0f), 0.42f, new Color(1f, 0.78f, 0.35f) * 3.5f);
+                baseTrail = CreateTrail(new Vector3(0f, -CenterHeight + 0.15f, 0f), 0.22f, new Color(1f, 0.85f, 0.6f) * 1.5f);
+            }
             // The white crown/base trails are retired (authored slashes replace them); the crown transform is still
             // used as an effect anchor, so only the rendering is switched off.
             crownTrail.enabled = baseTrail.enabled = false;

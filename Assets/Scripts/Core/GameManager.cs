@@ -37,6 +37,11 @@ namespace KingLastPiece
 
         public enum Mode { Game, Practice, Effects }
 
+        [Tooltip("Mode this scene boots into (set by the world bake).")]
+        [SerializeField] Mode sceneMode = Mode.Game;
+        [Tooltip("Baked piece prefabs (enemy component + model), used instead of building pieces at runtime.")]
+        [SerializeField] GameObject[] piecePrefabs = new GameObject[0];
+
         /// <summary>Set before the GameManager is created to boot into a different mode (e.g. the Attack Lab).</summary>
         public static Mode StartMode = Mode.Game;
         public Mode CurrentMode { get; private set; }
@@ -107,33 +112,28 @@ namespace KingLastPiece
             if (Instance != null && Instance != this) { Destroy(gameObject); return; }
             Instance = this;
 
-            BuildArena();
-            SetupLighting();
+            CurrentMode = StartMode != Mode.Game ? StartMode : sceneMode;
+            StartMode = Mode.Game;
 
-            var playerGo = new GameObject("WhiteKing");
-            Player = playerGo.AddComponent<PlayerController>();
-            Player.Build();
+            // The world is baked into the scene (KING ▸ Setup ▸ Bake World Into Scenes); anything missing is built here.
+            var board = FindFirstObjectByType<ArenaBoard>();
+            if (board == null)
+            {
+                board = WorldBuilder.BuildArena();
+                WorldBuilder.ApplyLighting();
+            }
+            BoardFx.Register(board.Grid);
+
+            Player = FindFirstObjectByType<PlayerController>();
+            if (Player == null) Player = WorldBuilder.BuildPlayer();
+            else Player.Build();
             Player.ResetForWave(SquareToWorld("e1"), 0f);
 
-            var cam = Camera.main;
-            if (cam == null)
-            {
-                var camGo = new GameObject("Main Camera") { tag = "MainCamera" };
-                cam = camGo.AddComponent<Camera>();
-                camGo.AddComponent<AudioListener>();
-            }
-            cam.clearFlags = CameraClearFlags.SolidColor;
-            cam.backgroundColor = new Color(0.025f, 0.025f, 0.04f);
-            cam.fieldOfView = 55f;
-            cam.nearClipPlane = 0.1f;
-            cam.farClipPlane = 200f;
+            var cam = WorldBuilder.SetupCamera();
             Rig = cam.GetComponent<CameraRig>();
-            if (Rig == null) Rig = cam.gameObject.AddComponent<CameraRig>();
             Rig.Init(cam, Player);
 
-            gameObject.AddComponent<Hud>();
-            CurrentMode = StartMode;
-            StartMode = Mode.Game;
+            if (GetComponent<Hud>() == null) gameObject.AddComponent<Hud>();
             EnterState(CurrentMode != Mode.Game ? GameState.Playing : GameState.Title);
         }
 
@@ -200,13 +200,40 @@ namespace KingLastPiece
 
         public T SpawnCustom<T>(PieceType modelType, Vector3 pos) where T : EnemyBase
         {
-            var go = new GameObject(typeof(T).Name);
-            go.transform.SetPositionAndRotation(new Vector3(pos.x, 0f, pos.z), Quaternion.LookRotation(Vector3.back));
-            var e = go.AddComponent<T>();
-            var model = PieceFactory.BuildEnemy(modelType, go.transform);
+            var at = new Vector3(pos.x, 0f, pos.z);
+            var facing = Quaternion.LookRotation(Vector3.back);
+            T e;
+            Transform model;
+            var prefab = FindPiecePrefab<T>();
+            if (prefab != null)
+            {
+                // Baked prefab: the enemy component plus its model (first child).
+                e = Instantiate(prefab, at, facing).GetComponent<T>();
+                e.name = prefab.name;
+                model = e.transform.GetChild(0);
+            }
+            else
+            {
+                var go = new GameObject(typeof(T).Name);
+                go.transform.SetPositionAndRotation(at, facing);
+                e = go.AddComponent<T>();
+                model = PieceFactory.BuildEnemy(modelType, go.transform);
+            }
             e.Setup(modelType, model);
             Enemies.Add(e);
             return e;
+        }
+
+        GameObject FindPiecePrefab<T>() where T : EnemyBase
+        {
+            if (piecePrefabs == null) return null;
+            foreach (var p in piecePrefabs)
+            {
+                if (p == null) continue;
+                var c = p.GetComponent<EnemyBase>();
+                if (c != null && c.GetType() == typeof(T)) return p;
+            }
+            return null;
         }
 
         public void ClearEnemies()
@@ -460,80 +487,6 @@ namespace KingLastPiece
             float overlap = minDist - dist;
             a.position += n * (overlap * shareA);
             b.position -= n * (overlap * (1f - shareA));
-        }
-
-        // ---------------------------------------------------------------- world
-
-        void BuildArena()
-        {
-            var root = new GameObject("Arena").transform;
-            var light = MaterialLib.Get(LightSquare, 0.35f);
-            var dark = MaterialLib.Get(DarkSquare, 0.45f);
-            var wood = MaterialLib.Get(new Color(0.16f, 0.09f, 0.05f), 0.5f);
-            var stone = MaterialLib.Get(new Color(0.16f, 0.16f, 0.18f), 0.15f);
-            var floor = MaterialLib.Get(new Color(0.04f, 0.04f, 0.05f), 0.1f);
-
-            var squares = new Transform[8, 8];
-            for (int f = 0; f < 8; f++)
-            for (int r = 0; r < 8; r++)
-            {
-                var pos = new Vector3((f - 3.5f) * TileSize, -0.2f, (r - 3.5f) * TileSize);
-                squares[f, r] = PieceFactory.Part(PrimitiveType.Cube, root, pos, new Vector3(TileSize, 0.4f, TileSize), (f + r) % 2 == 0 ? dark : light);
-            }
-            BoardFx.Register(squares);
-
-            float edge = BoardHalf + 0.35f;
-            float len = BoardHalf * 2f + 1.4f;
-            PieceFactory.Part(PrimitiveType.Cube, root, new Vector3(0, -0.15f, edge), new Vector3(len, 0.5f, 0.7f), wood);
-            PieceFactory.Part(PrimitiveType.Cube, root, new Vector3(0, -0.15f, -edge), new Vector3(len, 0.5f, 0.7f), wood);
-            PieceFactory.Part(PrimitiveType.Cube, root, new Vector3(edge, -0.15f, 0), new Vector3(0.7f, 0.5f, len), wood);
-            PieceFactory.Part(PrimitiveType.Cube, root, new Vector3(-edge, -0.15f, 0), new Vector3(0.7f, 0.5f, len), wood);
-            PieceFactory.Part(PrimitiveType.Cube, root, new Vector3(0, -1.2f, 0), new Vector3(160f, 1f, 160f), floor);
-
-            // Ring of pillars with braziers around the board.
-            var fire = MaterialLib.Emissive(new Color(1f, 0.45f, 0.12f), 4f);
-            for (int i = 0; i < 8; i++)
-            {
-                float a = (i * 45f + 22.5f) * Mathf.Deg2Rad;
-                var p = new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a)) * 15f;
-                PieceFactory.Part(PrimitiveType.Cylinder, root, p + Vector3.up * 2.3f, new Vector3(1.3f, 3f, 1.3f), stone);
-                PieceFactory.Part(PrimitiveType.Cube, root, p + Vector3.up * 5.5f, new Vector3(1.8f, 0.4f, 1.8f), stone);
-                if (i % 2 == 0)
-                {
-                    PieceFactory.Part(PrimitiveType.Sphere, root, p + Vector3.up * 6f, new Vector3(0.8f, 0.6f, 0.8f), fire);
-                    var lg = new GameObject("Brazier Light").AddComponent<Light>();
-                    lg.transform.SetParent(root, false);
-                    lg.transform.position = p + Vector3.up * 6.5f;
-                    lg.type = LightType.Point;
-                    lg.color = new Color(1f, 0.55f, 0.25f);
-                    lg.range = 18f;
-                    lg.intensity = 4f;
-                }
-            }
-        }
-
-        void SetupLighting()
-        {
-            Light sun = null;
-            foreach (var l in FindObjectsByType<Light>(FindObjectsSortMode.None))
-                if (l.type == LightType.Directional) { sun = l; break; }
-            if (sun == null)
-            {
-                sun = new GameObject("Directional Light").AddComponent<Light>();
-                sun.type = LightType.Directional;
-            }
-            sun.transform.rotation = Quaternion.Euler(52f, -35f, 0f);
-            sun.color = new Color(0.75f, 0.78f, 0.95f);
-            sun.intensity = 0.9f;
-            sun.shadows = LightShadows.Soft;
-
-            RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
-            RenderSettings.ambientLight = new Color(0.2f, 0.19f, 0.24f);
-            RenderSettings.fog = true;
-            RenderSettings.fogMode = FogMode.Linear;
-            RenderSettings.fogColor = new Color(0.025f, 0.025f, 0.04f);
-            RenderSettings.fogStartDistance = 20f;
-            RenderSettings.fogEndDistance = 55f;
         }
     }
 

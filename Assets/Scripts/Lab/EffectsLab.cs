@@ -31,8 +31,10 @@ namespace KingLastPiece
         void Awake()
         {
             Instance = this;
+            // The scene has a baked GameManager (set to Effects); older scenes get one created here.
             GameManager.StartMode = GameManager.Mode.Effects;
-            game = new GameObject("GameManager").AddComponent<GameManager>();
+            game = FindFirstObjectByType<GameManager>();
+            if (game == null) game = new GameObject("GameManager").AddComponent<GameManager>();
         }
 
         void OnDestroy()
