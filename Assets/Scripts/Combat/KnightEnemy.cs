@@ -47,10 +47,11 @@ namespace KingLastPiece
             {
                 if (CanAttackNow)
                 {
-                    // The knight's capture: jump from the L-square onto the King's square.
+                    // The knight's capture: jump from the L-square onto the King's square, striking it and the
+                    // four squares beside it (a cross).
                     BeginAttack(new AttackPlan
                     {
-                        kind = AtkKind.Leap, target = BoardSlots.Center(KingSquare), windup = 1.2f, active = 0.55f, recover = 0.9f,
+                        kind = AtkKind.Leap, target = BoardSlots.Center(KingSquare), windup = 1.05f, active = 0.55f, recover = 0.9f,
                         damage = 20f, poise = 35f, radius = 1.5f
                     });
                     cooldown = Random.Range(3.4f, 4.6f);

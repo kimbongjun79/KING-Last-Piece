@@ -10,7 +10,7 @@ namespace KingLastPiece
     /// </summary>
     public class PawnEnemy : EnemyBase
     {
-        const float Windup = 1.6f;
+        const float Windup = 1.2f;
 
         protected override void Configure()
         {

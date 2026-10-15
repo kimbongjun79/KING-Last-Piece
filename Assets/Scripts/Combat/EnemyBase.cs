@@ -82,7 +82,8 @@ namespace KingLastPiece
 
             Vector3 center = plan.kind == AtkKind.Leap ? plan.target : atkStart;
             Vector3 radial = playerPos - new Vector3(center.x, 0f, center.z);
-            if (radial.magnitude > plan.radius + playerRadius + Margin) return false;
+            float edge = StrikesCross ? CrossGap(radial) : radial.magnitude - plan.radius;
+            if (edge > playerRadius + Margin) return false;
             escape = radial.sqrMagnitude > 0.01f ? radial.normalized : (playerPos - FlatPos).normalized;
             if (escape.sqrMagnitude < 0.01f) escape = -transform.forward;
             return true;
@@ -434,11 +435,11 @@ namespace KingLastPiece
                     plan.target = ClampPoint(plan.target);
                     // Knights show their L route and a ghost on the landing square; the queen just the landing area.
                     telegraph = Type == PieceType.Knight
-                        ? Telegraph.Leap(atkStart, plan.target, plan.radius, plan.windup, model)
-                        : Telegraph.Area(plan.target, plan.radius, plan.windup);
+                        ? Telegraph.Leap(atkStart, plan.target, plan.windup, model)
+                        : Telegraph.Area(plan.target, plan.radius, plan.windup, atkStart);
                     break;
                 case AtkKind.Slam:
-                    telegraph = Telegraph.Area(atkStart, plan.radius, plan.windup);
+                    telegraph = Telegraph.Area(atkStart, plan.radius, plan.windup, atkStart);
                     break;
             }
             Enter(EState.Windup);
@@ -582,14 +583,26 @@ namespace KingLastPiece
             Enter(EState.Recover);
         }
 
+        /// <summary>The knight lands on the King's square and strikes it and the four squares beside it (a cross).</summary>
+        bool StrikesCross => Type == PieceType.Knight && plan.kind == AtkKind.Leap;
+
+        /// <summary>Distance from an offset (from the landing square's centre) to the cross of five squares (0 inside).</summary>
+        static float CrossGap(Vector3 d)
+        {
+            float t = GameManager.TileSize;
+            float Box(float hx, float hz) => new Vector2(Mathf.Max(Mathf.Abs(d.x) - hx, 0f), Mathf.Max(Mathf.Abs(d.z) - hz, 0f)).magnitude;
+            return Mathf.Min(Box(1.5f * t, 0.5f * t), Box(0.5f * t, 1.5f * t));
+        }
+
         void TryHitPlayer(Vector3 center, float radius)
         {
             if (atkHit || Player == null || Player.IsDead) return;
             Vector3 d = Player.FlatPos - new Vector3(center.x, 0f, center.z);
-            float dist = d.magnitude;
-            if (dist <= radius + Player.Radius) atkHit = Player.TakeHitFrom(this, plan.damage, plan.poise);
+            // Gap between the King's centre and the strike's edge (the knight's landing strikes a cross of squares).
+            float gap = StrikesCross ? CrossGap(d) : d.magnitude - radius;
+            if (gap <= Player.Radius) atkHit = Player.TakeHitFrom(this, plan.damage, plan.poise);
             // A near miss still counts for a perfect dodge (rolling out of the hit at the last moment).
-            else if (dist <= radius + Player.Radius + PlayerController.NearMissMargin) Player.NotifyNearMiss(this);
+            else if (gap <= Player.Radius + PlayerController.NearMissMargin) Player.NotifyNearMiss(this);
         }
 
         void ClearTelegraph()

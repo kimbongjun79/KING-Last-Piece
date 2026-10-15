@@ -59,20 +59,20 @@ namespace KingLastPiece
                 {
                     BeginAttack(new AttackPlan
                     {
-                        kind = AtkKind.Slam, windup = 1.18f * Speed, active = 0.14f, recover = 1.0f,
+                        kind = AtkKind.Slam, windup = 1.08f * Speed, active = 0.14f, recover = 1.0f,
                         damage = 26f, poise = 50f, radius = 3.8f
                     });
                 }
                 else if (ReadyAtAttackSlot)
                 {
                     dashesLeft = phase2 ? 2 : 1;
-                    Dash(0.86f * Speed, BoardSlots.LineDirection(MySquare, KingSquare));
+                    Dash(0.8f * Speed, BoardSlots.LineDirection(MySquare, KingSquare));
                 }
                 else if (d > 5f && r < 0.2f)
                 {
                     BeginAttack(new AttackPlan
                     {
-                        kind = AtkKind.Leap, target = BoardSlots.Center(KingSquare), windup = 0.97f * Speed, active = 0.6f, recover = 1.0f,
+                        kind = AtkKind.Leap, target = BoardSlots.Center(KingSquare), windup = 0.9f * Speed, active = 0.6f, recover = 1.0f,
                         damage = 28f, poise = 45f, radius = 2.2f
                     });
                 }
@@ -95,7 +95,7 @@ namespace KingLastPiece
             BeginAttack(new AttackPlan
             {
                 kind = AtkKind.Dash, dir = dir, windup = windup, recover = dashesLeft > 0 ? 0.25f : 1.1f,
-                length = Mathf.Clamp(to.magnitude + 4f, 6f, 12f), speed = 19f, damage = 22f, poise = 40f, radius = 1.0f
+                length = Mathf.Clamp(to.magnitude + 4f, 6f, 12f), speed = 24f, damage = 22f, poise = 40f, radius = 1.0f
             });
         }
 
@@ -104,7 +104,7 @@ namespace KingLastPiece
             if (dashesLeft <= 0) return false;
             dashesLeft--;
             // Follow-up dashes stay on chess lines too (nearest of the 8 directions).
-            Dash(0.48f * Speed, BoardSlots.Snap8(ToPlayer));
+            Dash(0.44f * Speed, BoardSlots.Snap8(ToPlayer));
             return true;
         }
     }
