@@ -642,7 +642,7 @@ namespace KingLastPiece
                 // Slam into the board's edge.
                 wallHit = true;
                 launchVelocity = Vector3.zero;
-                Effects.Shockwave(p, 1.6f, Vfx.Accent, 0.35f);
+                SquareRingFx.Spawn(p, 1.6f, Vfx.Accent, 0.35f, 45f);
                 Effects.Sparks(p + Vector3.up * launchHeight, Vfx.Accent, 16, 6f);
                 Game.Rig.Shake(0.35f);
             }
@@ -810,7 +810,7 @@ namespace KingLastPiece
             Effects.Sparks(transform.position + Vector3.up * (airHeight + 1f), VulnerableColor, 10, 5f);
             if (!alreadyAirborne)
             {
-                Effects.Shockwave(FlatPos, forced ? 1.2f : 0.8f, VulnerableColor, 0.3f);
+                SquareRingFx.Spawn(FlatPos, forced ? 1.2f : 0.8f, VulnerableColor, 0.3f, 45f);
                 Vfx.Slash(SlashFxKind.SlashBVertical, transform.position + Vector3.up * 0.8f, Quaternion.LookRotation(airKnock.sqrMagnitude > 0.01f ? airKnock : transform.forward),
                     forced ? 1.1f : 0.75f, Vfx.Accent);
             }
@@ -832,7 +832,7 @@ namespace KingLastPiece
             if (airHeight <= 0f && airVy < 0f)
             {
                 modelY = 0f;
-                Effects.Shockwave(FlatPos, 1.4f, new Color(0.7f, 0.65f, 0.55f), 0.35f);
+                SquareRingFx.Spawn(FlatPos, 1.4f, VulnerableColor, 0.35f, 45f);
                 Sfx.Play("STG_AirLand", transform.position);
                 Effects.Sparks(transform.position + Vector3.up * 0.2f, new Color(0.6f, 0.55f, 0.5f), 8, 3f);
                 Enter(EState.Getup);
@@ -928,7 +928,7 @@ namespace KingLastPiece
             Sfx.Play("STG_Vulnerable", transform.position + Vector3.up * modelHeight);
             Sfx.Play("STG_Vulnerable_Loop", transform.position + Vector3.up * modelHeight);
             Flash(VulnerableColor * 2.2f, 0.18f);
-            Effects.Shockwave(FlatPos, 1.6f, VulnerableColor, 0.35f);
+            SquareRingFx.Spawn(FlatPos, 1.6f, VulnerableColor, 0.35f, 45f);
             Vfx.Burst(SlashFxKind.SlashC, transform.position + Vector3.up * (modelHeight + 0.2f), Quaternion.identity, 0.9f, VulnerableColor, "flare", "spark");
             Effects.Sparks(transform.position + Vector3.up * 2f, VulnerableColor, 16, 4f);
             Game.Rig.Shake(0.15f);

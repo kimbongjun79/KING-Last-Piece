@@ -490,11 +490,12 @@ namespace KingLastPiece
         float radius, duration, t;
         Transform[] sides;
 
-        public static void Spawn(Vector3 center, float radius, Color color, float duration)
+        /// <param name="yaw">Square orientation (45 = a diamond); random 0/45 when omitted.</param>
+        public static void Spawn(Vector3 center, float radius, Color color, float duration, float? yaw = null)
         {
             var go = new GameObject("SquareRing");
             go.transform.position = new Vector3(center.x, 0.03f, center.z);
-            go.transform.rotation = Quaternion.Euler(0f, Random.value < 0.5f ? 0f : 45f, 0f);
+            go.transform.rotation = Quaternion.Euler(0f, yaw ?? (Random.value < 0.5f ? 0f : 45f), 0f);
             var fx = go.AddComponent<SquareRingFx>();
             fx.radius = radius;
             fx.duration = duration;
