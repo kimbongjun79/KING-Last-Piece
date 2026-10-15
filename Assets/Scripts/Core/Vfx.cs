@@ -295,7 +295,7 @@ namespace KingLastPiece
                     break;
                 case VfxStyle.BoardRipple:
                     BoardFx.Ripple(center, radius, strength);
-                    SquareRingFx.Spawn(center, radius, accent, 0.5f);
+                    SquareRingFx.Spawn(center, radius, accent, 0.5f, 0f);   // square (the diamond marks a launched piece)
                     // Deep projector: the squares lift up to ~0.4 while rippling and must keep showing the cracks.
                     CrackDecalFx.Spawn(center, Mathf.Min(6f, radius * 2f), strength * 0.8f, 1.1f);
                     Confetti(center + Vector3.up * 0.1f, Vector3.zero, Mathf.RoundToInt(10 * strength), 4f * strength);

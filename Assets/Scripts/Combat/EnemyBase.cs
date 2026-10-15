@@ -687,6 +687,7 @@ namespace KingLastPiece
         {
             if (IsDead || state == EState.Spawning) return false;
 
+            hitFrame = Time.frameCount;
             Health -= damage;
             LastHitTime = Time.time;
             Flash(new Color(1.6f, 1.5f, 1.3f), 0.09f);
@@ -810,9 +811,11 @@ namespace KingLastPiece
             Effects.Sparks(transform.position + Vector3.up * (airHeight + 1f), VulnerableColor, 10, 5f);
             if (!alreadyAirborne)
             {
-                SquareRingFx.Spawn(FlatPos, forced ? 1.2f : 0.8f, VulnerableColor, 0.3f, 45f);
-                Vfx.Slash(SlashFxKind.SlashBVertical, transform.position + Vector3.up * 0.8f, Quaternion.LookRotation(airKnock.sqrMagnitude > 0.01f ? airKnock : transform.forward),
-                    forced ? 1.1f : 0.75f, Vfx.Accent);
+                GroundDiamond(forced ? 1.2f : 0.8f, 0.3f);
+                // A blow already plays its own hit effect: the launch slash only marks launches without one.
+                if (!StruckThisFrame)
+                    Vfx.Slash(SlashFxKind.SlashBVertical, transform.position + Vector3.up * 0.8f, Quaternion.LookRotation(airKnock.sqrMagnitude > 0.01f ? airKnock : transform.forward),
+                        forced ? 1.1f : 0.75f, Vfx.Accent);
             }
         }
 
@@ -832,11 +835,23 @@ namespace KingLastPiece
             if (airHeight <= 0f && airVy < 0f)
             {
                 modelY = 0f;
-                SquareRingFx.Spawn(FlatPos, 1.4f, VulnerableColor, 0.35f, 45f);
+                GroundDiamond(1.4f, 0.35f);
                 Sfx.Play("STG_AirLand", transform.position);
                 Effects.Sparks(transform.position + Vector3.up * 0.2f, new Color(0.6f, 0.55f, 0.5f), 8, 3f);
                 Enter(EState.Getup);
             }
+        }
+
+        // One hit, one set of effects: a heavy that also breaks the guard and launches would otherwise stack them.
+        int hitFrame = -1, diamondFrame = -1;
+        bool StruckThisFrame => hitFrame == Time.frameCount;
+
+        /// <summary>Expanding hollow white diamond on the board under the piece (at most one per frame).</summary>
+        void GroundDiamond(float radius, float duration)
+        {
+            if (diamondFrame == Time.frameCount) return;
+            diamondFrame = Time.frameCount;
+            SquareRingFx.Spawn(FlatPos, radius, VulnerableColor, duration, 45f);
         }
 
         /// <summary>Kicks the hit reel: the top snaps back away from the King and twists (stronger in the air).</summary>
@@ -928,8 +943,9 @@ namespace KingLastPiece
             Sfx.Play("STG_Vulnerable", transform.position + Vector3.up * modelHeight);
             Sfx.Play("STG_Vulnerable_Loop", transform.position + Vector3.up * modelHeight);
             Flash(VulnerableColor * 2.2f, 0.18f);
-            SquareRingFx.Spawn(FlatPos, 1.6f, VulnerableColor, 0.35f, 45f);
-            Vfx.Burst(SlashFxKind.SlashC, transform.position + Vector3.up * (modelHeight + 0.2f), Quaternion.identity, 0.9f, VulnerableColor, "flare", "spark");
+            GroundDiamond(1.6f, 0.35f);
+            if (!StruckThisFrame)
+                Vfx.Burst(SlashFxKind.SlashC, transform.position + Vector3.up * (modelHeight + 0.2f), Quaternion.identity, 0.9f, VulnerableColor, "flare", "spark");
             Effects.Sparks(transform.position + Vector3.up * 2f, VulnerableColor, 16, 4f);
             Game.Rig.Shake(0.15f);
         }
