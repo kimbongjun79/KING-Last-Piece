@@ -555,8 +555,9 @@ namespace KingLastPiece
         /// Logs every attack with the square it started from relative to the King's square, checks it against the
         /// piece's move pattern, and captures a top-down 5×2 sheet with the slot view on.
         /// </summary>
-        IEnumerator SlotScenario(string dir, StringBuilder stats)
+        IEnumerator SlotScenario(string dir, StringBuilder stats, bool detour = true)
         {
+            EnemyBase.DetourAroundKing = detour;
             var hud = game.GetComponent<Hud>();
             if (hud != null) hud.enabled = false;
             game.ClearEnemies();
@@ -578,6 +579,8 @@ namespace KingLastPiece
             var byType = new Dictionary<PieceType, (int ok, int bad)>();
             var bad = new StringBuilder();
             int maxWaiting = 0;
+            int pawnThroughKing = 0;   // frames a walking pawn is right on top of the King (should stay ~0)
+            var pawnDist = new Dictionary<EnemyBase, float>();
             const int cols = 5, rows = 2, frames = 900;
             Texture2D sheet = null;
             int tileW = 0, tileH = 0, shot = 0;
@@ -591,6 +594,13 @@ namespace KingLastPiece
                 {
                     if (e == null || e.IsDead) continue;
                     if (!e.HoldsAttackSlot && BoardSlots.TryGet(e, out _)) waiting++;
+                    if (e.Type == PieceType.Pawn && e.StateCode == 'm')
+                    {
+                        // Walking INTO the King (closer than 1.2 m and getting closer) — leaving after a thrust doesn't count.
+                        float dk = (e.FlatPos - player.FlatPos).magnitude;
+                        if (pawnDist.TryGetValue(e, out float prev) && dk < 1.2f && dk < prev - 0.001f) pawnThroughKing++;
+                        pawnDist[e] = dk;
+                    }
                     bool now = e.IsAttacking;
                     attacking.TryGetValue(e, out bool was);
                     attacking[e] = now;
@@ -621,9 +631,10 @@ namespace KingLastPiece
                 }
             }
 
-            var line = new StringBuilder("Slots");
+            EnemyBase.DetourAroundKing = true;
+            var line = new StringBuilder(detour ? "Slots" : "SlotsNoDetour");
             foreach (var kv in byType) line.Append($"\t{kv.Key}={kv.Value.ok}ok/{kv.Value.bad}bad");
-            line.Append($"\tmax_waiting={maxWaiting}\toff_pattern:{(bad.Length > 0 ? bad.ToString() : " none")}");
+            line.Append($"\tmax_waiting={maxWaiting}\tpawn_through_king={pawnThroughKing}\toff_pattern:{(bad.Length > 0 ? bad.ToString() : " none")}");
             stats.AppendLine(line.ToString());
             Destroy(view);
             if (sheet != null)
@@ -842,6 +853,7 @@ namespace KingLastPiece
             yield return AutoAssistScenario(dir, stats);
             yield return CrumbleScenario(dir);
             yield return GapCloserScenario(dir, stats);
+            yield return SlotScenario(dir, stats, false);   // A/B: pawns walking straight through the King
             yield return SlotScenario(dir, stats);
             yield return TelegraphScenario(dir);
             yield return KingFallScenario(dir);

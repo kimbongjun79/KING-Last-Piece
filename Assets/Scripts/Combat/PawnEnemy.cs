@@ -5,7 +5,8 @@ namespace KingLastPiece
     /// <summary>
     /// Pawn: takes one of the squares around the King (black pawns face rank 1, so the squares above him come first)
     /// and strikes by where it stands — from a diagonal square a capture thrust straight along that diagonal through
-    /// the King's square (no tracking); from a straight neighbour a short push that follows the King.
+    /// the King's square; from a straight neighbour a straight push into his square. The direction is fixed once the
+    /// wind-up starts.
     /// Slow, long wind-up: dangerous in numbers, punishable alone.
     /// </summary>
     public class PawnEnemy : EnemyBase
@@ -32,27 +33,17 @@ namespace KingLastPiece
             {
                 if (CanAttackNow)
                 {
+                    // From a diagonal square: the capture; from a straight neighbour: the push. Either way the line is
+                    // fixed the moment the wind-up starts — from this square through the King's square, no tracking.
                     Vector2Int off = MySquare - KingSquare;
                     bool diagonal = off.x != 0 && off.y != 0;
-                    if (diagonal)
+                    float length = (BoardSlots.Center(KingSquare) - FlatPos).magnitude + 0.6f;
+                    BeginAttack(new AttackPlan
                     {
-                        // Diagonal capture: from this square through the King's square.
-                        float length = (BoardSlots.Center(KingSquare) - FlatPos).magnitude + 0.6f;
-                        BeginAttack(new AttackPlan
-                        {
-                            kind = AtkKind.Lunge, dir = BoardSlots.LineDirection(MySquare, KingSquare), windup = Windup,
-                            active = 0.24f, recover = 0.8f, length = length, damage = 12f, poise = 15f, radius = 0.7f, trackUntil = 0f
-                        });
-                    }
-                    else
-                    {
-                        // Straight push into the next square, turning to follow the King for most of the wind-up.
-                        BeginAttack(new AttackPlan
-                        {
-                            kind = AtkKind.Lunge, dir = ToPlayer, windup = Windup, active = 0.18f, recover = 0.8f,
-                            length = 1.7f, damage = 12f, poise = 15f, radius = 0.7f, trackUntil = 0.7f
-                        });
-                    }
+                        kind = AtkKind.Lunge, dir = BoardSlots.LineDirection(MySquare, KingSquare), windup = Windup,
+                        active = diagonal ? 0.24f : 0.2f, recover = 0.8f, length = length, damage = 12f, poise = 15f,
+                        radius = 0.7f, trackUntil = 0f
+                    });
                     cooldown = Random.Range(2.6f, 3.8f);
                 }
                 return;

@@ -118,7 +118,10 @@ namespace KingLastPiece
                 routeDir = dir;
                 routeLength = length;
                 ClearDots();
-                AddDots(start + dir * 0.5f, start + dir * Mathf.Max(0.6f, length - 0.2f));
+                // Dots run from this square to the centre of the last square the charge reaches.
+                Vector3 end = squares.Count > 1 ? BoardSlots.Center(squares[squares.Count - 1]) : start + dir * Mathf.Max(0.6f, length - 0.2f);
+                Vector3 along = end - start;
+                AddDots(start + along.normalized * 0.5f, end);
             }
         }
 

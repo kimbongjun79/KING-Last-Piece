@@ -405,8 +405,40 @@ namespace KingLastPiece
                 float step = Mathf.Min(Mathf.Abs(d.x), Mathf.Abs(d.z));
                 target = FlatPos + new Vector3(Mathf.Sign(d.x) * step, 0f, Mathf.Sign(d.z) * step);   // along the diagonal
             }
+            else if (gait == Gait.Direct && DetourAroundKing) target = AroundKing(target);
             MoveTowards(target, speed, dt);
         }
+
+        /// <summary>
+        /// Walking to a square on the far side of the King: instead of cutting straight through him, curve around him
+        /// (keeping about <see cref="KingClearance"/> away) on the side the target lies on.
+        /// </summary>
+        Vector3 AroundKing(Vector3 target)
+        {
+            if (Player == null) return target;
+            Vector3 k = Player.FlatPos, pos = FlatPos, to = target - pos;
+            float len2 = to.sqrMagnitude;
+            if (len2 < 0.01f) return target;
+            float t = Mathf.Clamp01(Vector3.Dot(k - pos, to) / len2);
+            Vector3 closest = pos + to * t;
+            if (t <= 0.02f || t >= 0.98f || (closest - k).magnitude >= KingClearance) return target;
+
+            Vector3 radial = pos - k;
+            radial.y = 0f;
+            if (radial.sqrMagnitude < 0.01f) radial = -to;
+            Vector3 r = radial.normalized;
+            // Go round on the side the target is on.
+            float side = Mathf.Sign(Vector3.Cross(r, target - k).y);
+            if (side == 0f) side = 1f;
+            Vector3 tangent = Vector3.Cross(Vector3.up, r) * side;
+            // Hold the orbit radius: drift out when too close, in when too far.
+            float push = Mathf.Clamp((KingClearance + 0.2f - radial.magnitude) * 1.5f, -0.6f, 1.2f);
+            return pos + (tangent + r * push).normalized * 1.5f;
+        }
+
+        const float KingClearance = 1.7f;
+        /// <summary>Lab switch for A/B checks of the detour (on in the game).</summary>
+        public static bool DetourAroundKing = true;
 
         // ---------------------------------------------------------------- attacks
 
