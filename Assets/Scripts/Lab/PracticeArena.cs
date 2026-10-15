@@ -652,7 +652,7 @@ namespace KingLastPiece
             bool line = ax == 0 || ay == 0 || ax == ay;
             switch (type)
             {
-                case PieceType.Pawn: return m == 1;                                               // diagonal capture or straight push
+                case PieceType.Pawn: return true;                                                 // pawns are outside the slot system
                 case PieceType.Knight: return (ax == 1 && ay == 2) || (ax == 2 && ay == 1);
                 case PieceType.Bishop: return ax == ay && m >= 2;
                 case PieceType.Rook: return ((ax == 0 || ay == 0) && m >= 2) || m <= 1;               // ram from anywhere on the line, or slam when crowded

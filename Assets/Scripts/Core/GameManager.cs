@@ -274,20 +274,26 @@ namespace KingLastPiece
             EnterState(GameState.Dead);
         }
 
+        /// <summary>
+        /// Pieces attacking right now in the same turn pool as <paramref name="except"/>: pawns share their own pool, the
+        /// other pieces another, so pawns keep pressing while the bigger pieces take their turns.
+        /// </summary>
         public int ActiveAttackers(EnemyBase except)
         {
             int n = 0;
+            bool pawn = except != null && except.Type == PieceType.Pawn;
             foreach (var e in Enemies)
-                if (e != null && e != except && !e.IsDead && e.IsAttacking) n++;
+                if (e != null && e != except && !e.IsDead && e.IsAttacking && (e.Type == PieceType.Pawn) == pawn) n++;
             return n;
         }
 
-        /// <summary>No other (non-boss) piece has been waiting longer for its turn to strike.</summary>
+        /// <summary>No other (non-boss) piece in the same turn pool has been waiting longer for its turn to strike.</summary>
         public bool IsNextInLine(EnemyBase e)
         {
             float mine = e.ReadySince;
+            bool pawn = e.Type == PieceType.Pawn;
             foreach (var o in Enemies)
-                if (o != null && o != e && !o.IsDead && !o.IsBoss && o.ReadySince < mine) return false;
+                if (o != null && o != e && !o.IsDead && !o.IsBoss && (o.Type == PieceType.Pawn) == pawn && o.ReadySince < mine) return false;
             return true;
         }
 

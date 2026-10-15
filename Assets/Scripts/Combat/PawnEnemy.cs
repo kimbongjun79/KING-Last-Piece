@@ -3,15 +3,15 @@ using UnityEngine;
 namespace KingLastPiece
 {
     /// <summary>
-    /// Pawn: takes one of the squares around the King (black pawns face rank 1, so the squares above him come first)
-    /// and strikes by where it stands — from a diagonal square a capture thrust straight along that diagonal through
-    /// the King's square; from a straight neighbour a straight push into his square. The direction is fixed once the
-    /// wind-up starts.
-    /// Slow, long wind-up: dangerous in numbers, punishable alone.
+    /// Pawn: foot soldier, outside the board-slot system. It walks straight at the King, stops about one square away,
+    /// and while it waits for its turn circles him at that distance; then it thrusts at him — the direction is fixed
+    /// the moment the wind-up starts. Pawns have their own attack turns (two at a time), so they keep pressing while the
+    /// bigger pieces take theirs. Slow wind-up: dangerous in numbers, punishable alone.
     /// </summary>
     public class PawnEnemy : EnemyBase
     {
-        const float Windup = 1.2f;
+        const float Windup = 1.2f, Reach = 1.7f, Hold = 1.9f;
+        float circleSign;
 
         protected override void Configure()
         {
@@ -19,6 +19,7 @@ namespace KingLastPiece
             SetHealth(100f);   // ~1.5 light-combo cycles (one cycle = 66)
             SetRadius(0.45f);
             moveSpeed = 2.6f;
+            circleSign = Random.value < 0.5f ? -1f : 1f;
         }
 
         protected override StaggerProfile CreateStaggerProfile() =>
@@ -26,29 +27,33 @@ namespace KingLastPiece
 
         protected override void Think(float dt)
         {
-            UpdateSlot(BoardSlots.PawnSlots, o => o.y < 0 ? 2.5f : 0f);
-            FaceTowards(ToPlayer, 300f);
+            Vector3 to = ToPlayer;
+            float d = to.magnitude;
+            FaceTowards(to, 300f);
 
-            if (ReadyAtAttackSlot)
+            if (d > Hold + 0.3f)
             {
-                if (CanAttackNow)
-                {
-                    // From a diagonal square: the capture; from a straight neighbour: the push. Either way the line is
-                    // fixed the moment the wind-up starts — from this square through the King's square, no tracking.
-                    Vector2Int off = MySquare - KingSquare;
-                    bool diagonal = off.x != 0 && off.y != 0;
-                    float length = (BoardSlots.Center(KingSquare) - FlatPos).magnitude + 0.6f;
-                    BeginAttack(new AttackPlan
-                    {
-                        kind = AtkKind.Lunge, dir = BoardSlots.LineDirection(MySquare, KingSquare), windup = Windup,
-                        active = diagonal ? 0.24f : 0.2f, recover = 0.8f, length = length, damage = 12f, poise = 15f,
-                        radius = 0.7f, trackUntil = 0f
-                    });
-                    cooldown = Random.Range(2.6f, 3.8f);
-                }
+                // Close in, aiming for the point one square short of the King.
+                MoveTowards(Player.FlatPos - to.normalized * Hold, moveSpeed, dt);
                 return;
             }
-            MoveToSlot(Gait.Direct, moveSpeed, dt);
+
+            if (CanAttackNow)
+            {
+                BeginAttack(new AttackPlan
+                {
+                    kind = AtkKind.Lunge, dir = to, windup = Windup, active = 0.2f, recover = 0.8f,
+                    length = Mathf.Max(Reach, d + 0.4f), damage = 12f, poise = 15f, radius = 0.7f, trackUntil = 0f
+                });
+                cooldown = Random.Range(2.6f, 3.8f);
+                return;
+            }
+
+            // Waiting for a turn: circle the King at about a square's distance (drift back out if crowded in).
+            Vector3 r = d > 0.01f ? -to / d : Vector3.back;
+            Vector3 tangent = Vector3.Cross(Vector3.up, r) * circleSign;
+            Vector3 drift = r * Mathf.Clamp(Hold - d, -0.5f, 0.5f);
+            MoveTowards(FlatPos + (tangent * 0.5f + drift) * 2f, moveSpeed * 0.45f, dt);
         }
     }
 }

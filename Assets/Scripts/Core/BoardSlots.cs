@@ -5,11 +5,12 @@ namespace KingLastPiece
 {
     /// <summary>
     /// Chessboard slot system. Instead of swarming the King, every piece reserves a square to attack from — the
-    /// squares its own move pattern reaches the King's square from (pawn: the squares around him, knight: the L squares,
-    /// bishop/rook/queen: their lines) — walks there in its own gait, and strikes along that move. One piece per
-    /// square (queen > rook > bishop > knight > pawn when they compete). When every attack square of its pattern is
-    /// taken, a piece waits on a square 2–3 squares out and takes over a slot as soon as one frees up. Squares off
-    /// the board simply don't exist, so a King with his back to the edge can only be surrounded from the open side.
+    /// squares its own move pattern reaches the King's square from (knight: the L squares, bishop/rook/queen: their
+    /// lines) — walks there in its own gait, and strikes along that move. One piece per square (queen > rook > bishop
+    /// > knight when they compete). Pawns are foot soldiers outside the system. When every attack square of its
+    /// pattern is taken, a piece waits on a square 2–3 squares out and takes over a slot as soon as one frees up.
+    /// Squares off the board simply don't exist, so a King with his back to the edge can only be surrounded from the
+    /// open side.
     /// </summary>
     public static class BoardSlots
     {
@@ -126,16 +127,6 @@ namespace KingLastPiece
         }
 
         // ---------------------------------------------------------------- move patterns (offsets from the King's square)
-
-        /// <summary>
-        /// Pawns strike from the squares around the King: the diagonals (their capture) and the straight neighbours
-        /// (their push). Black pawns face rank 1, so the squares above the King come first.
-        /// </summary>
-        public static readonly Vector2Int[] PawnSlots =
-        {
-            new Vector2Int(-1, 1), new Vector2Int(1, 1), new Vector2Int(-1, -1), new Vector2Int(1, -1),
-            new Vector2Int(0, 1), new Vector2Int(-1, 0), new Vector2Int(1, 0), new Vector2Int(0, -1),
-        };
 
         public static readonly Vector2Int[] KnightSlots =
         {
