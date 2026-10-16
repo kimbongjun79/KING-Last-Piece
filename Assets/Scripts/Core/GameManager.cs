@@ -149,6 +149,8 @@ namespace KingLastPiece
             var cam = WorldBuilder.SetupCamera();
             Rig = cam.GetComponent<CameraRig>();
             Rig.Init(cam, Player);
+            // Grey-box of the planned white chess classroom (replaces the dark hall until the real models are in).
+            ClassroomBlockout.Build(board);
 
             if (GetComponent<Hud>() == null) gameObject.AddComponent<Hud>();
             EnterState(UsesRounds ? GameState.Title : GameState.Playing);
@@ -525,6 +527,7 @@ namespace KingLastPiece
 
                 case GameState.Playing:
                     if (GameInput.Pause) TogglePause();
+                    if (Paused && GameInput.MainMenu) { QuitToTitle(); break; }
                     if (Paused) break;
                     RunTime += Time.deltaTime;
                     ResolveCollisions();
@@ -633,6 +636,16 @@ namespace KingLastPiece
             if (this == null) return;   // the scene went away meanwhile
             Submitting = false;
             BackToTitle();
+        }
+
+        /// <summary>Pause ▸ 메인 메뉴: abandons the run (nothing is recorded) and reloads this scene's title.</summary>
+        public void QuitToTitle()
+        {
+            if (!UsesRounds) return;
+            Paused = false;
+            Time.timeScale = 1f;
+            Sfx.Play("UI_Back");
+            UnityEngine.SceneManagement.SceneManager.LoadScene(gameObject.scene.name);
         }
 
         /// <summary>Endless results → the title: the scene reloads (a fresh board, King and run).</summary>

@@ -120,6 +120,11 @@ namespace KingLastPiece
             }
         }
 
+        /// <summary>Pause menu ▸ main menu: M or the pad's Select / View.</summary>
+        public static bool MainMenu =>
+            (Keyboard.current != null && Keyboard.current.mKey.wasPressedThisFrame) ||
+            (Gamepad.current != null && Gamepad.current.selectButton.wasPressedThisFrame);
+
         public static bool Pause =>
             (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame) ||
             (Gamepad.current != null && Gamepad.current.startButton.wasPressedThisFrame);

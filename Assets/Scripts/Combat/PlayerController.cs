@@ -944,12 +944,9 @@ namespace KingLastPiece
             DodgeCharges = Mathf.Min(MaxDodges, DodgeCharges + 1);
             Game.SlowMo(SlowScale, SlowDuration);
             Game.Rig.Kick(0.45f);
+            // No burst effects (wind ring, shockwave, sparks): slow motion, the screen tint and a cool flash on the King
+            // carry the moment.
             Flash(new Color(0.6f, 1.2f, 2.2f), 0.25f);
-            var cyan = new Color(0.45f, 0.8f, 1f);
-            Effects.Shockwave(FlatPos, 1.8f, cyan, 0.4f);
-            // Silver-blue wind ring around the King: the attack slipped past.
-            Vfx.Slash(SlashFxKind.SlashD, transform.position + Vector3.up * 0.8f, transform.rotation, 1.3f, cyan);
-            Effects.Sparks(transform.position + Vector3.up * 1.1f, cyan, 18, 5f);
         }
 
         // ---------------------------------------------------------------- royal throw (counter)

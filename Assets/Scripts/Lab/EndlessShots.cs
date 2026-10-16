@@ -38,6 +38,7 @@ namespace KingLastPiece
             game.Player.GodMode = true;
             yield return Frames(60);
 
+            yield return ClassroomShots();
             yield return EliteTiers();
             yield return DarkWindup();
             yield return RoundShot(11, "21_Round11_First_Dark_Pawn.png", closeOnElite: true);
@@ -118,6 +119,27 @@ namespace KingLastPiece
             game.DebugTogglePause();
             game.Rig.UseOverride = false;
             game.ClearEnemies();
+        }
+
+        /// <summary>The grey-box classroom: a wide view across the room, and the play camera's usual view.</summary>
+        IEnumerator ClassroomShots()
+        {
+            var hud = game.GetComponent<Hud>();
+            if (hud != null) hud.enabled = false;
+            float h = GameManager.BoardHalf + 9f;
+            game.Rig.UseOverride = true;
+            game.Rig.OverridePosition = new Vector3(-h * 0.9f, 14f, -h * 1.1f);
+            game.Rig.OverrideLookAt = new Vector3(h * 0.15f, 0f, h * 0.2f);
+            yield return Frames(5);
+            yield return Shot("32_Classroom_Wide.png");
+            game.Rig.OverridePosition = new Vector3(h * 0.85f - 2f, 4.5f, -h * 0.2f);
+            game.Rig.OverrideLookAt = new Vector3(h + 6f, 2f, 0f);
+            yield return Frames(3);
+            yield return Shot("33_Classroom_Window.png");
+            game.Rig.UseOverride = false;
+            yield return Frames(20);
+            yield return Shot("34_Classroom_Play_View.png");
+            if (hud != null) hud.enabled = true;
         }
 
         /// <summary>A Dark III rook winding up next to the King: the aura should step back so the red glow shows.</summary>

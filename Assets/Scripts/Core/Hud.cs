@@ -655,6 +655,18 @@ namespace KingLastPiece
                     new Color(0.85f, 0.82f, 0.75f));
             Text(new Rect(0, area.y + 190 * scale, Screen.width, 36 * scale), "능력치와 조작법은 위의 탭에서 볼 수 있습니다", small,
                 new Color(1f, 1f, 1f, 0.5f));
+            if (!g.UsesRounds) return;
+
+            // Back to the main menu (the run is abandoned, nothing recorded).
+            var e = Event.current;
+            var b = new Rect((Screen.width - 280 * scale) / 2f, area.y + 260 * scale, 280 * scale, 56 * scale);
+            bool hot = b.Contains(e.mousePosition);
+            if (e.type == EventType.MouseDown && hot) { g.QuitToTitle(); e.Use(); return; }
+            Fill(new Rect(b.x - 2 * scale, b.y - 2 * scale, b.width + 4 * scale, b.height + 4 * scale), new Color(Gold.r, Gold.g, Gold.b, hot ? 0.9f : 0.5f));
+            Fill(b, hot ? new Color(0.24f, 0.18f, 0.08f, 0.95f) : new Color(0.06f, 0.055f, 0.06f, 0.95f));
+            Text(b, "메인 메뉴로", new GUIStyle(mid) { fontSize = Mathf.RoundToInt(24 * scale) }, new Color(1f, 0.95f, 0.85f));
+            Text(new Rect(0, b.yMax + 8 * scale, Screen.width, 26 * scale), g.IsEndless ? "진행 중인 기록은 저장되지 않습니다   ·   M 키" : "M 키",
+                new GUIStyle(small) { fontSize = Mathf.RoundToInt(15 * scale) }, new Color(1f, 1f, 1f, 0.45f));
         }
 
         /// <summary>A gold-ruled panel of name/value rows.</summary>

@@ -79,6 +79,7 @@ namespace KingLastPiece
                 }
             }
             MovePillars(Mathf.Max(15f, half + 7f));
+            ClassroomBlockout.Build(this);   // the room keeps its margin around the bigger board
             BoardFx.Register(Grid);
         }
 
