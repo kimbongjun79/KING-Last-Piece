@@ -508,15 +508,4 @@ namespace KingLastPiece
             b.position -= n * (overlap * (1f - shareA));
         }
     }
-
-    static class GameBootstrap
-    {
-        /// <summary>Auto-starts the game in any scene that doesn't already contain a GameManager.</summary>
-        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
-        static void Boot()
-        {
-            if (Object.FindFirstObjectByType<GameManager>() != null) return;
-            new GameObject("GameManager").AddComponent<GameManager>();
-        }
-    }
 }
