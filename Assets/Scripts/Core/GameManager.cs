@@ -122,7 +122,8 @@ namespace KingLastPiece
 
         void Awake()
         {
-            if (Instance != null && Instance != this) { Destroy(gameObject); return; }
+            // One per scene (a manager left over from the previous scene while switching modes doesn't count).
+            if (Instance != null && Instance != this && Instance.gameObject.scene == gameObject.scene) { Destroy(gameObject); return; }
             Instance = this;
 
             CurrentMode = StartMode != Mode.Game ? StartMode : sceneMode;
@@ -151,6 +152,10 @@ namespace KingLastPiece
 
             if (GetComponent<Hud>() == null) gameObject.AddComponent<Hud>();
             EnterState(UsesRounds ? GameState.Title : GameState.Playing);
+            TitleChoice = IsEndless ? 1 : 0;
+            // Picked on the other scene's title: start right away instead of showing this title again.
+            skipTitle = UsesRounds && startFromMenu;
+            startFromMenu = false;
         }
 
         /// <summary>The classic game and the endless mode run rounds (title, round clears, restarts); the labs don't.</summary>
@@ -484,7 +489,10 @@ namespace KingLastPiece
             switch (State)
             {
                 case GameState.Title:
-                    if (GameInput.Confirm) { Sfx.Play("UI_Title_Start"); StartWave(0); }
+                    if (skipTitle) { skipTitle = false; StartWave(0); break; }
+                    int step = GameInput.MenuStep;
+                    if (step != 0) { TitleChoice = (TitleChoice + step + 2) % 2; Sfx.Play("UI_Hover"); }
+                    if (GameInput.Confirm) ChooseMode(TitleChoice);
                     break;
 
                 case GameState.Playing:
@@ -546,6 +554,35 @@ namespace KingLastPiece
         }
 
         // ---------------------------------------------------------------- lab automation hooks
+
+        // ---------------------------------------------------------------- main menu (mode select)
+
+        /// <summary>Scenes of the two game modes (both in the build settings).</summary>
+        public const string NormalScene = "NormalMode", EndlessScene = "EndlessMode";
+
+        /// <summary>Title menu selection: 0 normal mode (ten rounds), 1 endless mode.</summary>
+        public int TitleChoice { get; set; }
+
+        static bool startFromMenu;   // set before loading the other mode's scene: it skips its title
+        bool skipTitle;
+
+        /// <summary>
+        /// Starts the chosen mode: this scene's own mode begins at once; the other loads its scene, which then starts
+        /// without showing the title again.
+        /// </summary>
+        public void ChooseMode(int choice)
+        {
+            if (State != GameState.Title) return;
+            Sfx.Play("UI_Title_Start");
+            bool endless = choice == 1;
+            if (endless == IsEndless)
+            {
+                StartWave(0);
+                return;
+            }
+            startFromMenu = true;
+            UnityEngine.SceneManagement.SceneManager.LoadScene(endless ? EndlessScene : NormalScene);
+        }
 
         /// <summary>Title → first round, as if Confirm was pressed (used by the sound-reference capture).</summary>
         public void DebugStartGame()

@@ -22,7 +22,7 @@ namespace KingLastPiece.EditorTools
         public static void BuildGameMenu() => Build(new[] { NormalScene, EndlessScene }, "Builds/Game/KING.exe");
 
         /// <summary>
-        /// CLI: -executeMethod KingLastPiece.EditorTools.LabBuild.BuildLabCli -scene &lt;scene path&gt; -buildPath &lt;exe&gt;
+        /// CLI: -executeMethod KingLastPiece.EditorTools.LabBuild.BuildLabCli -scene &lt;scene path[,scene path…]&gt; -buildPath &lt;exe&gt;
         /// (defaults to the practice arena).
         /// </summary>
         public static void BuildLabCli()
@@ -34,7 +34,8 @@ namespace KingLastPiece.EditorTools
                 if (args[i] == "-buildPath") path = args[i + 1];
                 if (args[i] == "-scene") scene = args[i + 1];
             }
-            bool ok = Build(new[] { scene }, path);
+            // Several scenes: comma-separated (the first one boots).
+            bool ok = Build(scene.Split(','), path);
             EditorApplication.Exit(ok ? 0 : 1);
         }
 

@@ -1,0 +1,4 @@
+Boot	mode=Game	state=Title	choice=0
+AfterEndless	mode=Endless	state=Playing	round=1	enemies=4	stats_power=0.7
+EndlessTitle	mode=Endless	state=Title	choice=1
+AfterNormal	mode=Game	state=Playing	wave=1/10	enemies=4	stats_power=1

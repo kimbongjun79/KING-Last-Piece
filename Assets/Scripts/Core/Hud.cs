@@ -415,18 +415,41 @@ namespace KingLastPiece
 
             Text(new Rect(0, dy + 22 * scale, W, 40 * scale), "모든 백색 기물이 쓰러졌다.  판 위에 남은 것은 왕 하나뿐.", small,
                 new Color(0.82f, 0.79f, 0.72f, fade));
-            string mode = g.IsEndless ? "무한 모드  —  끝없이 밀려오는 흑색 군대에 맞서라" : "10 라운드  —  흑색 군대와 여왕을 무너뜨려라";
-            Text(new Rect(0, dy + 64 * scale, W, 34 * scale), mode, new GUIStyle(small) { fontSize = Mathf.RoundToInt(19 * scale) },
-                new Color(0.65f, 0.63f, 0.58f, fade));
-
-            // Framed start prompt.
+            // Mode select: two framed cards; ←/→ (or the mouse) to choose, Enter / click to start.
+            (string name, string line)[] modes =
+            {
+                ("일반 모드", "10 라운드  ·  흑색 군대와 여왕을 무너뜨려라"),
+                ("무한 모드", "끝없는 라운드  ·  매 라운드 영구 강화"),
+            };
+            var e = Event.current;
+            float bw = 330 * scale, bh = 104 * scale, gap = 34 * scale;
+            float bx0 = (W - (2 * bw + gap)) / 2f, by = H * 0.62f;
+            bool mouseMoved = e.type == EventType.Repaint && (e.mousePosition - lastMouse).sqrMagnitude > 1f;
+            if (e.type == EventType.Repaint) lastMouse = e.mousePosition;
             float blink = 0.55f + 0.45f * Mathf.Sin(t * 3f);
-            var pr = new Rect((W - 460 * scale) / 2f, H * 0.72f, 460 * scale, 58 * scale);
-            Fill(new Rect(pr.x - 2 * scale, pr.y - 2 * scale, pr.width + 4 * scale, pr.height + 4 * scale), new Color(Gold.r, Gold.g, Gold.b, 0.5f * blink * fade));
-            Fill(pr, new Color(0f, 0f, 0f, 0.65f * fade));
-            Text(pr, "ENTER / START 를 눌러 시작", new GUIStyle(mid) { fontSize = Mathf.RoundToInt(26 * scale) }, new Color(1f, 1f, 1f, (0.5f + 0.5f * blink) * fade));
-            Text(new Rect(0, pr.yMax + 14 * scale, W, 28 * scale), "조작법은 게임 중  Esc  일시정지 메뉴에서 볼 수 있습니다",
-                new GUIStyle(small) { fontSize = Mathf.RoundToInt(16 * scale) }, new Color(1f, 1f, 1f, 0.4f * fade));
+            for (int i = 0; i < modes.Length; i++)
+            {
+                var b = new Rect(bx0 + i * (bw + gap), by, bw, bh);
+                if (mouseMoved && b.Contains(e.mousePosition)) g.TitleChoice = i;
+                if (e.type == EventType.MouseDown && b.Contains(e.mousePosition)) { g.TitleChoice = i; g.ChooseMode(i); e.Use(); }
+                bool on = g.TitleChoice == i;
+                if (on) b.y -= 6 * scale;
+                Fill(new Rect(b.x - 2 * scale, b.y - 2 * scale, b.width + 4 * scale, b.height + 4 * scale),
+                    on ? new Color(Gold.r, Gold.g, Gold.b, (0.6f + 0.4f * blink) * fade) : new Color(Gold.r, Gold.g, Gold.b, 0.25f * fade));
+                Fill(b, on ? new Color(0.16f, 0.12f, 0.06f, 0.85f * fade) : new Color(0f, 0f, 0f, 0.6f * fade));
+                // Chess-tile strip along the top of the card.
+                for (int k = 0; k < 10; k++)
+                    Fill(new Rect(b.x + k * b.width / 10f, b.y, b.width / 10f, 6 * scale),
+                        k % 2 == 0 ? new Color(0.9f, 0.87f, 0.78f, (on ? 0.8f : 0.3f) * fade) : new Color(0.1f, 0.08f, 0.08f, (on ? 0.8f : 0.3f) * fade));
+                Text(new Rect(b.x, b.y + 16 * scale, b.width, 44 * scale), modes[i].name, new GUIStyle(mid) { fontSize = Mathf.RoundToInt(30 * scale) },
+                    on ? new Color(1f, 0.95f, 0.85f, fade) : new Color(0.75f, 0.72f, 0.66f, fade));
+                Text(new Rect(b.x, b.y + 62 * scale, b.width, 28 * scale), modes[i].line, new GUIStyle(small) { fontSize = Mathf.RoundToInt(16 * scale) },
+                    on ? new Color(Gold.r, Gold.g, Gold.b, fade) : new Color(0.6f, 0.58f, 0.54f, fade));
+            }
+            Text(new Rect(0, by + bh + 22 * scale, W, 30 * scale), "← →  모드 선택      ENTER / START  시작", new GUIStyle(small) { fontSize = Mathf.RoundToInt(19 * scale) },
+                new Color(1f, 1f, 1f, (0.45f + 0.35f * blink) * fade));
+            Text(new Rect(0, by + bh + 54 * scale, W, 28 * scale), "조작법은 게임 중  Esc  일시정지 메뉴에서 볼 수 있습니다",
+                new GUIStyle(small) { fontSize = Mathf.RoundToInt(16 * scale) }, new Color(1f, 1f, 1f, 0.35f * fade));
 
             // Chess-tile band along the bottom edge.
             float tile = 28 * scale;
