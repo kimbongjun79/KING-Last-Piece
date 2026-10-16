@@ -182,7 +182,7 @@ namespace KingLastPiece
         /// <summary>Rolls a critical hit: true with <see cref="PlayerStats.critChance"/>; <paramref name="mult"/> is the damage factor.</summary>
         // Stagger (guard damage) per attack, whatever the style: the combo opens light and finishes heavy, the heavy
         // breaks guards, the Royal Throw (after a perfect dodge) most of all — its swing hits and its crash landing.
-        const float StaggerLightEarly = 9f, StaggerLightMid = 16f, StaggerLightFinish = 26f;   // hits 1–2, 3, 4
+        const float StaggerLightEarly = 6f, StaggerLightMid = 10f, StaggerLightFinish = 20f;   // hits 1–2, 3, 4 (a full combo: 42)
         const float StaggerHeavy = 42f, StaggerCounterSwing = 55f, StaggerCounterThrow = 75f;
         float atkStagger;   // per hit window of the current attack
 

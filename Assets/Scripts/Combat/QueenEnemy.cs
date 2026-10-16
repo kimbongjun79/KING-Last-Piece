@@ -21,7 +21,7 @@ namespace KingLastPiece
             SetModelScale(1.35f);
             moveSpeed = 3.2f;
             // Very hard to stagger: about two breaks over a whole round-10 fight (its poise refills only slowly).
-            maxPoise = 420f;
+            maxPoise = 300f;
             staggerDuration = 1.6f;
         }
 
