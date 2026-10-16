@@ -97,6 +97,7 @@ namespace KingLastPiece
         // Sound-event bookkeeping (footstep phase, edge-triggered warnings, lock changes).
         int lastStep;
         bool prevSprint, lowHpWarned, lowStaminaWarned, swingSfx;
+        int inkArcs;   // ink arcs drawn so far along the Royal Throw swing
         EnemyBase prevLock;
         bool counterReleased;
         readonly HashSet<EnemyBase> counterHits = new HashSet<EnemyBase>();
@@ -885,14 +886,8 @@ namespace KingLastPiece
             Flash(new Color(0.6f, 1.2f, 2.2f), 0.25f);
             var cyan = new Color(0.45f, 0.8f, 1f);
             Effects.Shockwave(FlatPos, 1.8f, cyan, 0.4f);
-            // Ink swirl around the King, sweeping the way he slipped past the attack: it faces the attacker and turns
-            // toward the side the roll went (dodging right → swirls left-to-right, left → right-to-left).
-            Vector3 toAttacker = attacker != null ? attacker.FlatPos - FlatPos : -dodgeDir;
-            toAttacker.y = 0f;
-            if (toAttacker.sqrMagnitude < 0.01f) toAttacker = transform.forward;
-            float side = Vector3.Cross(toAttacker.normalized, dodgeDir).y;
-            bool turnRight = Mathf.Abs(side) > 0.1f ? side > 0f : Random.value < 0.5f;
-            Vfx.Slash(SlashFxKind.Ink, transform.position + Vector3.up * 0.8f, Quaternion.LookRotation(toAttacker), 1.3f, null, mirror: turnRight);
+            // Silver-blue wind ring around the King: the attack slipped past.
+            Vfx.Slash(SlashFxKind.SlashD, transform.position + Vector3.up * 0.8f, transform.rotation, 1.3f, cyan);
             Effects.Sparks(transform.position + Vector3.up * 1.1f, cyan, 18, 5f);
         }
 
@@ -916,6 +911,7 @@ namespace KingLastPiece
             counterAngle0 = Vector3.SignedAngle(Vector3.forward, to, Vector3.up);
             counterSpin = Random.value < 0.5f ? 1f : -1f;
             swingSfx = false;
+            inkArcs = 0;
             Sfx.Play("THR_Grab", counterTarget.FlatPos);
             transform.rotation = Quaternion.LookRotation(to);
             Enter(State.Counter);
@@ -955,6 +951,16 @@ namespace KingLastPiece
                 ApplyPose(BodyPose.P(tilt: -18f, squash: -0.06f));
                 crownTrail.emitting = true;
 
+                // Ink arcs trace the swing: one per half turn, each sweeping the half the piece is about to cross
+                // (a NamuFX slash sweeps right → front → left of its facing, i.e. anticlockwise; mirrored for clockwise).
+                float turned = Mathf.Abs(angle - counterAngle0);
+                while (inkArcs < 4 && turned >= inkArcs * 180f)
+                {
+                    float mid = counterAngle0 + counterSpin * (inkArcs * 180f + 90f);
+                    Vfx.Slash(SlashFxKind.Ink, FlatPos + Vector3.up * 1.0f, Quaternion.Euler(0f, mid, 0f), 1.5f, null, mirror: counterSpin > 0f);
+                    inkArcs++;
+                }
+
                 if (Random.value < 0.6f)
                     Effects.Sparks(piecePos + Vector3.up * 1.2f, Vfx.Accent, 2, 4f);
 
@@ -988,7 +994,6 @@ namespace KingLastPiece
                     Game.Rig.Kick(1f);
                     Game.Rig.Shake(0.5f);
                     Effects.Shockwave(FlatPos, 2.2f, Vfx.Accent, 0.4f);
-                    Vfx.Slash(SlashFxKind.AoeA, transform.position + Vector3.up * 0.9f, transform.rotation, 1.2f, Vfx.Accent);
                     LockTarget = null;
                 }
                 float p = Mathf.Clamp01((t - CounterRelease) / (CounterDuration - CounterRelease));
