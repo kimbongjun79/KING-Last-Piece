@@ -78,7 +78,12 @@ namespace KingLastPiece
             Trees(Group(room, "Trees Outside"));
             room.localRotation = Quaternion.Euler(0f, RoomYaw, 0f);
             Furniture(Group(root, "Furniture"), prop, dark);
-            root.gameObject.AddComponent<ClassroomAmbience>();
+            var ambience = root.gameObject.AddComponent<ClassroomAmbience>();
+            // The shadow light: a directional light from high above (the main light, the only one URP shadows from).
+            var shadowLight = new GameObject("Shadow Light (overhead)").AddComponent<Light>();
+            shadowLight.transform.SetParent(root, false);
+            shadowLight.type = LightType.Directional;
+            ambience.shadowLight = shadowLight;
             return root;
         }
 
@@ -194,8 +199,8 @@ namespace KingLastPiece
             floor.gameObject.AddComponent<BoxCollider>();
             Box(root, "Outside Ground", new Vector3(0f, floorY - 3f, 0f), new Vector3(half * 12f, 1f, half * 12f), MaterialLib.Get(GroundGrey, 0.1f));
 
-            // Ceiling: no lamps — the room is lit only by the sun through the windows. The ceiling casts no shadow so a
-            // sun high enough for natural piece shadows (32°) can still reach the table over the front wall (see below).
+            // Ceiling: no lamps — the room is lit by the sun through the windows. It casts no shadow: the overhead shadow
+            // light (see ClassroomAmbience) shines down through it to give the pieces their shadows.
             Box(root, "Ceiling", new Vector3(0f, floorY + height + thick / 2f, 0f), new Vector3(half * 2f + thick, thick, half * 2f + thick),
                 MaterialLib.Get(CeilingGrey, 0.1f), shadows: false);
 
@@ -228,9 +233,7 @@ namespace KingLastPiece
             float sill = M(0.9f), top = M(2.3f), window = M(1.5f);
             string n = side > 0 ? "E" : "W";
             Box(root, $"Wall {n} Low", new Vector3(x, floorY + sill / 2f, 0f), new Vector3(thick, sill, len), wall);
-            // The east wall ends up in front of the battlefield (RoomYaw): above its windows it lets the sun through,
-            // so the light falls on the table between the shadows of the window piers.
-            Box(root, $"Wall {n} High", new Vector3(x, floorY + (top + height) / 2f, 0f), new Vector3(thick, height - top, len), wall, shadows: side < 0);
+            Box(root, $"Wall {n} High", new Vector3(x, floorY + (top + height) / 2f, 0f), new Vector3(thick, height - top, len), wall);
             const int windows = 3;
             float pier = (len - windows * window) / (windows + 1);
             var glass = MaterialLib.Transparent(new Color(0.75f, 0.88f, 1f, 0.12f));
