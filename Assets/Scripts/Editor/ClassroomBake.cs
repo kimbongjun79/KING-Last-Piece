@@ -19,6 +19,8 @@ namespace KingLastPiece.EditorTools
         const string ScenePath = "Assets/Scenes/EndlessMode.unity";
         const string ProfilePath = "Assets/Settings/ClassroomFocusBlur.asset";
         const string MaterialDir = "Assets/Materials/Classroom";
+        // SDR version: the HDR .exr is 139 MB, over GitHub's 100 MB file limit.
+        const string SkyboxPath = "Assets/3D Skybox/Mediterranean Freebies/Materials/sdr/05-Green Fields_sdr.mat";
 
         [MenuItem("KING/Setup/Bake Classroom (EndlessMode)")]
         public static void BakeMenu()
@@ -36,7 +38,7 @@ namespace KingLastPiece.EditorTools
         /// <summary>CLI: logs each furniture model's imported materials and textures (texture troubleshooting).</summary>
         public static void DiagnoseCli()
         {
-            foreach (var path in new[] { "table", "chair", "door", "plant" })
+            foreach (var path in new[] { "table", "chair", "door", "plant", "window" })
             {
                 string p = $"Assets/Resources/Models/{path}_v01_with VARCO.fbx";
                 foreach (var a in AssetDatabase.LoadAllAssetsAtPath(p))
@@ -64,7 +66,7 @@ namespace KingLastPiece.EditorTools
 
         const string ModelDir = "Assets/Resources/Models";
         const string TextureDir = ModelDir + "/Textures";
-        static readonly string[] FurnitureModels = { "table", "chair", "door", "plant" };
+        static readonly string[] FurnitureModels = { "table", "chair", "door", "plant", "window" };
 
         /// <summary>
         /// The provided models carry their textures embedded in the FBX, which the importer doesn't pull out on its
@@ -118,7 +120,9 @@ namespace KingLastPiece.EditorTools
 
             if (AssetDatabase.IsValidFolder(MaterialDir)) AssetDatabase.DeleteAsset(MaterialDir);
             var root = ClassroomBlockout.Build(arena);
-            root.GetComponent<ClassroomAmbience>().Apply();   // so the scene view shows the daylight too
+            var ambience = root.GetComponent<ClassroomAmbience>();
+            ambience.skybox = AssetDatabase.LoadAssetAtPath<Material>(SkyboxPath);
+            ambience.Apply();   // so the scene view shows the daylight too
             AddFocusBlur(root);
             // Its own material folder, cleared on every bake (no duplicates piling up).
             WorldBake.SaveMaterials(root.gameObject, MaterialDir);

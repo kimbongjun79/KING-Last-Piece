@@ -149,6 +149,16 @@ namespace KingLastPiece
                 yield return Frames(3);
                 yield return Shot("35_Desk_Game.png");
             }
+            // A champion's portrait on the wall, from in front.
+            var portrait = GameObject.Find("Portrait 13th — Garry Kasparov");
+            if (portrait != null)
+            {
+                Vector3 c = portrait.transform.position;
+                game.Rig.OverridePosition = c + portrait.transform.forward * (1.1f * m) + Vector3.up * (0.05f * m);
+                game.Rig.OverrideLookAt = c - Vector3.up * (0.06f * m);
+                yield return Frames(3);
+                yield return Shot("37_Champion_Portrait.png");
+            }
             // The chess clock beside the board.
             var clock = GameObject.Find("Chess Clock");
             if (clock != null)

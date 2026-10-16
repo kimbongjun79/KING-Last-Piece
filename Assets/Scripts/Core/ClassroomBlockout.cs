@@ -26,6 +26,7 @@ namespace KingLastPiece
         const string ChairModel = "Models/chair_v01_with VARCO";
         const string DoorModel = "Models/door_v01_with VARCO";
         const string PlantModel = "Models/plant_v01_with VARCO";
+        const string WindowModel = "Models/window_v01_with VARCO";
 
         static readonly Color WallGrey = new Color(0.86f, 0.86f, 0.84f);
         static readonly Color FloorGrey = new Color(0.66f, 0.64f, 0.6f);
@@ -33,9 +34,6 @@ namespace KingLastPiece
         static readonly Color TableWood = new Color(0.55f, 0.42f, 0.3f);
         static readonly Color DarkGrey = new Color(0.28f, 0.29f, 0.3f);
         static readonly Color CeilingGrey = new Color(0.9f, 0.9f, 0.89f);
-        static readonly Color GroundGrey = new Color(0.5f, 0.55f, 0.48f);
-        static readonly Color TreeGrey = new Color(0.38f, 0.45f, 0.36f);
-        static readonly Color TrunkGrey = new Color(0.4f, 0.36f, 0.32f);
 
         public static float M(float realMetres) => realMetres * Scale;
 
@@ -75,7 +73,6 @@ namespace KingLastPiece
             // trees. The board, the chess table and the student desks keep facing +Z — toward the windows.
             var room = Group(root, "Room");
             Room(room, wall, prop, dark);
-            Trees(Group(room, "Trees Outside"));
             room.localRotation = Quaternion.Euler(0f, RoomYaw, 0f);
             Furniture(Group(root, "Furniture"), prop, dark);
             var ambience = root.gameObject.AddComponent<ClassroomAmbience>();
@@ -197,32 +194,29 @@ namespace KingLastPiece
             float half = M(RoomHalf), height = M(RoomHeight), thick = M(WallThick), floorY = Floor;
             var floor = Box(root, "Floor", new Vector3(0f, floorY - 0.5f, 0f), new Vector3(half * 2f, 1f, half * 2f), MaterialLib.Get(FloorGrey, 0.3f));
             floor.gameObject.AddComponent<BoxCollider>();
-            Box(root, "Outside Ground", new Vector3(0f, floorY - 3f, 0f), new Vector3(half * 12f, 1f, half * 12f), MaterialLib.Get(GroundGrey, 0.1f));
 
             // Ceiling: no lamps — the room is lit by the sun through the windows. It casts no shadow: the overhead shadow
             // light (see ClassroomAmbience) shines down through it to give the pieces their shadows.
             Box(root, "Ceiling", new Vector3(0f, floorY + height + thick / 2f, 0f), new Vector3(half * 2f + thick, thick, half * 2f + thick),
                 MaterialLib.Get(CeilingGrey, 0.1f), shadows: false);
 
-            // North: chalkboard (3.6 × 1.2 m).
+            // North: the world champions 8th–12th in frames.
             Box(root, "Wall N", new Vector3(0f, floorY + height / 2f, half), new Vector3(half * 2f + thick, height, thick), wall);
-            Box(root, "Chalkboard", new Vector3(0f, floorY + M(1.5f), half - thick / 2f - M(0.02f)), new Vector3(M(3.6f), M(1.2f), M(0.03f)), dark);
-            Box(root, "Chalk Tray", new Vector3(0f, floorY + M(0.88f), half - thick / 2f - M(0.05f)), new Vector3(M(3.6f), M(0.03f), M(0.08f)), prop);
+            Portraits(root, side: 1, half, thick, floorY, 0);
 
-            // South: the door (provided model) and bookshelves.
+            // South: the door (provided model) and the champions 13th–17th.
             Box(root, "Wall S", new Vector3(0f, floorY + height / 2f, -half), new Vector3(half * 2f + thick, height, thick), wall);
             var door = Model(root, DoorModel, 2.1f, AlignWidthAlongX);
             if (door != null) door.localPosition = new Vector3(M(3f), floorY, -half + thick / 2f + M(0.03f));
-            // The teacher's desk in front of the chalkboard, and potted plants in the corners and by the chalkboard.
+            // The teacher's desk under the portraits, and potted plants in the corners and along the north wall.
             Desk(root, new Vector3(0f, 0f, half - M(0.7f)), withChair: false, game: -1, dark);
             foreach (var p in new[] { new Vector2(-1f, -1f), new Vector2(1f, -1f), new Vector2(-1f, 1f), new Vector2(1f, 1f) })
                 Plant(root, new Vector3(p.x * (half - M(0.5f)), 0f, p.y * (half - M(0.5f))));
             Plant(root, new Vector3(-M(2.3f), 0f, half - M(0.45f)));
             Plant(root, new Vector3(M(2.3f), 0f, half - M(0.45f)));
-            for (int i = 0; i < 3; i++)
-                Box(root, "Bookshelf", new Vector3(M(-3.6f + i * 1f), floorY + M(1f), -half + thick / 2f + M(0.18f)), new Vector3(M(0.9f), M(2f), M(0.35f)), prop);
+            Portraits(root, side: -1, half, thick, floorY, 5);
 
-            // East and west: three windows each (1.5 × 1.4 m, sill at 0.9 m), the trees beyond.
+            // East and west: three windows each (the provided window model, 1.39 × 1.5 m, sill at 0.85 m).
             for (int side = -1; side <= 1; side += 2)
                 WindowWall(root, side, half, height, thick, floorY, wall, dark);
         }
@@ -230,23 +224,119 @@ namespace KingLastPiece
         static void WindowWall(Transform root, int side, float half, float height, float thick, float floorY, Material wall, Material dark)
         {
             float x = side * half, len = half * 2f + thick;
-            float sill = M(0.9f), top = M(2.3f), window = M(1.5f);
+            // Openings sized to the provided window model (1.39 m wide, 1.5 m tall).
+            float sill = M(0.85f), top = M(2.35f), window = M(1.39f);
             string n = side > 0 ? "E" : "W";
             Box(root, $"Wall {n} Low", new Vector3(x, floorY + sill / 2f, 0f), new Vector3(thick, sill, len), wall);
             Box(root, $"Wall {n} High", new Vector3(x, floorY + (top + height) / 2f, 0f), new Vector3(thick, height - top, len), wall);
             const int windows = 3;
             float pier = (len - windows * window) / (windows + 1);
-            var glass = MaterialLib.Transparent(new Color(0.75f, 0.88f, 1f, 0.12f));
             for (int i = 0; i <= windows; i++)
             {
                 float z = -len / 2f + pier / 2f + i * (pier + window);
                 Box(root, $"Wall {n} Pier", new Vector3(x, floorY + (sill + top) / 2f, z), new Vector3(thick, top - sill, pier), wall);
                 if (i == windows) break;
                 float wz = z + pier / 2f + window / 2f;
-                Box(root, "Window Glass", new Vector3(x, floorY + (sill + top) / 2f, wz), new Vector3(M(0.01f), top - sill, window), glass, shadows: false);
-                Box(root, "Window Mullion", new Vector3(x, floorY + (sill + top) / 2f, wz), new Vector3(M(0.05f), top - sill, M(0.04f)), dark);
-                Box(root, "Window Transom", new Vector3(x, floorY + sill + (top - sill) * 0.66f, wz), new Vector3(M(0.05f), M(0.04f), window), dark);
+                // The window frame model in the opening, its thin side across the wall.
+                var frame = Model(root, WindowModel, top / Scale - sill / Scale, m =>
+                {
+                    var b = Bounds(m);
+                    if (b.size.x > b.size.z) m.localRotation = Quaternion.Euler(0f, 90f, 0f) * m.localRotation;
+                });
+                if (frame != null)
+                {
+                    frame.localPosition = new Vector3(x, floorY + sill, wz);
+                    // Centred in the opening and in the wall's thickness (the model's pivot is at its base centre).
+                    var b = Bounds(frame);
+                    frame.position += new Vector3(x - b.center.x, 0f, wz - b.center.z);
+                }
+                else Box(root, "Window Glass", new Vector3(x, floorY + (sill + top) / 2f, wz), new Vector3(M(0.01f), top - sill, window),
+                    MaterialLib.Transparent(new Color(0.75f, 0.88f, 1f, 0.12f)), shadows: false);
             }
+        }
+
+        // ---------------------------------------------------------------- portraits
+
+        /// <summary>World chess champions with a portrait in Resources/Textures/Chess_Champion_Photo (8th–17th).</summary>
+        static readonly (int n, string name, string years)[] Champions =
+        {
+            (8, "Mikhail Tal", "1960-1961"),
+            (9, "Tigran Petrosian", "1963-1969"),
+            (10, "Boris Spassky", "1969-1972"),
+            (11, "Bobby Fischer", "1972-1975"),
+            (12, "Anatoly Karpov", "1975-1985"),
+            (13, "Garry Kasparov", "1985-2000"),
+            (14, "Vladimir Kramnik", "2000-2007"),
+            (15, "Viswanathan Anand", "2007-2013"),
+            (16, "Magnus Carlsen", "2013-2023"),
+            (17, "Ding Liren", "2023-2024"),
+        };
+
+        static string Ordinal(int n) => n + (n % 10 == 1 && n != 11 ? "st" : n % 10 == 2 && n != 12 ? "nd" : n % 10 == 3 && n != 13 ? "rd" : "th");
+
+        /// <summary>
+        /// Five framed portraits along a wall (north: side 1, south: side −1), starting at champion <paramref name="first"/>:
+        /// a 40 × 50 cm photo in a dark wooden frame with a gilt inner edge, hung with its centre at 1.6 m, and a brass
+        /// name plate below. The south row stays clear of the door.
+        /// </summary>
+        static void Portraits(Transform root, int side, float half, float thick, float floorY, int first)
+        {
+            float[] xs = side > 0 ? new[] { -3.2f, -1.6f, 0f, 1.6f, 3.2f } : new[] { -3.6f, -2.2f, -0.8f, 0.6f, 2.0f };
+            float wallFace = side * (half - thick / 2f);
+            var wood = MaterialLib.Get(new Color(0.16f, 0.1f, 0.06f), 0.45f);
+            var gilt = MaterialLib.Get(new Color(0.78f, 0.62f, 0.32f), 0.7f, 0.8f);
+            var plate = MaterialLib.Get(new Color(0.7f, 0.58f, 0.32f), 0.65f, 0.85f);
+            var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            for (int i = 0; i < 5 && first + i < Champions.Length; i++)
+            {
+                var c = Champions[first + i];
+                var tex = Resources.Load<Texture2D>($"Textures/Chess_Champion_Photo/{Ordinal(c.n)}_Chess_Champion_Photo");
+                var p = Group(root, $"Portrait {Ordinal(c.n)} — {c.name}");
+                p.localPosition = new Vector3(M(xs[i]), floorY + M(1.6f), wallFace);
+                p.localRotation = Quaternion.Euler(0f, side > 0 ? 180f : 0f, 0f);   // facing into the room
+                float w = M(0.4f), h = M(0.5f), border = M(0.045f), depth = M(0.025f);
+                // Frame: four wooden bars, a gilt lip, the photo.
+                Box(p, "Frame Top", new Vector3(0f, h / 2f + border / 2f, depth / 2f), new Vector3(w + border * 2f, border, depth), wood);
+                Box(p, "Frame Bottom", new Vector3(0f, -h / 2f - border / 2f, depth / 2f), new Vector3(w + border * 2f, border, depth), wood);
+                Box(p, "Frame Left", new Vector3(-w / 2f - border / 2f, 0f, depth / 2f), new Vector3(border, h, depth), wood);
+                Box(p, "Frame Right", new Vector3(w / 2f + border / 2f, 0f, depth / 2f), new Vector3(border, h, depth), wood);
+                Box(p, "Gilt Lip", new Vector3(0f, 0f, depth * 0.35f), new Vector3(w + M(0.012f), h + M(0.012f), depth * 0.3f), gilt);
+                var photo = Box(p, "Photo", new Vector3(0f, 0f, depth * 0.55f), new Vector3(w, h, M(0.002f)), tex != null ? PhotoMaterial(tex) : wood, shadows: false);
+                photo.localRotation = Quaternion.Euler(0f, 180f, 180f);   // the cube's −Z face toward the room, upright
+                // Name plate and its engraving.
+                var plateT = Box(p, "Name Plate", new Vector3(0f, -h / 2f - border - M(0.05f), M(0.004f)), new Vector3(M(0.34f), M(0.045f), M(0.006f)), plate);
+                Engrave(p, font, $"{Ordinal(c.n).ToUpperInvariant()} WORLD CHAMPION", new Vector3(0f, plateT.localPosition.y + M(0.011f), M(0.0075f)), M(0.0075f));
+                Engrave(p, font, $"{c.name}   {c.years}", new Vector3(0f, plateT.localPosition.y - M(0.008f), M(0.0075f)), M(0.0105f));
+            }
+        }
+
+        static Material PhotoMaterial(Texture2D tex)
+        {
+            var m = new Material(MaterialLib.Get(Color.white, 0.25f));   // its own copy: the white base is shared
+            m.SetTexture("_BaseMap", tex);
+            m.SetTexture("_MainTex", tex);
+            m.name = "Portrait " + tex.name;
+            return m;
+        }
+
+        /// <summary>Dark text on a plate (legacy text mesh, facing the room like the frame).</summary>
+        static void Engrave(Transform parent, Font font, string text, Vector3 pos, float height)
+        {
+            var go = new GameObject("Engraving");
+            go.transform.SetParent(parent, false);
+            go.transform.localPosition = pos;
+            go.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
+            var tm = go.AddComponent<TextMesh>();
+            tm.font = font;
+            tm.text = text;
+            tm.anchor = TextAnchor.MiddleCenter;
+            tm.alignment = TextAlignment.Center;
+            tm.fontSize = 64;
+            tm.characterSize = height / 2.8f;   // sized so the longest line fits the plate
+            tm.color = new Color(0.12f, 0.08f, 0.04f);
+            var r = go.GetComponent<MeshRenderer>();
+            r.sharedMaterial = font.material;
+            r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         }
 
         // ---------------------------------------------------------------- furniture
@@ -404,35 +494,6 @@ namespace KingLastPiece
             if (back.sqrMagnitude < 1e-4f) return;
             float yaw = Vector3.SignedAngle(back.normalized, Vector3.back, Vector3.up);
             m.localRotation = Quaternion.Euler(0f, yaw, 0f) * m.localRotation;
-        }
-
-        // ---------------------------------------------------------------- outside
-
-        /// <summary>Grey-box trees outside the window walls (6–10 m tall in real life), and a few beyond the others.</summary>
-        static void Trees(Transform root)
-        {
-            var trunk = MaterialLib.Get(TrunkGrey, 0.1f);
-            var crown = MaterialLib.Get(TreeGrey, 0.1f);
-            var rng = new System.Random(7);
-            float R(float a, float b) => a + (float)rng.NextDouble() * (b - a);
-            float half = M(RoomHalf);
-            for (int i = 0; i < 40; i++)
-            {
-                int sideKind = i % 4;   // 0, 1: east / west (window views), 2: north, 3: south
-                float along = M(R(-12f, 12f)), out_ = half + M(R(3f, 16f));
-                Vector3 p = sideKind < 2
-                    ? new Vector3((sideKind == 0 ? 1 : -1) * out_, 0f, along)
-                    : new Vector3(along, 0f, (sideKind == 2 ? 1 : -1) * out_);
-                float h = M(R(6f, 10f)), w = M(R(3f, 5f));
-                var tree = new GameObject("Tree").transform;
-                tree.SetParent(root, false);
-                tree.localPosition = new Vector3(p.x, Floor - 2.5f, p.z);
-                PieceFactory.Part(PrimitiveType.Cylinder, tree, new Vector3(0f, h * 0.3f, 0f), new Vector3(M(0.35f), h * 0.3f, M(0.35f)), trunk).name = "Trunk";
-                PieceFactory.Part(PrimitiveType.Sphere, tree, new Vector3(0f, h * 0.72f, 0f), new Vector3(w, w * 0.85f, w), crown).name = "Crown";
-                PieceFactory.Part(PrimitiveType.Sphere, tree, new Vector3(w * 0.25f, h * 0.72f + w * 0.35f, 0f), Vector3.one * w * 0.65f, crown).name = "Crown";
-                // Trees don't shade the windows: the low sun has to reach the battlefield.
-                foreach (var r in tree.GetComponentsInChildren<Renderer>()) r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-            }
         }
 
         static Transform Box(Transform parent, string name, Vector3 pos, Vector3 size, Material mat, bool shadows = true)

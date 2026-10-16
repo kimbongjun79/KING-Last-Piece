@@ -31,6 +31,8 @@ namespace KingLastPiece
         public float shadowDistance = 90f;
 
         [Header("Room")]
+        [Tooltip("Sky seen through the windows (3D Skybox ▸ 05-Green Fields, SDR).")]
+        public Material skybox;
         public Color ambient = new Color(0.26f, 0.27f, 0.3f);
         public Color sky = new Color(0.66f, 0.77f, 0.9f);
         public Color fog = new Color(0.5f, 0.54f, 0.6f);
@@ -81,10 +83,12 @@ namespace KingLastPiece
             RenderSettings.fogColor = fog;
             RenderSettings.fogStartDistance = fogStart;
             RenderSettings.fogEndDistance = fogEnd;
+            if (skybox != null) RenderSettings.skybox = skybox;
             var cam = Camera.main;
             if (cam != null)
             {
                 cam.backgroundColor = sky;
+                cam.clearFlags = skybox != null ? CameraClearFlags.Skybox : CameraClearFlags.SolidColor;
                 cam.farClipPlane = farClip;
             }
             if (Application.isPlaying && UnityEngine.Rendering.GraphicsSettings.currentRenderPipeline is UniversalRenderPipelineAsset urp)
