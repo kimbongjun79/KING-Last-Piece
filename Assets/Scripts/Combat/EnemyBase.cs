@@ -196,6 +196,7 @@ namespace KingLastPiece
 
         float damageMult = 1f, tempo = 1f;
         GameObject aura;
+        float auraOpacity = 1f;
 
         /// <summary>
         /// Makes this piece an empowered piece of the given tier (0 leaves it normal) and scales its health by
@@ -297,6 +298,14 @@ namespace KingLastPiece
                 case EState.Getup:
                     UpdateGetup();
                     break;
+            }
+
+            // While winding up and striking, the black aura steps back so the red wind-up glow on the piece reads clearly.
+            if (aura != null)
+            {
+                float target = state == EState.Windup || state == EState.Attack ? 0.12f : 1f;
+                float next = Mathf.MoveTowards(auraOpacity, target, dt * 5f);
+                if (next != auraOpacity) EliteAura.SetOpacity(aura, auraOpacity = next);
             }
 
             if (moving && !wasMoving) Sfx.Play("EN_Move_Slide", transform.position);

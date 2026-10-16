@@ -39,6 +39,7 @@ namespace KingLastPiece
             yield return Frames(60);
 
             yield return EliteTiers();
+            yield return DarkWindup();
             yield return RoundShot(11, "21_Round11_First_Dark_Pawn.png", closeOnElite: true);
             yield return RoundShot(29, "22_Round29_Half_Dark.png", closeOnElite: false);
             yield return RoundShot(20, "23_Round20_Dark_Queen.png", closeOnElite: true);
@@ -115,6 +116,27 @@ namespace KingLastPiece
             yield return Shot("20_Dark_Tiers.png");
             if (hud != null) hud.enabled = true;
             game.DebugTogglePause();
+            game.Rig.UseOverride = false;
+            game.ClearEnemies();
+        }
+
+        /// <summary>A Dark III rook winding up next to the King: the aura should step back so the red glow shows.</summary>
+        IEnumerator DarkWindup()
+        {
+            game.ClearEnemies();
+            var at = GameManager.SquareToWorld("e4");
+            game.Player.ReturnToStart(at, 0f);
+            var rook = game.SpawnEmpowered(PieceType.Rook, 3, at + new Vector3(0f, 0f, 2f));
+            for (int f = 0; f < 600 && !(rook.IsAttacking && rook.WindupProgress > 0.7f); f++) yield return null;
+            game.Rig.UseOverride = true;
+            game.Rig.OverridePosition = rook.FlatPos + new Vector3(2.6f, 2.4f, -2.6f);
+            game.Rig.OverrideLookAt = rook.FlatPos + Vector3.up * 1f;
+            var hud = game.GetComponent<Hud>();
+            if (hud != null) hud.enabled = false;
+            yield return Frames(2);
+            yield return Shot("31_Dark_Windup.png");
+            if (hud != null) hud.enabled = true;
+            stats.Append($"DarkWindup\tattacking={rook.IsAttacking}\twindup={rook.WindupProgress:0.00}\n");
             game.Rig.UseOverride = false;
             game.ClearEnemies();
         }

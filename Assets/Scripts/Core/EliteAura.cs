@@ -74,6 +74,22 @@ namespace KingLastPiece
             return fx;
         }
 
+        static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
+        static MaterialPropertyBlock mpb;
+
+        /// <summary>Fades the aura (0 = gone, 1 = full) without touching the shared materials.</summary>
+        public static void SetOpacity(GameObject aura, float opacity)
+        {
+            if (aura == null) return;
+            mpb ??= new MaterialPropertyBlock();
+            foreach (var r in aura.GetComponentsInChildren<ParticleSystemRenderer>())
+            {
+                r.GetPropertyBlock(mpb);
+                mpb.SetColor(BaseColorId, new Color(0.03f, 0.03f, 0.035f, opacity));
+                r.SetPropertyBlock(mpb);
+            }
+        }
+
         static Material[] Swap(FxLibrary lib, Material[] mats)
         {
             if (lib.eliteAuraSource == null || lib.eliteAuraBlack == null) return mats;
