@@ -194,13 +194,9 @@ namespace KingLastPiece
             floor.gameObject.AddComponent<BoxCollider>();
             Box(root, "Outside Ground", new Vector3(0f, floorY - 3f, 0f), new Vector3(half * 12f, 1f, half * 12f), MaterialLib.Get(GroundGrey, 0.1f));
 
-            // Ceiling with light panels (no shadow: the sun comes in at an angle the windows alone couldn't light the table at).
+            // Ceiling: no lamps — the room is lit only by the sun through the windows, so the ceiling and walls cast shadows.
             Box(root, "Ceiling", new Vector3(0f, floorY + height + thick / 2f, 0f), new Vector3(half * 2f + thick, thick, half * 2f + thick),
-                MaterialLib.Get(CeilingGrey, 0.1f), shadows: false);
-            var panel = MaterialLib.Get(new Color(0.97f, 0.97f, 0.95f), 0.1f, 0f, new Color(0.6f, 0.6f, 0.58f));
-            for (int i = -1; i <= 1; i++)
-                for (int j = -1; j <= 1; j += 2)
-                    Box(root, "Ceiling Light", new Vector3(i * M(3f), floorY + height - M(0.02f), j * M(1.8f)), new Vector3(M(1.2f), M(0.04f), M(0.3f)), panel, shadows: false);
+                MaterialLib.Get(CeilingGrey, 0.1f));
 
             // North: chalkboard (3.6 × 1.2 m).
             Box(root, "Wall N", new Vector3(0f, floorY + height / 2f, half), new Vector3(half * 2f + thick, height, thick), wall);
@@ -428,6 +424,8 @@ namespace KingLastPiece
                 PieceFactory.Part(PrimitiveType.Cylinder, tree, new Vector3(0f, h * 0.3f, 0f), new Vector3(M(0.35f), h * 0.3f, M(0.35f)), trunk).name = "Trunk";
                 PieceFactory.Part(PrimitiveType.Sphere, tree, new Vector3(0f, h * 0.72f, 0f), new Vector3(w, w * 0.85f, w), crown).name = "Crown";
                 PieceFactory.Part(PrimitiveType.Sphere, tree, new Vector3(w * 0.25f, h * 0.72f + w * 0.35f, 0f), Vector3.one * w * 0.65f, crown).name = "Crown";
+                // Trees don't shade the windows: the low sun has to reach the battlefield.
+                foreach (var r in tree.GetComponentsInChildren<Renderer>()) r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             }
         }
 
