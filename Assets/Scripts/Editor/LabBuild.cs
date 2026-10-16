@@ -7,7 +7,7 @@ namespace KingLastPiece.EditorTools
     /// <summary>Builds standalone players for the game, the practice arena and the effects lab.</summary>
     public static class LabBuild
     {
-        const string GameScene = "Assets/Scenes/SampleScene.unity";
+        const string GameScene = "Assets/Scenes/teat.unity";   // the endless mode (the classic SampleScene was retired)
         const string PracticeScene = "Assets/Scenes/Practice.unity";
         const string EffectsScene = "Assets/Scenes/EffectsLab.unity";
 

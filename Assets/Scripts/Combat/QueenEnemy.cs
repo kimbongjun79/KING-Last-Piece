@@ -36,11 +36,9 @@ namespace KingLastPiece
                 Flash(new Color(2f, 0.2f, 0.1f), 0.4f);
                 Effects.DarkWave(transform.position, 5f, 0.7f);
                 Game.Rig.Shake(0.5f);
-                Game.ShowBanner("The Queen summons her pawns");
-                Vector3 side = transform.right * 3f;
-                // Summoned pawns appear on the squares to either side of her.
-                Game.SpawnEnemy(PieceType.Pawn, BoardSlots.Center(BoardSlots.ToSquare(FlatPos + side)));
-                Game.SpawnEnemy(PieceType.Pawn, BoardSlots.Center(BoardSlots.ToSquare(FlatPos - side)));
+                // Two pawns in the classic game; in the endless mode more and stronger pieces as the bosses go on.
+                Game.ShowBanner(Game.IsEndless && Game.Round >= 20 ? "The Queen summons her army" : "The Queen summons her pawns");
+                Game.SummonFor(this);
                 cooldown = 1.2f;
                 return;
             }

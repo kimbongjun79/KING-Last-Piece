@@ -20,6 +20,8 @@ namespace KingLastPiece
             float hp = g.Player.Health;
             hpTrail = hp > hpTrail ? hp : Mathf.MoveTowards(hpTrail, hp, 40f * dt);
 
+            if (g.Paused && GameInput.MenuStep != 0) pauseTab = (pauseTab + GameInput.MenuStep + PauseTabs.Length) % PauseTabs.Length;
+
             var boss = g.Boss;
             float bf = boss != null ? boss.Health / boss.MaxHealth : 0f;
             bossTrail = bf > bossTrail ? bf : Mathf.MoveTowards(bossTrail, bf, 0.25f * dt);
@@ -66,12 +68,13 @@ namespace KingLastPiece
             DrawJustDodge(g);
             DrawBanner(g);
             DrawPopups(g);
-            if (g.CurrentMode == GameManager.Mode.Game) DrawRound(g);
+            if (g.UsesRounds) DrawRound(g);
             DrawControlsHint();
             if (g.CurrentMode == GameManager.Mode.Practice) DrawPracticePanel();
 
             if (g.State == GameManager.GameState.Dead) DrawDeath(g);
-            if (g.Paused) DrawPause();
+            if (g.State == GameManager.GameState.Upgrade) DrawUpgrades(g);
+            if (g.Paused) DrawPause(g);
         }
 
         // ---------------------------------------------------------------- pieces
@@ -99,7 +102,7 @@ namespace KingLastPiece
 
             // Stamina (pulses amber when nearly empty).
             float sy = y + h + 10 * u, sw = 320 * u, sh = 13 * u;
-            float st = p.Stamina / PlayerController.MaxStamina;
+            float st = p.Stamina / p.MaxStamina;
             bool low = st < 0.25f;
             float pulse = low ? 0.5f + 0.5f * Mathf.Sin(Time.unscaledTime * 10f) : 0f;
             Color stMain = Color.Lerp(new Color(0.2f, 0.55f, 0.28f), new Color(0.85f, 0.55f, 0.15f), pulse);
@@ -108,9 +111,9 @@ namespace KingLastPiece
 
             // Royal Flasks: little gold vials.
             float fy = sy + sh + 8 * u;
-            for (int i = 0; i < PlayerController.MaxFlasks; i++)
+            for (int i = 0; i < p.MaxFlasks; i++)
                 DrawVial(new Rect(bx + i * 28 * u, fy, 19 * u, 30 * u), i < p.Flasks);
-            SmallText(new Rect(bx + PlayerController.MaxFlasks * 28 * u + 4 * u, fy + 6 * u, 120 * u, 22 * u),
+            SmallText(new Rect(bx + p.MaxFlasks * 28 * u + 4 * u, fy + 6 * u, 120 * u, 22 * u),
                 $"FLASK  x{p.Flasks}", TextAnchor.MiddleLeft, 15);
         }
 
@@ -124,14 +127,14 @@ namespace KingLastPiece
             if (p.IsDead) return;
             Vector3 sp = g.Rig.Cam.WorldToScreenPoint(p.transform.position);
             if (sp.z < 0f) return;
-            bool full = p.DodgeCharges >= PlayerController.MaxDodges;
+            bool full = p.DodgeCharges >= p.MaxDodges;
             float target = full ? 0.45f : 1f;
             rollAlpha = Mathf.MoveTowards(rollAlpha, target, Time.unscaledDeltaTime * 3f);
 
             float ds = 9 * scale, gap = 24 * scale;
-            float cx = sp.x - (PlayerController.MaxDodges - 1) * gap / 2f;
+            float cx = sp.x - (p.MaxDodges - 1) * gap / 2f;
             float cy = Screen.height - sp.y + 34 * scale;
-            for (int i = 0; i < PlayerController.MaxDodges; i++)
+            for (int i = 0; i < p.MaxDodges; i++)
             {
                 var c = new Vector2(cx + i * gap, cy);
                 Diamond(c, ds + 3 * scale, new Color(0f, 0f, 0f, 0.6f * rollAlpha));
@@ -281,7 +284,8 @@ namespace KingLastPiece
         void DrawRound(GameManager g)
         {
             var r = new Rect(0, 18 * scale, Screen.width, 30 * scale);
-            Text(r, $"ROUND {g.WaveIndex + 1} / {g.WaveCount}", small, new Color(0.9f, 0.85f, 0.7f, 0.85f));
+            string round = g.IsEndless ? $"ROUND {g.Round}     BOARD {BoardSlots.Size}×{BoardSlots.Size}" : $"ROUND {g.WaveIndex + 1} / {g.WaveCount}";
+            Text(r, round, small, new Color(0.9f, 0.85f, 0.7f, 0.85f));
         }
 
         void DrawPopups(GameManager g)
@@ -314,6 +318,7 @@ namespace KingLastPiece
                 $"I     Infinite stamina: {(arena.InfiniteStamina ? "ON" : "OFF")}",
                 $"H     Hit-stop: {(g.HitStopEnabled ? "ON" : "OFF")}",
                 $"V     Board slots: {(arena.SlotViewOn ? "ON" : "OFF")}",
+                $"E     Spawn tier: {(arena.SpawnTier == 0 ? "normal" : "Dark " + new string('I', arena.SpawnTier))}",
             };
             Fill(new Rect(x, y, w, (rows.Length + 1.6f) * line + 16 * scale), new Color(0f, 0f, 0f, 0.6f));
             x += 14 * scale;
@@ -353,7 +358,7 @@ namespace KingLastPiece
         void DrawControlsHint()
         {
             var r = new Rect(20 * scale, Screen.height - 40 * scale, Screen.width, 30 * scale);
-            Text(r, "WASD Move   Shift Sprint   Mouse Look   LMB Light (hold)   RMB Heavy   Space Roll (x3)   Q Lock-on   R Flask   Esc Pause",
+            Text(r, "WASD Move   Shift Sprint   Mouse Look   LMB Light (hold)   RMB Heavy   Space Roll   Q Lock-on   R Flask   Esc Pause",
                 new GUIStyle(label) { fontSize = Mathf.RoundToInt(15 * scale), fontStyle = FontStyle.Normal },
                 new Color(1f, 1f, 1f, 0.45f));
         }
@@ -405,12 +410,125 @@ namespace KingLastPiece
                     new Color(1f, 1f, 1f, a));
         }
 
-        void DrawPause()
+        // ---------------------------------------------------------------- pause (tabs: game / stats)
+
+        int pauseTab;
+        /// <summary>Pause screen tab: 0 game, 1 stats.</summary>
+        public int PauseTab { get => pauseTab; set => pauseTab = value; }
+        Vector2 lastMouse;
+        static readonly string[] PauseTabs = { "GAME", "STATS" };
+
+        void DrawPause(GameManager g)
         {
-            Fill(new Rect(0, 0, Screen.width, Screen.height), new Color(0, 0, 0, 0.55f));
-            Text(new Rect(0, Screen.height * 0.4f, Screen.width, 60 * scale), "PAUSED", mid, Color.white);
-            Text(new Rect(0, Screen.height * 0.4f + 60 * scale, Screen.width, 40 * scale), "Esc / Start to resume", small,
-                new Color(0.8f, 0.8f, 0.8f));
+            Fill(new Rect(0, 0, Screen.width, Screen.height), new Color(0, 0, 0, 0.6f));
+
+            // Tab bar: click, ←/→ (A/D) or the pad's shoulders (keys handled in Update).
+            float tw = 200 * scale, th = 44 * scale, tx = (Screen.width - tw * PauseTabs.Length) / 2f, ty = Screen.height * 0.16f;
+            for (int i = 0; i < PauseTabs.Length; i++)
+            {
+                var r = new Rect(tx + i * tw, ty, tw - 8 * scale, th);
+                if (Event.current.type == EventType.MouseDown && r.Contains(Event.current.mousePosition)) { pauseTab = i; Event.current.Use(); }
+                bool on = i == pauseTab;
+                Fill(r, on ? new Color(Gold.r, Gold.g, Gold.b, 0.85f) : new Color(1f, 1f, 1f, 0.08f));
+                Text(r, PauseTabs[i], small, on ? new Color(0.08f, 0.06f, 0.05f) : new Color(0.85f, 0.82f, 0.75f));
+            }
+            Text(new Rect(0, ty + th + 6 * scale, Screen.width, 26 * scale), "← / →  switch tab", new GUIStyle(small) { fontSize = Mathf.RoundToInt(15 * scale) },
+                new Color(1f, 1f, 1f, 0.4f));
+
+            if (pauseTab == 0)
+            {
+                Text(new Rect(0, Screen.height * 0.4f, Screen.width, 60 * scale), "PAUSED", mid, Color.white);
+                Text(new Rect(0, Screen.height * 0.4f + 60 * scale, Screen.width, 40 * scale), "Esc / Start to resume", small,
+                    new Color(0.8f, 0.8f, 0.8f));
+            }
+            else DrawStats(g.Player, new Rect((Screen.width - 640 * scale) / 2f, ty + th + 50 * scale, 640 * scale, 0f));
+        }
+
+        /// <summary>The King's stats (pause ▸ STATS).</summary>
+        void DrawStats(PlayerController p, Rect area)
+        {
+            var s = p.Stats;
+            float dmgCut = 1f - s.DamageTaken(100f) / 100f;
+            (string name, string value)[] rows =
+            {
+                ("Attack Power", $"{Mathf.RoundToInt(s.attackPower * 100f)}%"),
+                ("Defense", $"{Mathf.RoundToInt(s.defense)}   (−{Mathf.RoundToInt(dmgCut * 100f)}% damage taken)"),
+                ("Max Health", $"{Mathf.RoundToInt(p.MaxHealth)}"),
+                ("Attack Speed", $"{Mathf.RoundToInt(s.attackSpeed * 100f)}%   (max 135%)"),
+                ("Attack Range", $"{Mathf.RoundToInt(s.attackRange * 100f)}%   (max 130%)"),
+                ("Max Stamina", $"{Mathf.RoundToInt(p.MaxStamina)}"),
+                ("Stamina per Attack", $"light {p.LightAttackCost:0.#}   ·   heavy {p.HeavyAttackCost:0.#}"),
+                ("Royal Flasks", $"{p.MaxFlasks}   (max 5)   ·   heals {Mathf.RoundToInt(s.healAmount)}"),
+                ("Roll Charges", $"{p.MaxDodges}   (max 3)   ·   {p.DodgeRechargeTime:0.00}s to refill"),
+            };
+            float line = 40 * scale;
+            var r = new Rect(area.x, area.y, area.width, rows.Length * line + 28 * scale);
+            Fill(r, new Color(0f, 0f, 0f, 0.55f));
+            Fill(new Rect(r.x, r.y, r.width, 2 * scale), new Color(Gold.r, Gold.g, Gold.b, 0.7f));
+            var name = new GUIStyle(label) { fontSize = Mathf.RoundToInt(20 * scale) };
+            var value = new GUIStyle(label) { fontSize = Mathf.RoundToInt(20 * scale), fontStyle = FontStyle.Normal, alignment = TextAnchor.MiddleRight };
+            float y = r.y + 14 * scale;
+            for (int i = 0; i < rows.Length; i++)
+            {
+                if (i % 2 == 0) Fill(new Rect(r.x + 8 * scale, y, r.width - 16 * scale, line), new Color(1f, 1f, 1f, 0.04f));
+                Text(new Rect(r.x + 24 * scale, y, r.width * 0.45f, line), rows[i].name, name, Gold);
+                Text(new Rect(r.x + 24 * scale, y, r.width - 48 * scale, line), rows[i].value, value, new Color(0.93f, 0.9f, 0.83f));
+                y += line;
+            }
+        }
+
+        // ---------------------------------------------------------------- round-end upgrades (endless)
+
+        /// <summary>Five cards; click, press 1–5, or move with ←/→ and confirm. Two are kept.</summary>
+        void DrawUpgrades(GameManager g)
+        {
+            var p = g.Player;
+            float a = Mathf.Clamp01(g.StateTime / 0.35f);
+            Fill(new Rect(0, 0, Screen.width, Screen.height), new Color(0f, 0f, 0f, 0.55f * a));
+            int left = Mathf.Min(Upgrades.Picks, g.Offers.Count) - g.Picked.Count;
+            Text(new Rect(0, Screen.height * 0.17f, Screen.width, 50 * scale), $"ROUND {g.Round} CLEARED", mid, new Color(Gold.r, Gold.g, Gold.b, a));
+            Text(new Rect(0, Screen.height * 0.17f + 52 * scale, Screen.width, 34 * scale),
+                left > 0 ? $"Choose {left} upgrade{(left > 1 ? "s" : "")}  —  click, 1–{g.Offers.Count}, or ← → and Enter" : "Onward",
+                small, new Color(0.9f, 0.88f, 0.8f, a));
+
+            int n = g.Offers.Count;
+            float cw = 250 * scale, ch = 300 * scale, gap = 22 * scale;
+            float x0 = (Screen.width - (n * cw + (n - 1) * gap)) / 2f, y0 = Screen.height * 0.36f;
+            var title = new GUIStyle(label) { alignment = TextAnchor.MiddleCenter, fontSize = Mathf.RoundToInt(24 * scale), wordWrap = true };
+            var amount = new GUIStyle(big) { fontSize = Mathf.RoundToInt(56 * scale) };
+            var info = new GUIStyle(small) { fontSize = Mathf.RoundToInt(19 * scale) };
+            var e = Event.current;
+            // Hover follows the mouse only when it moves, so the keys / pad can steer the cursor too.
+            bool mouseMoved = e.type == EventType.Repaint && (e.mousePosition - lastMouse).sqrMagnitude > 1f;
+            if (e.type == EventType.Repaint) lastMouse = e.mousePosition;
+            for (int i = 0; i < n; i++)
+            {
+                var r = new Rect(x0 + i * (cw + gap), y0, cw, ch);
+                bool picked = g.Picked.Contains(i);
+                if (mouseMoved && r.Contains(e.mousePosition)) g.OfferCursor = i;
+                if (e.type == EventType.MouseDown && r.Contains(e.mousePosition)) { g.PickUpgrade(i); e.Use(); }
+                bool hot = g.OfferCursor == i && !picked;
+                float lift = hot ? 10 * scale : 0f;
+                r.y -= lift;
+
+                Fill(new Rect(r.x - 3 * scale, r.y - 3 * scale, r.width + 6 * scale, r.height + 6 * scale),
+                    picked ? new Color(Gold.r, Gold.g, Gold.b, a) : hot ? new Color(0.95f, 0.92f, 0.85f, a) : new Color(Gold.r * 0.5f, Gold.g * 0.5f, Gold.b * 0.5f, a));
+                Fill(r, picked ? new Color(0.22f, 0.17f, 0.08f, 0.97f * a) : new Color(0.06f, 0.055f, 0.06f, 0.97f * a));
+                // Chess-tile header strip.
+                for (int k = 0; k < 8; k++)
+                    Fill(new Rect(r.x + k * r.width / 8f, r.y, r.width / 8f, 10 * scale), (k % 2 == 0 ? new Color(0.9f, 0.87f, 0.78f, a) : new Color(0.12f, 0.1f, 0.1f, a)));
+
+                var u = g.Offers[i];
+                Text(new Rect(r.x, r.y + 14 * scale, 34 * scale, 34 * scale), (i + 1).ToString(), info, new Color(1f, 1f, 1f, 0.5f * a));
+                Text(new Rect(r.x + 12 * scale, r.y + 40 * scale, r.width - 24 * scale, 64 * scale), u.Title.ToUpperInvariant(), title, new Color(Gold.r, Gold.g, Gold.b, a));
+                Text(new Rect(r.x, r.y + 110 * scale, r.width, 80 * scale), u.AmountText, amount, new Color(0.96f, 0.94f, 0.88f, a));
+                Text(new Rect(r.x, r.y + 200 * scale, r.width, 34 * scale), picked ? "TAKEN" : Upgrades.Preview(p.Stats, u), info,
+                    picked ? new Color(Gold.r, Gold.g, Gold.b, a) : new Color(0.75f, 0.73f, 0.68f, a));
+                var d = Upgrades.Def(u.kind);
+                if (!float.IsInfinity(d.cap))
+                    Text(new Rect(r.x, r.y + 236 * scale, r.width, 30 * scale), d.percent ? $"max {Mathf.RoundToInt(d.cap * 100f)}%" : $"max {Mathf.RoundToInt(d.cap)}",
+                        new GUIStyle(info) { fontSize = Mathf.RoundToInt(15 * scale) }, new Color(1f, 1f, 1f, 0.35f * a));
+            }
         }
 
         // ---------------------------------------------------------------- primitives

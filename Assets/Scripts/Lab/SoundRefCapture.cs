@@ -218,7 +218,7 @@ namespace KingLastPiece
             yield return Frames(50);
             player.TakeHit(60f, 40f, player.transform.position + player.transform.forward);
             yield return Frames(50);
-            for (int i = 0; i < PlayerController.MaxFlasks + 1; i++)
+            for (int i = 0; i < player.MaxFlasks + 1; i++)
             {
                 player.Press(PlayerController.Buffered.Heal);
                 yield return Frames(100);

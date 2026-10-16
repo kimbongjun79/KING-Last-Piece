@@ -20,6 +20,20 @@ MonoBehaviour:
   slashWater: {fileID: 607914935907159708, guid: 22b9fc8929c1f1e43b844b37ab4cb21b, type: 3}
   slashAoeA: {fileID: 6855955652325114174, guid: f8dc879bd6649cb4782409815764d676, type: 3}
   recoverHold: {fileID: 100004, guid: d9751637d4fc2de40a234b45e10cb88d, type: 3}
+  eliteAura:
+  - {fileID: 2720650084040897827, guid: de283b37bdd532540a43a9dabc14ffce, type: 3}
+  - {fileID: 6397433411572311964, guid: 3ad6581d9e6a10e4987680f1483aab44, type: 3}
+  - {fileID: 6098213378169517917, guid: 158e426725463794cae0a836b2491d0b, type: 3}
+  eliteAuraSource:
+  - {fileID: 2100000, guid: 5128396eb71c75f49854866176356e38, type: 2}
+  - {fileID: 2100000, guid: 8ebb21c657e555f4c872abc85f091294, type: 2}
+  - {fileID: 2100000, guid: 5fb897f5b2ce1b94d9ce8c75213d1cac, type: 2}
+  - {fileID: 2100000, guid: 1ca788d9de917624296dbc7c512915ee, type: 2}
+  eliteAuraBlack:
+  - {fileID: 2100000, guid: cecd252395eddae4b959e8411c8433a0, type: 2}
+  - {fileID: 2100000, guid: 42a7c19bc8451c74b8c713b900e9af6d, type: 2}
+  - {fileID: 2100000, guid: 97b655c6ed10d5b43bde68dd21c87b01, type: 2}
+  - {fileID: 2100000, guid: 3e00f4fac1b4d41499fcf8dd93191858, type: 2}
   crackDecal: {fileID: 2100000, guid: 9ec0894b2095afd46bf21847e77c3c2a, type: 2}
   crackTextures:
   - {fileID: 2800000, guid: 8edc32bb14d82ec43960bcdf251ef64a, type: 3}

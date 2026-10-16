@@ -13,8 +13,11 @@ namespace KingLastPiece
         enum State { Normal, Attack, Dodge, Heal, Stagger, Counter, Dead }
         public enum Buffered { None, Light, Heavy, Dodge, Heal }
 
-        public const float MaxStamina = 100f;
-        public const int MaxFlasks = 3;
+        /// <summary>The King's stats (classic defaults; the endless mode starts weaker and upgrades them).</summary>
+        public PlayerStats Stats { get; set; } = PlayerStats.Classic();
+        public float MaxStamina => Stats.maxStamina;
+        public int MaxFlasks => Stats.maxFlasks;
+        public float HealAmount => Stats.healAmount;
         const float MoveSpeed = 5.2f, LockedMoveSpeed = 4.3f;
         const float SprintSpeed = 8.2f, SprintDrain = 14f, SprintRecoverAt = 20f;
         /// <summary>Light (combo) attacks cost only this fraction of their listed stamina.</summary>
@@ -26,8 +29,10 @@ namespace KingLastPiece
         const float DodgeDuration = 0.5f, IFrameStart = 0.03f, IFrameEnd = 0.36f, DodgeCancelAt = 0.4f;
 
         // Dodge charges replace stamina for rolling: a short burst of rolls, refilled quickly.
-        public const int MaxDodges = 3;
-        const float DodgeRechargeTime = 0.7f, DodgeRechargeDelay = 0.35f;
+        public int MaxDodges => Stats.maxDodges;
+        const float BaseDodgeRechargeTime = 0.7f, DodgeRechargeDelay = 0.35f;
+        /// <summary>Seconds to refill one roll charge.</summary>
+        public float DodgeRechargeTime => BaseDodgeRechargeTime / Mathf.Max(0.1f, Stats.dodgeRecharge);
 
         // Perfect dodge: an attack that lands (or narrowly misses) within this long after the roll starts.
         const float JustWindow = 0.2f;
@@ -38,7 +43,7 @@ namespace KingLastPiece
         const float CounterApproach = 0.12f, CounterRelease = 0.74f, CounterDuration = 1.0f;
         // All of the throw damage lands on impact, so the piece always gets to fly first.
         const float SwingRadius = 1.8f, ThrowLandingDamage = 75f, SwingHitDamage = 25f;
-        const float HealDuration = 1.1f, HealAt = 0.6f, HealAmount = 45f;
+        const float HealDuration = 1.1f, HealAt = 0.6f;
         const float StaminaRegen = 45f, StaminaDelay = 0.5f;
         const float BufferWindow = 0.4f, LockRange = 20f;
         const float ModelHeight = 2.1f, CenterHeight = 0.95f, BaseRadius = 0.42f;
@@ -151,7 +156,7 @@ namespace KingLastPiece
             body.gameObject.SetActive(true);   // shattered on death
             body.localPosition = Vector3.zero;
             crumbled = false;
-            InitActor(100f);
+            InitActor(Stats.maxHealth);
             Stamina = MaxStamina;
             Flasks = MaxFlasks;
             Enter(State.Normal);
@@ -168,11 +173,27 @@ namespace KingLastPiece
             SetGlow(Color.black);
         }
 
+        /// <summary>Stamina a light combo hit / the heavy attack costs (for the stats screen).</summary>
+        public float LightAttackCost => (Style ?? AttackStyles.Default).lights[0].cost * LightCostScale;
+        public float HeavyAttackCost => (Style ?? AttackStyles.Default).heavy.cost;
+
+        /// <summary>A permanent round-end upgrade: the gain applies right away (more health heals, a new flask is full).</summary>
+        public void ApplyUpgrade(Upgrade u)
+        {
+            Upgrades.Apply(Stats, u);
+            float hpGain = Stats.maxHealth - MaxHealth;
+            MaxHealth = Stats.maxHealth;
+            if (hpGain > 0f) Health = Mathf.Min(MaxHealth, Health + hpGain);
+            Flasks = Mathf.Min(MaxFlasks, Flasks + (u.kind == UpgradeKind.Flask ? 1 : 0));
+            DodgeCharges = Mathf.Min(MaxDodges, DodgeCharges + (u.kind == UpgradeKind.MaxDodges ? 1 : 0));
+            if (u.kind == UpgradeKind.MaxStamina) Stamina = MaxStamina;
+        }
+
         /// <summary>Between waves: one flask back (up to the max) and some health.</summary>
         public void Rest()
         {
             Flasks = Mathf.Min(MaxFlasks, Flasks + 1);
-            Health = Mathf.Min(MaxHealth, Health + 35f);
+            Health = Mathf.Min(MaxHealth, Health + MaxHealth * 0.35f);
             Stamina = MaxStamina;
             LockTarget = null;
             Flash(new Color(1f, 0.8f, 0.3f) * 1.5f, 0.4f);
@@ -236,7 +257,9 @@ namespace KingLastPiece
             dt = DeltaTime;
             if (InputEnabled) ReadInput(dt);
             else { buffer = Buffered.None; LockTarget = null; }
-            stateTime += dt;
+            // Attack speed plays the whole attack (wind-up, swing, recovery, cancel points) faster.
+            float atkDt = state == State.Attack ? dt * Stats.attackSpeed : dt;
+            stateTime += atkDt;
             UpdateStamina(dt);
             UpdateDodgeCharges(dt);
             UpdateLockTarget();
@@ -246,7 +269,7 @@ namespace KingLastPiece
             switch (state)
             {
                 case State.Normal: UpdateNormal(dt); break;
-                case State.Attack: UpdateAttack(dt); break;
+                case State.Attack: UpdateAttack(atkDt); break;
                 case State.Dodge: UpdateDodge(dt); break;
                 case State.Heal: UpdateHeal(dt); break;
                 case State.Stagger: UpdateStagger(dt); break;
@@ -682,7 +705,9 @@ namespace KingLastPiece
         {
             bool landed = false;
             int hitCount = 0;
-            Vector3 center = FlatPos + transform.forward * w.forward;
+            // Attack range scales the reach (and how far ahead the hit is centred); attack power the damage.
+            float range = w.range * Stats.attackRange, damage = w.damage * Stats.attackPower;
+            Vector3 center = FlatPos + transform.forward * (w.forward * Stats.attackRange);
             scratch.Clear();
             scratch.AddRange(Game.Enemies);
             foreach (var e in scratch)
@@ -690,7 +715,7 @@ namespace KingLastPiece
                 if (e == null || e.IsDead || already.Contains(e)) continue;
                 Vector3 to = e.FlatPos - center;
                 float d = to.magnitude;
-                if (d > w.range + e.Radius) continue;
+                if (d > range + e.Radius) continue;
                 if (w.shape == HitShape.Arc && d > 0.4f && Vector3.Angle(transform.forward, to) > w.arc * 0.5f) continue;
                 if (w.shape == HitShape.Arc && w.sweep && d > 0.4f)
                 {
@@ -701,10 +726,10 @@ namespace KingLastPiece
                     if (ang < lo || ang > hi) continue;
                 }
                 already.Add(e);
-                if (e.TakeHit(w.damage, w.poise, transform.position))
+                if (e.TakeHit(damage, w.poise, transform.position))
                 {
                     landed = true;
-                    Game.ReportDamage(e, w.damage);
+                    Game.ReportDamage(e, damage);
                     Vector3 toE = (e.FlatPos - FlatPos).normalized;
                     Vfx.Hit(e.Visual.position + Vector3.up * 1.0f - toE * e.Radius, toE, atk.heavy, e.Visual);
                     Sfx.Play(e.IsBoss ? "HIT_Boss" : atk.heavy ? "HIT_Heavy" : "HIT_Light", e.transform.position + Vector3.up);
@@ -969,9 +994,9 @@ namespace KingLastPiece
                     if (e == null || e.IsDead || counterHits.Contains(e)) continue;
                     if ((e.FlatPos - piecePos).magnitude > counterTarget.Radius + e.Radius + 0.5f) continue;
                     counterHits.Add(e);
-                    if (e.TakeHit(SwingHitDamage, 50f, piecePos))
+                    if (e.TakeHit(SwingHitDamage * Stats.attackPower, 50f, piecePos))
                     {
-                        Game.ReportDamage(e, SwingHitDamage);
+                        Game.ReportDamage(e, SwingHitDamage * Stats.attackPower);
                         Sfx.Play("THR_SwingHit", e.transform.position + Vector3.up);
                         Effects.Sparks(e.transform.position + Vector3.up, Vfx.Accent, 14, 6f);
                         Game.Rig.Shake(0.3f);
@@ -989,7 +1014,7 @@ namespace KingLastPiece
                     Sfx.Play("THR_Fly", counterTarget.transform.position + Vector3.up);
                     Vector3 dir = counterTarget.FlatPos - FlatPos;
                     Game.EndSlowMo();
-                    counterTarget.Launch(dir, 17f, 7f, ThrowLandingDamage);
+                    counterTarget.Launch(dir, 17f, 7f, ThrowLandingDamage * Stats.attackPower);
                     Game.HitStop(0.12f);
                     Game.Rig.Kick(1f);
                     Game.Rig.Shake(0.5f);
@@ -1038,7 +1063,7 @@ namespace KingLastPiece
         {
             if (IsDead || IsInvulnerable || GodMode || Game.State != GameManager.GameState.Playing) return false;
 
-            Health -= damage;
+            Health -= Stats.DamageTaken(damage);
             Flash(new Color(2f, 0.1f, 0.05f), 0.15f);
             SetGlow(Color.black);
             Game.HitStop(0.08f);

@@ -10,11 +10,12 @@ namespace KingLastPiece
     [DefaultExecutionOrder(100)]
     public class GameManager : MonoBehaviour
     {
-        public enum GameState { Title, Playing, WaveClear, Dead, Victory }
+        public enum GameState { Title, Playing, WaveClear, Upgrade, Dead, Victory }
 
         public const float TileSize = 2f;
-        public const float BoardHalf = 8f;
-        public const float PlayableHalf = 7.3f;
+        /// <summary>Half the board's width (8 m for the 8×8 board; the endless board grows a ring every 20 rounds).</summary>
+        public static float BoardHalf => BoardSlots.Size * TileSize * 0.5f;
+        public static float PlayableHalf => BoardHalf - 0.7f;
         public static readonly Color LightSquare = new Color(0.74f, 0.7f, 0.62f);
         public static readonly Color DarkSquare = new Color(0.26f, 0.12f, 0.1f);
 
@@ -35,7 +36,18 @@ namespace KingLastPiece
         public int Deaths { get; private set; }
         public float RunTime { get; private set; }
 
-        public enum Mode { Game, Practice, Effects }
+        /// <summary>Game: the classic ten rounds. Endless: endless rounds with upgrades (scene "teat").</summary>
+        public enum Mode { Game, Practice, Effects, Endless }
+
+        /// <summary>Endless mode: the round number (1-based).</summary>
+        public int Round => WaveIndex + 1;
+        public bool IsEndless => CurrentMode == Mode.Endless;
+        /// <summary>Round-end upgrades on offer, and the ones already taken this time (endless mode).</summary>
+        public readonly List<Upgrade> Offers = new List<Upgrade>();
+        public readonly List<int> Picked = new List<int>();
+        /// <summary>Upgrade card under the cursor / selected with the keys or pad (−1: none).</summary>
+        public int OfferCursor { get; set; } = -1;
+        ArenaBoard board;
 
         [Tooltip("Mode this scene boots into (set by the world bake).")]
         [SerializeField] Mode sceneMode = Mode.Game;
@@ -116,18 +128,20 @@ namespace KingLastPiece
             StartMode = Mode.Game;
 
             // The world is baked into the scene (KING ▸ Setup ▸ Bake World Into Scenes); anything missing is built here.
-            var board = FindFirstObjectByType<ArenaBoard>();
+            board = FindFirstObjectByType<ArenaBoard>();
             if (board == null)
             {
                 board = WorldBuilder.BuildArena();
                 WorldBuilder.ApplyLighting();
             }
             WorldBuilder.EnsureColliders(board);
+            BoardSlots.SetSize(8);   // static: a previous endless run may have grown it
             BoardFx.Register(board.Grid);
 
             Player = FindFirstObjectByType<PlayerController>();
             if (Player == null) Player = WorldBuilder.BuildPlayer();
             else Player.Build();
+            if (IsEndless) Player.Stats = PlayerStats.EndlessStart();
             Player.ResetForWave(SquareToWorld("e1"), 0f);
 
             var cam = WorldBuilder.SetupCamera();
@@ -135,8 +149,11 @@ namespace KingLastPiece
             Rig.Init(cam, Player);
 
             if (GetComponent<Hud>() == null) gameObject.AddComponent<Hud>();
-            EnterState(CurrentMode != Mode.Game ? GameState.Playing : GameState.Title);
+            EnterState(UsesRounds ? GameState.Title : GameState.Playing);
         }
+
+        /// <summary>The classic game and the endless mode run rounds (title, round clears, restarts); the labs don't.</summary>
+        public bool UsesRounds => CurrentMode == Mode.Game || CurrentMode == Mode.Endless;
 
         void OnDestroy()
         {
@@ -170,11 +187,19 @@ namespace KingLastPiece
             Enemies.Clear();
             BoardSlots.Clear();
 
-            bool keepPlayer = State == GameState.WaveClear;
+            bool keepPlayer = State == GameState.WaveClear || State == GameState.Upgrade;
+            // A new endless run starts the King from scratch (weak stats, no upgrades) on the small board.
+            if (IsEndless && index == 0 && !keepPlayer) Player.Stats = PlayerStats.EndlessStart();
             if (!keepPlayer)
             {
                 Player.ResetForWave(SquareToWorld("e1"), 0f);
                 Rig.Snap();
+            }
+
+            if (IsEndless)
+            {
+                StartEndlessRound(index + 1);
+                return;
             }
 
             foreach (var (type, square) in Waves[index].pieces)
@@ -186,6 +211,111 @@ namespace KingLastPiece
             if (final) Sfx.Play("GAME_FinalRound");
             Sfx.Play(final ? "BGM_Boss" : "BGM_Battle");
             EnterState(GameState.Playing);
+        }
+
+        // ---------------------------------------------------------------- endless mode
+
+        void StartEndlessRound(int round)
+        {
+            // Every 20 rounds the board grows a ring of squares (and shrinks back for a new run).
+            int size = EndlessRounds.BoardSize(round);
+            bool grew = size > BoardSlots.Size;
+            if (size != BoardSlots.Size) board.Resize(size);
+
+            var army = EndlessRounds.Army(round);
+            var squares = EndlessRounds.SpawnSquares(BoardSlots.ToSquare(Player.FlatPos), army.Count);
+            for (int i = 0; i < army.Count && i < squares.Count; i++)
+                SpawnEmpowered(army[i].type, army[i].tier, BoardSlots.Center(squares[i]));
+
+            bool boss = EndlessRounds.IsBossRound(round);
+            string banner = EndlessRounds.Title(round);
+            if (grew) banner += "  ·  The board grows";
+            if (round % 40 == 0) banner += "  ·  The black army grows stronger";
+            ShowBanner(banner);
+            Sfx.Play("GAME_RoundStart");
+            if (boss) Sfx.Play("GAME_FinalRound");
+            Sfx.Play(boss ? "BGM_Boss" : "BGM_Battle");
+            EnterState(GameState.Playing);
+        }
+
+        /// <summary>
+        /// Spawns a piece at the given empowered tier (0 = normal) with the endless mode's health scaling (every 40
+        /// rounds; queens are sturdier there too). In the other modes only the tier applies.
+        /// </summary>
+        public EnemyBase SpawnEmpowered(PieceType type, int tier, Vector3 pos)
+        {
+            var e = SpawnEnemy(type, pos);
+            float hp = IsEndless ? EndlessRounds.HealthMultiplier(Round) * (type == PieceType.Queen ? EndlessRounds.QueenHealthBoost : 1f) : 1f;
+            e.Empower(tier, hp);
+            return e;
+        }
+
+        /// <summary>A queen at half health calls her pieces onto the squares around her.</summary>
+        public void SummonFor(EnemyBase queen)
+        {
+            if (!IsEndless)
+            {
+                // Classic: two pawns on the squares to either side of her.
+                Vector3 side = queen.transform.right * 3f;
+                SpawnEnemy(PieceType.Pawn, BoardSlots.Center(BoardSlots.ToSquare(queen.FlatPos + side)));
+                SpawnEnemy(PieceType.Pawn, BoardSlots.Center(BoardSlots.ToSquare(queen.FlatPos - side)));
+                return;
+            }
+            var summons = EndlessRounds.QueenSummons(Round);
+            var center = BoardSlots.ToSquare(queen.FlatPos);
+            var king = BoardSlots.KingSquare;
+            var free = new List<Vector2Int>();
+            for (int ring = 1; ring <= 3 && free.Count < summons.Count; ring++)
+                for (int x = -ring; x <= ring; x++)
+                for (int y = -ring; y <= ring; y++)
+                {
+                    var s = center + new Vector2Int(x, y);
+                    if (Mathf.Max(Mathf.Abs(x), Mathf.Abs(y)) != ring || !BoardSlots.OnBoard(s) || BoardSlots.Chebyshev(s, king) < 2) continue;
+                    if (!free.Contains(s)) free.Add(s);
+                }
+            for (int i = 0; i < summons.Count && i < free.Count; i++)
+                SpawnEmpowered(summons[i].type, summons[i].tier, BoardSlots.Center(free[i]));
+        }
+
+        /// <summary>Takes the upgrade card <paramref name="i"/> (two per round); the next round starts after the second.</summary>
+        public void PickUpgrade(int i)
+        {
+            if (State != GameState.Upgrade || i < 0 || i >= Offers.Count || Picked.Contains(i)) return;
+            Picked.Add(i);
+            Player.ApplyUpgrade(Offers[i]);
+            Sfx.Play("UI_Confirm");
+            if (Picked.Count >= Mathf.Min(Upgrades.Picks, Offers.Count)) upgradeDoneAt = StateTime;
+        }
+
+        float upgradeDoneAt = -1f;
+
+        void EnterUpgrade()
+        {
+            Offers.Clear();
+            Offers.AddRange(Upgrades.Roll(Player.Stats));
+            Picked.Clear();
+            OfferCursor = -1;
+            upgradeDoneAt = Offers.Count == 0 ? 0f : -1f;
+            EnterState(GameState.Upgrade);
+        }
+
+        void UpdateUpgrade()
+        {
+            if (upgradeDoneAt >= 0f)
+            {
+                // A short beat to see the second pick land, then on to the next round.
+                if (StateTime - upgradeDoneAt > 0.6f) StartWave(WaveIndex + 1);
+                return;
+            }
+            int key = GameInput.NumberPressed;
+            if (key >= 1 && key <= Offers.Count) { PickUpgrade(key - 1); return; }
+            int step = GameInput.MenuStep;
+            if (step != 0)
+            {
+                OfferCursor = OfferCursor < 0 ? 0 : (OfferCursor + step + Offers.Count) % Offers.Count;
+                Sfx.Play("UI_Hover");
+            }
+            if (GameInput.Confirm && OfferCursor >= 0) PickUpgrade(OfferCursor);
         }
 
         public EnemyBase SpawnEnemy(PieceType type, Vector3 pos)
@@ -340,9 +470,9 @@ namespace KingLastPiece
                     if (Paused) break;
                     RunTime += Time.deltaTime;
                     ResolveCollisions();
-                    if (CurrentMode == Mode.Game && AliveCount() == 0 && StateTime > 1f)
+                    if (UsesRounds && AliveCount() == 0 && StateTime > 1f)
                     {
-                        if (WaveIndex >= Waves.Length - 1)
+                        if (!IsEndless && WaveIndex >= Waves.Length - 1)
                         {
                             EnterState(GameState.Victory);
                             Sfx.Play("GAME_Victory");
@@ -366,11 +496,20 @@ namespace KingLastPiece
                         Player.ReturnToStart(SquareToWorld("e1"), 0f);
                         Rig.Snap();
                     }
-                    if (StateTime > 3.4f) StartWave(WaveIndex + 1);
+                    if (StateTime > 3.4f)
+                    {
+                        // Endless: pick two of five permanent upgrades before the next round.
+                        if (IsEndless) EnterUpgrade();
+                        else StartWave(WaveIndex + 1);
+                    }
+                    break;
+
+                case GameState.Upgrade:
+                    UpdateUpgrade();
                     break;
 
                 case GameState.Dead:
-                    if (CurrentMode != Mode.Game)
+                    if (!UsesRounds)
                     {
                         if (StateTime > 1.5f) RevivePlayerInPlace();
                         break;
@@ -393,7 +532,7 @@ namespace KingLastPiece
             StartWave(0);
         }
 
-        public void DebugStartWave(int index) => StartWave(Mathf.Clamp(index, 0, Waves.Length - 1));
+        public void DebugStartWave(int index) => StartWave(IsEndless ? Mathf.Max(0, index) : Mathf.Clamp(index, 0, Waves.Length - 1));
         public void DebugTogglePause() => TogglePause();
 
         void TogglePause()

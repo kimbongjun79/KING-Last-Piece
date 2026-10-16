@@ -92,6 +92,34 @@ namespace KingLastPiece
             (Keyboard.current != null && (Keyboard.current.enterKey.wasPressedThisFrame || Keyboard.current.numpadEnterKey.wasPressedThisFrame)) ||
             (Gamepad.current != null && (Gamepad.current.buttonSouth.wasPressedThisFrame || Gamepad.current.startButton.wasPressedThisFrame));
 
+        /// <summary>Number key 1–9 pressed this frame (top row or keypad), or 0.</summary>
+        public static int NumberPressed
+        {
+            get
+            {
+                var kb = Keyboard.current;
+                if (kb == null) return 0;
+                for (int i = 1; i <= 9; i++)
+                    if (kb[Key.Digit1 + (i - 1)].wasPressedThisFrame || kb[Key.Numpad1 + (i - 1)].wasPressedThisFrame) return i;
+                return 0;
+            }
+        }
+
+        /// <summary>Menu left/right this frame: −1, +1 or 0 (A/D, arrows, d-pad, shoulders).</summary>
+        public static int MenuStep
+        {
+            get
+            {
+                var kb = Keyboard.current;
+                var gp = Gamepad.current;
+                if ((kb != null && (kb.leftArrowKey.wasPressedThisFrame || kb.aKey.wasPressedThisFrame)) ||
+                    (gp != null && (gp.dpad.left.wasPressedThisFrame || gp.leftShoulder.wasPressedThisFrame))) return -1;
+                if ((kb != null && (kb.rightArrowKey.wasPressedThisFrame || kb.dKey.wasPressedThisFrame)) ||
+                    (gp != null && (gp.dpad.right.wasPressedThisFrame || gp.rightShoulder.wasPressedThisFrame))) return 1;
+                return 0;
+            }
+        }
+
         public static bool Pause =>
             (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame) ||
             (Gamepad.current != null && Gamepad.current.startButton.wasPressedThisFrame);

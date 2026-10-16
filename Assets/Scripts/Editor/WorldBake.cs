@@ -20,7 +20,7 @@ namespace KingLastPiece.EditorTools
 
         static readonly (string scene, GameManager.Mode mode)[] Scenes =
         {
-            ("Assets/Scenes/SampleScene.unity", GameManager.Mode.Game),
+            ("Assets/Scenes/teat.unity", GameManager.Mode.Endless),
             ("Assets/Scenes/Practice.unity", GameManager.Mode.Practice),
             ("Assets/Scenes/EffectsLab.unity", GameManager.Mode.Effects),
         };
@@ -82,7 +82,9 @@ namespace KingLastPiece.EditorTools
 
         static void BakeScene(string path, GameManager.Mode mode, GameObject[] prefabs)
         {
-            var scene = EditorSceneManager.OpenScene(path, OpenSceneMode.Single);
+            var scene = File.Exists(path)
+                ? EditorSceneManager.OpenScene(path, OpenSceneMode.Single)
+                : EditorSceneManager.NewScene(NewSceneSetup.DefaultGameObjects, NewSceneMode.Single);
             foreach (var root in scene.GetRootGameObjects())
                 if (System.Array.IndexOf(BakedRoots, root.name) >= 0) Object.DestroyImmediate(root);
 
@@ -103,7 +105,7 @@ namespace KingLastPiece.EditorTools
 
             foreach (var root in scene.GetRootGameObjects()) SaveMaterials(root);
             EditorSceneManager.MarkSceneDirty(scene);
-            EditorSceneManager.SaveScene(scene);
+            EditorSceneManager.SaveScene(scene, path);
         }
 
         /// <summary>Readable, stable names: imported model materials keep theirs, generated ones are named by color.</summary>

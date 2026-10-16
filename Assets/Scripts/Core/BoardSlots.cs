@@ -14,7 +14,16 @@ namespace KingLastPiece
     /// </summary>
     public static class BoardSlots
     {
-        public const int Size = 8;
+        /// <summary>Squares per side: 8, plus one ring (2 squares) per expansion of the endless board.</summary>
+        public static int Size { get; private set; } = 8;
+
+        /// <summary>Resizes the board grid (the original 8×8 stays centred, so its square names keep their places).</summary>
+        public static void SetSize(int size)
+        {
+            if (size == Size) return;
+            Size = size;
+            Clear();
+        }
         static float Tile => GameManager.TileSize;
 
         static readonly Dictionary<Vector2Int, EnemyBase> owners = new Dictionary<Vector2Int, EnemyBase>();
@@ -35,13 +44,17 @@ namespace KingLastPiece
             Mathf.Clamp(Mathf.FloorToInt(p.x / Tile + Size * 0.5f), 0, Size - 1),
             Mathf.Clamp(Mathf.FloorToInt(p.z / Tile + Size * 0.5f), 0, Size - 1));
 
-        public static Vector3 Center(Vector2Int s) => new Vector3((s.x - 3.5f) * Tile, 0f, (s.y - 3.5f) * Tile);
+        public static Vector3 Center(Vector2Int s) => new Vector3((s.x - (Size - 1) * 0.5f) * Tile, 0f, (s.y - (Size - 1) * 0.5f) * Tile);
 
         public static bool OnBoard(Vector2Int s) => s.x >= 0 && s.y >= 0 && s.x < Size && s.y < Size;
 
         public static int Chebyshev(Vector2Int a, Vector2Int b) => Mathf.Max(Mathf.Abs(a.x - b.x), Mathf.Abs(a.y - b.y));
 
-        public static string Name(Vector2Int s) => $"{(char)('a' + s.x)}{s.y + 1}";
+        public static string Name(Vector2Int s)
+        {
+            int o = (Size - 8) / 2;   // the original a1 square sits o squares in from the corner of a grown board
+            return $"{(char)('a' + s.x - o)}{s.y - o + 1}";
+        }
 
         // ---------------------------------------------------------------- king
 
@@ -134,10 +147,10 @@ namespace KingLastPiece
             new Vector2Int(-1, -2), new Vector2Int(-2, -1), new Vector2Int(-2, 1), new Vector2Int(-1, 2),
         };
 
-        // Rooks and bishops strike from anywhere on their lines (2 squares out up to the far edge): a piece already on the
-        // King's rank/file or diagonal charges from where it is. The queen keeps to 2–3 squares.
-        public static readonly Vector2Int[] BishopSlots = Lines(diagonal: true, orthogonal: false, 2, 7);
-        public static readonly Vector2Int[] RookSlots = Lines(diagonal: false, orthogonal: true, 2, 7);
+        // Rooks and bishops strike from anywhere on their lines (2 squares out up to the far edge, however big the board
+        // grows): a piece already on the King's rank/file or diagonal charges from where it is. The queen keeps to 2–3 squares.
+        public static readonly Vector2Int[] BishopSlots = Lines(diagonal: true, orthogonal: false, 2, 31);
+        public static readonly Vector2Int[] RookSlots = Lines(diagonal: false, orthogonal: true, 2, 31);
         public static readonly Vector2Int[] QueenSlots = Lines(diagonal: true, orthogonal: true, 2, 3);
 
         /// <summary>Squares on the lines through the King, <paramref name="minK"/>..<paramref name="maxK"/> squares out (at least 2: room to charge).</summary>
@@ -158,46 +171,6 @@ namespace KingLastPiece
                 }
             }
             return list.ToArray();
-        }
-
-        static readonly Vector2Int[] knightPrev = new Vector2Int[Size * Size];
-        static readonly bool[] knightSeen = new bool[Size * Size];
-        static readonly Queue<Vector2Int> knightQueue = new Queue<Vector2Int>();
-
-        /// <summary>
-        /// First hop of a shortest knight route from <paramref name="from"/> to <paramref name="to"/> that never lands
-        /// on the King's square or on a square another piece holds. False when there is no route (or already there).
-        /// </summary>
-        public static bool KnightStep(Vector2Int from, Vector2Int to, EnemyBase self, out Vector2Int step)
-        {
-            step = from;
-            if (from == to) return false;
-            System.Array.Clear(knightSeen, 0, knightSeen.Length);
-            knightQueue.Clear();
-            knightQueue.Enqueue(from);
-            knightSeen[from.x * Size + from.y] = true;
-            while (knightQueue.Count > 0)
-            {
-                var c = knightQueue.Dequeue();
-                foreach (var o in KnightSlots)
-                {
-                    var n = c + o;
-                    if (!OnBoard(n) || knightSeen[n.x * Size + n.y] || n == KingSquare) continue;
-                    if (n != to && !IsFreeFor(n, self)) continue;
-                    knightSeen[n.x * Size + n.y] = true;
-                    knightPrev[n.x * Size + n.y] = c;
-                    if (n == to)
-                    {
-                        // Walk back to the hop right after the start.
-                        var s = n;
-                        while (knightPrev[s.x * Size + s.y] != from) s = knightPrev[s.x * Size + s.y];
-                        step = s;
-                        return true;
-                    }
-                    knightQueue.Enqueue(n);
-                }
-            }
-            return false;
         }
 
         /// <summary>Unit step (one of the 8 directions) from one square toward another along their line.</summary>

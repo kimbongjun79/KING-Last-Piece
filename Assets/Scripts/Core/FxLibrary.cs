@@ -21,6 +21,11 @@ namespace KingLastPiece
         [Header("Tazo FX")]
         public GameObject recoverHold;   // the King's healing aura (looping)
 
+        [Header("AC Little Enchant Mesh VFX (empowered pieces)")]
+        public GameObject[] eliteAura;          // Dark Lvl 1–3
+        public Material[] eliteAuraSource;      // the pack's (additive) materials…
+        public Material[] eliteAuraBlack;       // …and their alpha-blended black replacements
+
         [Header("Ground cracks (URP decals)")]
         public Material crackDecal;
         public Texture2D[] crackTextures;

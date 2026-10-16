@@ -182,6 +182,47 @@ namespace KingLastPiece
         protected void SetRadius(float r) => Radius = r;
         protected void SetModelScale(float s) => model.localScale = Vector3.one * s;
 
+        // ---------------------------------------------------------------- empowered ("dark") pieces
+
+        /// <summary>0 = a normal piece; 1–3 = an empowered piece wrapped in a black aura, stronger at every tier.</summary>
+        public int EliteTier { get; private set; }
+
+        // Per tier (index 0 = normal): health, damage, stagger resistance, attack tempo (wind-up/recovery time — barely
+        // faster: attack speed grows very little) and move speed.
+        static readonly float[] EliteHealth = { 1f, 1.6f, 2.3f, 3.2f };
+        static readonly float[] EliteDamage = { 1f, 1.25f, 1.5f, 1.8f };
+        static readonly float[] EliteStagger = { 1f, 1.5f, 2f, 2.6f };
+        static readonly float[] EliteTempo = { 1f, 0.97f, 0.94f, 0.91f };
+        static readonly float[] EliteMove = { 1f, 1.05f, 1.1f, 1.15f };
+
+        float damageMult = 1f, tempo = 1f;
+        GameObject aura;
+
+        /// <summary>
+        /// Makes this piece an empowered piece of the given tier (0 leaves it normal) and scales its health by
+        /// <paramref name="healthMult"/> on top (the endless mode's every-40-rounds boost). Call right after spawning.
+        /// </summary>
+        public void Empower(int tier, float healthMult = 1f)
+        {
+            int t = Mathf.Clamp(tier, 0, 3);
+            EliteTier = t;
+            MaxHealth *= EliteHealth[t] * healthMult;
+            Health = MaxHealth;
+            damageMult = EliteDamage[t];
+            tempo = EliteTempo[t];
+            moveSpeed *= EliteMove[t];
+            maxPoise *= EliteStagger[t];
+            poise = maxPoise;
+            if (stagger != null)
+            {
+                stagger.Profile.maxGauge *= EliteStagger[t];
+                stagger.Profile.decayPerSecond *= EliteStagger[t];
+            }
+            if (t == 0) return;
+            DisplayName = $"{DisplayName}  ·  Dark {new string('I', t)}";
+            aura = EliteAura.Attach(model, Type, t);
+        }
+
         protected virtual void Update()
         {
             float dt = Time.deltaTime;
@@ -483,6 +524,10 @@ namespace KingLastPiece
             readyFrame = -10;
             ClearTelegraph();
             plan = p;
+            // Empowered pieces hit harder and strike a touch sooner.
+            plan.damage *= damageMult;
+            plan.windup *= tempo;
+            plan.recover *= tempo;
             atkStart = FlatPos;
             atkHit = false;
             landed = false;
@@ -1084,6 +1129,7 @@ namespace KingLastPiece
         void Die(Vector3 source)
         {
             IsDead = true;
+            if (aura != null) Destroy(aura);
             BoardSlots.Release(this);
             ClearTelegraph();
             SetGlow(Color.black);
