@@ -86,7 +86,7 @@ namespace KingLastPiece
         /// Starts a looping authored effect riding on <paramref name="parent"/> (particles simulate in its local space so
         /// they move with it). Null when the prefab isn't there. End it with <see cref="Release"/>.
         /// </summary>
-        public static GameObject Attach(GameObject prefab, Transform parent, Vector3 localPos, float scale)
+        public static GameObject Attach(GameObject prefab, Transform parent, Vector3 localPos, float scale, float speed = 1f)
         {
             if (prefab == null || parent == null) return null;
             var fx = Object.Instantiate(prefab, parent);
@@ -98,6 +98,7 @@ namespace KingLastPiece
                 var m = ps.main;
                 m.simulationSpace = ParticleSystemSimulationSpace.Local;
                 m.scalingMode = ParticleSystemScalingMode.Hierarchy;
+                m.simulationSpeed *= speed;
             }
             foreach (var a in fx.GetComponentsInChildren<AudioSource>()) a.enabled = false;   // sounds go through Sfx
             return fx;

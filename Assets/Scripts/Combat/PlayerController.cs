@@ -199,11 +199,10 @@ namespace KingLastPiece
             if (u.kind == UpgradeKind.MaxStamina) Stamina = MaxStamina;
         }
 
-        /// <summary>Between waves: one flask back (up to the max) and some health.</summary>
+        /// <summary>Between waves: one flask back (up to the max) and full stamina — no health back (flasks heal).</summary>
         public void Rest()
         {
             Flasks = Mathf.Min(MaxFlasks, Flasks + 1);
-            Health = Mathf.Min(MaxHealth, Health + MaxHealth * 0.35f);
             Stamina = MaxStamina;
             LockTarget = null;
             Flash(new Color(1f, 0.8f, 0.3f) * 1.5f, 0.4f);
@@ -766,7 +765,8 @@ namespace KingLastPiece
                     landed = true;
                     Game.ReportDamage(e, damage * mult, crit);
                     Vector3 toE = (e.FlatPos - FlatPos).normalized;
-                    Vfx.Hit(e.Visual.position + Vector3.up * 1.0f - toE * e.Radius, toE, atk.heavy, e.Visual);
+                    // The hit flash/burst sits just inside the struck piece's near side (not out at its radius).
+                    Vfx.Hit(e.Visual.position + Vector3.up * 1.0f - toE * (e.Radius * 0.3f), toE, atk.heavy, e.Visual);
                     Sfx.Play(e.IsBoss ? "HIT_Boss" : atk.heavy ? "HIT_Heavy" : "HIT_Light", e.transform.position + Vector3.up);
                     hitCount++;
                     if (w.launch) e.ForceLaunch(transform.position);
@@ -862,7 +862,7 @@ namespace KingLastPiece
             healed = false;
             Enter(State.Heal);
             // Tazo FX healing aura while drinking (falls back to the old gold sparks when the pack isn't there).
-            healFx = Vfx.Attach(FxLibrary.Instance != null ? FxLibrary.Instance.recoverHold : null, transform, Vector3.up * 0.35f, 0.8f);
+            healFx = Vfx.Attach(FxLibrary.Instance != null ? FxLibrary.Instance.recoverHold : null, transform, Vector3.up * 0.35f, 0.8f, 1.1f);   // played at 1.1× speed
             SetGlow((healFx != null ? HealGreen : new Color(0.9f, 0.6f, 0.15f)) * 0.6f);
         }
 
