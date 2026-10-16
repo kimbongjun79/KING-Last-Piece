@@ -630,6 +630,21 @@ namespace KingLastPiece
             return false;
         }
 
+        /// <summary>
+        /// Attack motion multiplier: 1 = the motion as tuned (dynamism 120%). The endless King's dynamism runs 80–140% with
+        /// his attack power, speed and range, i.e. ×0.67 … ×1.17 on the lean, hop, squash, lunge and camera kick.
+        /// </summary>
+        public float Motion => Stats.Dynamism / 1.2f;
+
+        /// <summary>The pose with its lean, lift and squash scaled (full turns — spins, flips — stay whole).</summary>
+        static BodyPose Dynamic(BodyPose p, float k)
+        {
+            p.tilt *= k;
+            p.lift *= k;
+            p.squash *= k;
+            return p;
+        }
+
         void UpdateAttack(float dt)
         {
             float t = stateTime, prevT = t - dt;
@@ -647,7 +662,8 @@ namespace KingLastPiece
             bool inActive = t >= atk.FirstHit && t <= atk.hits[0].end;
             if (buffer == Buffered.Dodge && !inActive && TryAct()) return;
 
-            // Root motion from move segments.
+            // Root motion from move segments (stronger / weaker with the motion's dynamism).
+            float dyn = Motion, reach = Stats.attackRange;
             bool blocked = LungeBlocked();
             if (!blocked)
             {
@@ -655,19 +671,20 @@ namespace KingLastPiece
                 {
                     float a = PoseTrack.Curve(m.ease, (prevT - m.start) / (m.end - m.start));
                     float b = PoseTrack.Curve(m.ease, (t - m.start) / (m.end - m.start));
-                    transform.position += transform.forward * (m.distance * (b - a));
+                    transform.position += transform.forward * (m.distance * dyn * (b - a));
                 }
             }
 
-            ApplyPose(atk.pose.Eval(t));
+            ApplyPose(Dynamic(atk.pose.Eval(t), dyn));
 
+            // Authored effects, the ground range arc, dust and impacts all scale with the attack range.
             if (atk.cues != null)
                 foreach (var cue in atk.cues)
                     if (prevT < cue.time && t >= cue.time)
                     {
                         Sfx.Play(cue.sfx, FlatPos);
                         Vfx.Slash(cue.kind, transform.position + Vector3.up * cue.height, transform.rotation * Quaternion.Euler(0f, cue.yaw, cue.roll),
-                            cue.scale, cue.gold ? Vfx.Accent : (Color?)null, cue.mirror);
+                            cue.scale * reach, cue.gold ? Vfx.Accent : (Color?)null, cue.mirror);
                     }
 
             bool trail = t >= atk.FirstHit - 0.07f && t <= atk.LastHit + 0.03f;
@@ -685,18 +702,19 @@ namespace KingLastPiece
                     Sfx.Play(w.sfx, FlatPos);
                     if (w.fx != SlashFxKind.None)
                         Vfx.Slash(w.fx, transform.position + Vector3.up * w.fxHeight, transform.rotation * Quaternion.Euler(0f, w.fxYaw, 0f),
-                            w.fxScale, w.fxGold ? Vfx.Accent : (Color?)null, w.fxFlip);
-                    // Ground range marker (translucent black/white arc) shows the attack's real reach.
+                            w.fxScale * reach, w.fxGold ? Vfx.Accent : (Color?)null, w.fxFlip);
+                    // Ground range marker (translucent black/white arc) shows the attack's real reach: the same centre and
+                    // radius DoHits uses, sweeping over the window's real duration (attack speed plays it faster).
+                    Vector3 hitCenter = FlatPos + transform.forward * (w.forward * reach);
                     if (w.slash)
-                        SlashFx.Spawn(FlatPos + transform.forward * w.forward, transform.forward, w.range * 0.82f,
-                            w.sweepFrom, w.sweepTo, w.end - w.start, new Color(1f, 0.82f, 0.45f));
-                    if (w.kick > 0f) Game.Rig.Kick(w.kick);
-                    if (w.dust) Vfx.Dust(FlatPos + transform.forward * w.forward, w.range);
+                        SlashFx.Spawn(hitCenter, transform.forward, w.range * reach * 0.82f,
+                            w.sweepFrom, w.sweepTo, (w.end - w.start) / Mathf.Max(0.1f, Stats.attackSpeed), new Color(1f, 0.82f, 0.45f));
+                    if (w.kick > 0f) Game.Rig.Kick(w.kick * dyn);
+                    if (w.dust) Vfx.Dust(hitCenter, w.range * reach);
                     if (w.impact)
                     {
-                        Vector3 c = transform.position + transform.forward * w.forward;
-                        Vfx.GroundImpact(c, w.range, atk.heavy ? 1.4f : 1f);
-                        Game.Rig.Shake(w.shake);
+                        Vfx.GroundImpact(hitCenter, w.range * reach, atk.heavy ? 1.4f : 1f);
+                        Game.Rig.Shake(w.shake * dyn);
                     }
                 }
                 if (w.sparkTrail && Random.value < 0.8f)

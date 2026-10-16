@@ -29,6 +29,8 @@ namespace KingLastPiece
         public float lightCostCut, heavyCostCut;
         /// <summary>Chance a hit is critical, and the damage multiplier of a critical hit.</summary>
         public float critChance = 0.05f, critDamage = 1.5f;
+        /// <summary>The King's attack motion follows his power, speed and range (endless mode); classic keeps it fixed.</summary>
+        public bool scalesMotion;
 
         public static PlayerStats Classic() => new PlayerStats();
 
@@ -38,14 +40,31 @@ namespace KingLastPiece
             maxHealth = 70f,
             maxStamina = 70f,
             attackPower = 0.7f,
-            attackSpeed = 0.85f,
-            attackRange = 0.8f,
+            attackSpeed = 0.75f,
+            attackRange = 0.7f,
+            scalesMotion = true,
             defense = 0f,
             maxFlasks = 1,
             healAmount = 20f,
             maxDodges = 1,
             dodgeRecharge = 0.45f,
         };
+
+        /// <summary>
+        /// How dynamic the attack motion is (lean, hop, squash, lunge, camera kick): 1.2 is the motion as tuned. In the
+        /// endless mode it grows from 0.8 (the weak starting King) to 1.4 as attack power, speed and range are upgraded.
+        /// </summary>
+        public float Dynamism
+        {
+            get
+            {
+                if (!scalesMotion) return 1.2f;
+                float p = Mathf.InverseLerp(0.7f, 1.7f, attackPower);
+                float s = Mathf.InverseLerp(0.75f, 1.35f, attackSpeed);
+                float r = Mathf.InverseLerp(0.7f, 1.3f, attackRange);
+                return Mathf.Lerp(0.8f, 1.4f, (p + s + r) / 3f);
+            }
+        }
 
         public PlayerStats Clone() => (PlayerStats)MemberwiseClone();
 

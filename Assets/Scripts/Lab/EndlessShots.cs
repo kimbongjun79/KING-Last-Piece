@@ -155,6 +155,51 @@ namespace KingLastPiece
             game.Rig.UseOverride = false;
         }
 
+        /// <summary>
+        /// The first combo hit with the weakest and the strongest King: the lean / hop (dynamism 80% vs 140%), the slash
+        /// effect and the ground range arc should all be smaller vs bigger, the arc matching the real hit reach.
+        /// </summary>
+        IEnumerator AttackScaleShots(PlayerController p)
+        {
+            var saved = p.Stats.Clone();
+            (string file, float power, float speed, float range)[] cases =
+            {
+                ("29_Attack_Weakest.png", 0.7f, 0.75f, 0.7f),
+                ("30_Attack_Strongest.png", 1.7f, 1.35f, 1.3f),
+            };
+            var hud = game.GetComponent<Hud>();
+            foreach (var c in cases)
+            {
+                game.ClearEnemies();
+                game.SpawnEnemy(PieceType.Pawn, GameManager.SquareToWorld("a8"));   // keeps the round live
+                p.Stats.attackPower = c.power;
+                p.Stats.attackSpeed = c.speed;
+                p.Stats.attackRange = c.range;
+                p.Stats.lightCostCut = 0f;
+                var at = GameManager.SquareToWorld("e3");
+                p.ReturnToStart(at, 0f);
+                game.Rig.UseOverride = true;
+                game.Rig.OverridePosition = at + new Vector3(3.2f, 4.6f, -3.6f);
+                game.Rig.OverrideLookAt = at + new Vector3(0f, 0.6f, 0.8f);
+                yield return Frames(20);
+                p.Press(PlayerController.Buffered.Light);
+                // The first whip's window runs 0.13–0.29 s of attack time; shoot near its end (scaled by attack speed).
+                float wait = 0.27f / c.speed;
+                float t0 = Time.time;
+                while (Time.time - t0 < wait) yield return null;
+                string state = $"attacking={p.IsAttacking}\tattack={(p.CurrentAttack != null ? p.CurrentAttack.name : "-")}\tt={p.StateTime:0.00}";
+                if (hud != null) hud.enabled = false;
+                yield return Shot(c.file);
+                if (hud != null) hud.enabled = true;
+                stats.Append($"AttackScale\t{c.file}\tpower={c.power}\tspeed={c.speed}\trange={c.range}\tdynamism={p.Stats.Dynamism * 100f:0}%\t" +
+                             $"motion=x{p.Motion:0.00}\t{state}\tarc_radius={2.8f * c.range * 0.82f:0.00}\thit_reach={2.8f * c.range:0.00}\n");
+                for (int f = 0; f < 90 && p.IsAttacking; f++) yield return null;
+            }
+            game.Rig.UseOverride = false;
+            p.Stats = saved;
+            game.ClearEnemies();
+        }
+
         /// <summary>Clears a round to bring up the cards, takes two, and opens the stats tab.</summary>
         IEnumerator UpgradeShots()
         {
@@ -202,6 +247,8 @@ namespace KingLastPiece
                 yield return Frames(30);   // the buffer window runs out before the next press
             }
             stats.Append($"HeavyGate\t{heavyLog}\n");
+
+            yield return AttackScaleShots(p);
 
             game.DebugTogglePause();
             var hud = game.GetComponent<Hud>();

@@ -540,6 +540,7 @@ namespace KingLastPiece
                 ("최대 체력", $"{Mathf.RoundToInt(p.MaxHealth)}"),
                 ("공격 속도", $"{Mathf.RoundToInt(s.attackSpeed * 100f)}%   (최대 135%)"),
                 ("공격 범위", $"{Mathf.RoundToInt(s.attackRange * 100f)}%   (최대 130%)"),
+                ("공격 역동감", $"{Mathf.RoundToInt(s.Dynamism * 100f)}%   (공격력·속도·범위에 따라 80~140%)"),
                 ("최대 기력", $"{Mathf.RoundToInt(p.MaxStamina)}"),
                 ("치명타", $"확률 {Mathf.RoundToInt(s.critChance * 100f)}% (최대 60%)   ·   피해 {Mathf.RoundToInt(s.critDamage * 100f)}% (최대 300%)"),
                 ("공격당 기력 소모", $"일반공격 {p.LightAttackCost:0.#} (−{Mathf.RoundToInt(s.lightCostCut * 100f)}%)   ·   강공격 {p.HeavyAttackCost:0.#} (−{Mathf.RoundToInt(s.heavyCostCut * 100f)}%)"),

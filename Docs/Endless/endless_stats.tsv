@@ -14,11 +14,13 @@ Aura	Pawn	T2	systems=4	particles=146	readable=True	Dark Aura 2:Cone/- Glow:Mesh/
 Aura	Rook	T2	systems=4	particles=146	readable=True	Dark Aura 2:Cone/- Glow:Mesh/10453 Particle:Mesh/10453 Particle2:Mesh/10453 
 Aura	Pawn	T3	systems=6	particles=287	readable=True	Dark Aura 3:Cone/- Glow:Mesh/8530 Smoke:Mesh/8530 Particle:Mesh/8530 Particle2:Mesh/8530 Particle3:Mesh/8530 
 Aura	Rook	T3	systems=6	particles=287	readable=True	Dark Aura 3:Cone/- Glow:Mesh/10453 Smoke:Mesh/10453 Particle:Mesh/10453 Particle2:Mesh/10453 Particle3:Mesh/10453 
-Round	11	pieces=9	dark=1	board=8	banner=11 라운드
+Round	11	pieces=8	dark=1	board=8	banner=11 라운드
 Round	29	pieces=14	dark=7	board=10	banner=29 라운드  ·  체스판이 넓어진다
 Round	20	pieces=1	dark=1	board=8	banner=20 라운드 — 다크 I 여왕
 Round	21	pieces=14	dark=4	board=10	banner=21 라운드  ·  체스판이 넓어진다
-Offers	최대 체력 +11; 최대 기력 +10; 회복약 회복량 +11; 치명타 확률 +5%; 강공격 기력 소모 감소 +10%; 
+Offers	최대 기력 +12; 치명타 확률 +6%; 회복약 개수 +1; 강공격 기력 소모 감소 +7%; 회피 충전 횟수 +1; 
 Picked	0,2	canConfirm=True	appliedBeforeConfirm=False
-Upgraded	round=4	power 0.70->0.70	hp 70->81	def 0->0	flasks 1->1	rolls 1->1
-HeavyGate	[70/48 → heavy] [22/48 → refused] [46/48 → refused] 
+Upgraded	round=4	power 0.70->0.70	hp 70->70	def 0->0	flasks 1->2	rolls 1->1
+HeavyGate	[82/48 → heavy] [34/48 → refused] [0/48 → heavy] 
+AttackScale	29_Attack_Weakest.png	power=0.7	speed=0.75	range=0.7	dynamism=80%	motion=x0.67	attacking=True	attack=Royal Whip R→L	t=0.26	arc_radius=1.61	hit_reach=1.96
+AttackScale	30_Attack_Strongest.png	power=1.7	speed=1.35	range=1.3	dynamism=140%	motion=x1.17	attacking=True	attack=Royal Whip R→L	t=0.25	arc_radius=2.98	hit_reach=3.64
