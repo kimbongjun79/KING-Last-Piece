@@ -451,8 +451,13 @@ namespace KingLastPiece
             Deaths++;
             Sfx.Play("GAME_Defeat");
             ResetTime();
+            // An endless run ends here: keep it if it's the best yet.
+            NewBest = IsEndless && BestRecord.Submit(Round, RunTime, Record.damageDealt, Record.kills);
             EnterState(GameState.Dead);
         }
+
+        /// <summary>The endless run that just ended beat the saved best.</summary>
+        public bool NewBest { get; private set; }
 
         /// <summary>
         /// Pieces attacking right now in the same turn pool as <paramref name="except"/>: pawns share their own pool, the

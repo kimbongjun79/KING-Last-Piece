@@ -451,6 +451,15 @@ namespace KingLastPiece
             Text(new Rect(0, by + bh + 54 * scale, W, 28 * scale), "조작법은 게임 중  Esc  일시정지 메뉴에서 볼 수 있습니다",
                 new GUIStyle(small) { fontSize = Mathf.RoundToInt(16 * scale) }, new Color(1f, 1f, 1f, 0.35f * fade));
 
+            // The endless mode's best run, just above the cards.
+            string best = BestRecord.Exists
+                ? $"무한 모드 최고 기록   {BestRecord.Round} 라운드  ·  {BestRecord.FormatTime(BestRecord.Time)}  ·  포획 {BestRecord.Kills}  ·  {BestRecord.Date}"
+                : "무한 모드 최고 기록   아직 없음";
+            Diamond(new Vector2(W / 2f - 400 * scale, by - 26 * scale), 4 * scale, gold);
+            Diamond(new Vector2(W / 2f + 400 * scale, by - 26 * scale), 4 * scale, gold);
+            Text(new Rect(0, by - 42 * scale, W, 32 * scale), best, new GUIStyle(small) { fontSize = Mathf.RoundToInt(18 * scale) },
+                new Color(Gold.r, Gold.g, Gold.b, 0.9f * fade));
+
             // Chess-tile band along the bottom edge.
             float tile = 28 * scale;
             int count = Mathf.CeilToInt(W / tile) + 1;
@@ -471,7 +480,10 @@ namespace KingLastPiece
             float W = Screen.width, H = Screen.height;
             Fill(new Rect(0, 0, W, H), new Color(0f, 0f, 0f, 0.72f * a));
             Text(new Rect(0, H * 0.07f, W, 120 * scale), "체크메이트", big, new Color(0.78f, 0.07f, 0.05f, a));
-            Text(new Rect(0, H * 0.07f + 112 * scale, W, 36 * scale), "왕이 쓰러졌다  ·  기록", small, new Color(Gold.r, Gold.g, Gold.b, a));
+            string sub = g.NewBest ? "왕이 쓰러졌다  ·  신기록!"
+                : $"왕이 쓰러졌다  ·  최고 기록 {BestRecord.Round} 라운드 ({BestRecord.FormatTime(BestRecord.Time)})";
+            float glow = g.NewBest ? 0.75f + 0.25f * Mathf.Sin(Time.unscaledTime * 6f) : 1f;
+            Text(new Rect(0, H * 0.07f + 112 * scale, W, 36 * scale), sub, small, new Color(Gold.r, Gold.g, Gold.b, a * glow));
             if (g.StateTime < 1.2f) return;
 
             var r = g.Record;
