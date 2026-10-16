@@ -126,14 +126,17 @@ namespace KingLastPiece
         {
             var hud = game.GetComponent<Hud>();
             if (hud != null) hud.enabled = false;
-            float h = GameManager.BoardHalf + 9f;
+            // Real chess scale: 1 real metre = ClassroomBlockout.Scale game metres; the table top is at y ≈ -0.4.
+            float m = ClassroomBlockout.Scale, floor = -0.4f - 0.75f * m;
             game.Rig.UseOverride = true;
-            game.Rig.OverridePosition = new Vector3(-h * 0.9f, 14f, -h * 1.1f);
-            game.Rig.OverrideLookAt = new Vector3(h * 0.15f, 0f, h * 0.2f);
+            // From a back corner of the room, at a standing person's eye height, looking at the chess table.
+            game.Rig.OverridePosition = new Vector3(-4.2f * m, floor + 1.7f * m, -4.4f * m);
+            game.Rig.OverrideLookAt = new Vector3(0f, -0.2f * m, 0f);
             yield return Frames(5);
             yield return Shot("32_Classroom_Wide.png");
-            game.Rig.OverridePosition = new Vector3(h * 0.85f - 2f, 4.5f, -h * 0.2f);
-            game.Rig.OverrideLookAt = new Vector3(h + 6f, 2f, 0f);
+            // From the table's edge toward the east windows.
+            game.Rig.OverridePosition = new Vector3(18f, 6f, -4f);
+            game.Rig.OverrideLookAt = new Vector3(5f * m, 0.8f * m, 0f);
             yield return Frames(3);
             yield return Shot("33_Classroom_Window.png");
             game.Rig.UseOverride = false;
