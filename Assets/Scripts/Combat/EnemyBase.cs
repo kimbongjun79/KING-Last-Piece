@@ -1154,6 +1154,7 @@ namespace KingLastPiece
         void Die(Vector3 source)
         {
             IsDead = true;
+            if (Game != null) Game.ReportKill(this);
             if (aura != null) Destroy(aura);
             BoardSlots.Release(this);
             ClearTelegraph();

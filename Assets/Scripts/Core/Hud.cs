@@ -461,8 +461,52 @@ namespace KingLastPiece
             Fill(new Rect(0, H - 2 * tile - 2 * scale, W, 2 * scale), new Color(Gold.r, Gold.g, Gold.b, 0.5f * fade));
         }
 
+        /// <summary>
+        /// Endless mode's end of run: "체크메이트", then the play record (round reached, time, damage dealt and taken…) and a
+        /// confirm button back to the title.
+        /// </summary>
+        void DrawResults(GameManager g)
+        {
+            float a = Mathf.Clamp01((g.StateTime - 0.6f) / 0.8f);
+            float W = Screen.width, H = Screen.height;
+            Fill(new Rect(0, 0, W, H), new Color(0f, 0f, 0f, 0.72f * a));
+            Text(new Rect(0, H * 0.07f, W, 120 * scale), "체크메이트", big, new Color(0.78f, 0.07f, 0.05f, a));
+            Text(new Rect(0, H * 0.07f + 112 * scale, W, 36 * scale), "왕이 쓰러졌다  ·  기록", small, new Color(Gold.r, Gold.g, Gold.b, a));
+            if (g.StateTime < 1.2f) return;
+
+            var r = g.Record;
+            var p = g.Player;
+            int m = Mathf.FloorToInt(g.RunTime / 60f), s = Mathf.FloorToInt(g.RunTime % 60f);
+            DrawTable(new Rect((W - 640 * scale) / 2f, H * 0.07f + 168 * scale, 640 * scale, 0f), new[]
+            {
+                ("도달 라운드", $"{g.Round} 라운드   (체스판 {BoardSlots.Size}×{BoardSlots.Size})"),
+                ("플레이 시간", $"{m:00}:{s:00}"),
+                ("입힌 피해", $"{Mathf.RoundToInt(r.damageDealt):N0}   (최대 한 방 {Mathf.RoundToInt(r.biggestHit)})"),
+                ("받은 피해", $"{Mathf.RoundToInt(r.damageTaken):N0}"),
+                ("포획한 기물", $"{r.kills}   (다크 기물 {r.darkKills})"),
+                ("치명타", $"{r.crits}회"),
+                ("완벽한 회피  ·  로열 스로", $"{p.JustDodgeCount}회  ·  {p.ThrowCount}회"),
+                ("사용한 회복약", $"{r.flasksUsed}개"),
+                ("획득한 강화", $"{r.upgrades}개"),
+            }, 260 * scale);
+
+            // Confirm → title.
+            var e = Event.current;
+            var b = new Rect((W - 300 * scale) / 2f, H * 0.07f + 168 * scale + 9 * 40 * scale + 56 * scale, 300 * scale, 60 * scale);
+            bool ready = g.StateTime > 1.8f;
+            if (ready && e.type == EventType.MouseDown && b.Contains(e.mousePosition)) { g.BackToTitle(); e.Use(); }
+            float pulse = 0.75f + 0.25f * Mathf.Sin(Time.unscaledTime * 5f);
+            Fill(new Rect(b.x - 3 * scale, b.y - 3 * scale, b.width + 6 * scale, b.height + 6 * scale),
+                new Color(Gold.r, Gold.g, Gold.b, (ready ? pulse : 0.3f) * a));
+            Fill(b, new Color(0.22f, 0.16f, 0.07f, a));
+            Text(b, "확인", new GUIStyle(mid) { fontSize = Mathf.RoundToInt(28 * scale) }, new Color(1f, 0.95f, 0.85f, (ready ? 1f : 0.4f) * a));
+            Text(new Rect(0, b.yMax + 10 * scale, W, 26 * scale), "ENTER / START 또는 클릭  —  타이틀로",
+                new GUIStyle(small) { fontSize = Mathf.RoundToInt(15 * scale) }, new Color(1f, 1f, 1f, 0.45f * a));
+        }
+
         void DrawDeath(GameManager g)
         {
+            if (g.IsEndless) { DrawResults(g); return; }
             float a = Mathf.Clamp01((g.StateTime - 0.6f) / 1.0f);
             float bandH = 200 * scale;
             Fill(new Rect(0, (Screen.height - bandH) / 2f, Screen.width, bandH), new Color(0, 0, 0, 0.75f * a));

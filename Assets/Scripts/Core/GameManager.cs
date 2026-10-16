@@ -184,6 +184,7 @@ namespace KingLastPiece
             {
                 Deaths = 0;
                 RunTime = 0f;
+                Record = new RunRecord();
             }
             WaveIndex = index;
             Paused = false;
@@ -304,6 +305,7 @@ namespace KingLastPiece
         {
             if (!CanConfirmUpgrades) return;
             foreach (int i in Picked) Player.ApplyUpgrade(Offers[i]);
+            Record.upgrades += Picked.Count;
             Sfx.Play("UI_Title_Start");
             upgradeDoneAt = StateTime;
         }
@@ -403,9 +405,30 @@ namespace KingLastPiece
 
         public int DamageEvents { get; private set; }
 
+        /// <summary>Play record of the current run (shown on the endless mode's results screen).</summary>
+        public class RunRecord
+        {
+            public float damageDealt, damageTaken, biggestHit;
+            public int kills, darkKills, crits, flasksUsed, upgrades;
+        }
+
+        public RunRecord Record { get; private set; } = new RunRecord();
+
+        public void ReportKill(EnemyBase e)
+        {
+            Record.kills++;
+            if (e.EliteTier > 0) Record.darkKills++;
+        }
+
+        public void ReportPlayerDamage(float amount) => Record.damageTaken += amount;
+        public void ReportFlask() => Record.flasksUsed++;
+
         public void ReportDamage(EnemyBase e, float amount, bool crit = false)
         {
             DamageEvents++;
+            Record.damageDealt += amount;
+            Record.biggestHit = Mathf.Max(Record.biggestHit, amount);
+            if (crit) Record.crits++;
             Sfx.Play("UI_DamagePopup");
             Popups.Add(new DamagePopup
             {
@@ -544,7 +567,12 @@ namespace KingLastPiece
                         if (StateTime > 1.5f) RevivePlayerInPlace();
                         break;
                     }
-                    if (StateTime > 1.8f && GameInput.Confirm) StartWave(WaveIndex);
+                    // Endless: the run ends — the results screen's confirm goes back to the title. Classic: retry the round.
+                    if (StateTime > 1.8f && GameInput.Confirm)
+                    {
+                        if (IsEndless) BackToTitle();
+                        else StartWave(WaveIndex);
+                    }
                     break;
 
                 case GameState.Victory:
@@ -582,6 +610,14 @@ namespace KingLastPiece
             }
             startFromMenu = true;
             UnityEngine.SceneManagement.SceneManager.LoadScene(endless ? EndlessScene : NormalScene);
+        }
+
+        /// <summary>Endless results → the title: the scene reloads (a fresh board, King and run).</summary>
+        public void BackToTitle()
+        {
+            if (State != GameState.Dead && State != GameState.Victory) return;
+            Sfx.Play("UI_Confirm");
+            UnityEngine.SceneManagement.SceneManager.LoadScene(gameObject.scene.name);
         }
 
         /// <summary>Title → first round, as if Confirm was pressed (used by the sound-reference capture).</summary>

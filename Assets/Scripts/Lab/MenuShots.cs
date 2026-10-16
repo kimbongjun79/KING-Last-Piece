@@ -55,6 +55,21 @@ namespace KingLastPiece
             log.Append($"AfterEndless\tmode={g.CurrentMode}\tstate={g.State}\tround={g.Round}\tenemies={g.Enemies.Count}\tstats_power={g.Player.Stats.attackPower}\n");
             yield return Shot("42_Endless_Started.png");
 
+            // Endless death: some fighting, then the King falls → results screen → confirm → this scene's title.
+            g.Player.Press(PlayerController.Buffered.Light);
+            yield return Frames(240);
+            g.Player.GodMode = false;
+            g.Player.TakeHit(9999f, 0f, g.Player.transform.position + Vector3.forward);
+            yield return Frames(150);
+            var rec = g.Record;
+            log.Append($"Dead\tstate={g.State}\tround={g.Round}\tdealt={rec.damageDealt:0}\ttaken={rec.damageTaken:0}\tkills={rec.kills}\ttime={g.RunTime:0.0}\n");
+            yield return Shot("44_Endless_Results.png");
+            g.BackToTitle();
+            yield return Frames(90);
+            g = GameManager.Instance;
+            log.Append($"AfterResults\tmode={g.CurrentMode}\tstate={g.State}\n");
+            yield return Shot("45_Back_To_Title.png");
+
             // Back to the normal mode: through the title of the endless scene.
             UnityEngine.SceneManagement.SceneManager.LoadScene(GameManager.EndlessScene);
             yield return Frames(60);

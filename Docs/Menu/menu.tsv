@@ -1,4 +1,6 @@
 Boot	mode=Game	state=Title	choice=0
 AfterEndless	mode=Endless	state=Playing	round=1	enemies=4	stats_power=0.7
+Dead	state=Dead	round=1	dealt=0	taken=70	kills=0	time=6.1
+AfterResults	mode=Endless	state=Title
 EndlessTitle	mode=Endless	state=Title	choice=1
 AfterNormal	mode=Game	state=Playing	wave=1/10	enemies=4	stats_power=1

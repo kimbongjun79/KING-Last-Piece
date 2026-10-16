@@ -859,6 +859,7 @@ namespace KingLastPiece
         {
             buffer = Buffered.None;
             Flasks--;
+            Game.ReportFlask();
             healed = false;
             Enter(State.Heal);
             // Tazo FX healing aura while drinking (falls back to the old gold sparks when the pack isn't there).
@@ -1102,7 +1103,9 @@ namespace KingLastPiece
         {
             if (IsDead || IsInvulnerable || GodMode || Game.State != GameManager.GameState.Playing) return false;
 
-            Health -= Stats.DamageTaken(damage);
+            float taken = Mathf.Min(Health, Stats.DamageTaken(damage));
+            Health -= taken;
+            Game.ReportPlayerDamage(taken);
             Flash(new Color(2f, 0.1f, 0.05f), 0.15f);
             SetGlow(Color.black);
             Game.HitStop(0.08f);
