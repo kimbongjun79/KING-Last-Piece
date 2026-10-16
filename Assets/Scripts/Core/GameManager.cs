@@ -149,8 +149,6 @@ namespace KingLastPiece
             var cam = WorldBuilder.SetupCamera();
             Rig = cam.GetComponent<CameraRig>();
             Rig.Init(cam, Player);
-            // Grey-box of the planned white chess classroom (replaces the dark hall until the real models are in).
-            ClassroomBlockout.Build(board);
 
             if (GetComponent<Hud>() == null) gameObject.AddComponent<Hud>();
             EnterState(UsesRounds ? GameState.Title : GameState.Playing);

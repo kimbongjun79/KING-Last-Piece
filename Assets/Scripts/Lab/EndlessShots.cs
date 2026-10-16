@@ -139,6 +139,26 @@ namespace KingLastPiece
             game.Rig.OverrideLookAt = new Vector3(5f * m, 0.8f * m, 0f);
             yield return Frames(3);
             yield return Shot("33_Classroom_Window.png");
+            // A famous game on a student desk (the first desk with a board), seen from close by.
+            var desk = GameObject.Find("Desk Game — " + ClassroomBlockout.Games[0].name);
+            if (desk != null)
+            {
+                Vector3 c = desk.transform.position;
+                game.Rig.OverridePosition = c + new Vector3(0.25f * m, 0.3f * m, -0.45f * m);
+                game.Rig.OverrideLookAt = c;
+                yield return Frames(3);
+                yield return Shot("35_Desk_Game.png");
+            }
+            // The chess clock beside the board.
+            var clock = GameObject.Find("Chess Clock");
+            if (clock != null)
+            {
+                Vector3 c = clock.transform.position + Vector3.up * 1.5f;
+                game.Rig.OverridePosition = c + new Vector3(-2.5f, 3f, -9f);
+                game.Rig.OverrideLookAt = c;
+                yield return Frames(3);
+                yield return Shot("36_Chess_Clock.png");
+            }
             game.Rig.UseOverride = false;
             yield return Frames(20);
             yield return Shot("34_Classroom_Play_View.png");

@@ -129,9 +129,9 @@ namespace KingLastPiece.EditorTools
         }
 
         /// <summary>Runtime-made materials (MaterialLib) become assets so the scene/prefab can reference them.</summary>
-        static void SaveMaterials(GameObject root)
+        internal static void SaveMaterials(GameObject root, string dir = MaterialDir)
         {
-            Directory.CreateDirectory(MaterialDir);
+            Directory.CreateDirectory(dir);
             foreach (var r in root.GetComponentsInChildren<Renderer>(true))
             {
                 foreach (var m in r.sharedMaterials)
@@ -139,7 +139,7 @@ namespace KingLastPiece.EditorTools
                     if (m == null || AssetDatabase.Contains(m)) continue;
                     string name = MaterialName(m);
                     foreach (char c in Path.GetInvalidFileNameChars()) name = name.Replace(c, '_');
-                    AssetDatabase.CreateAsset(m, AssetDatabase.GenerateUniqueAssetPath($"{MaterialDir}/{name}.mat"));
+                    AssetDatabase.CreateAsset(m, AssetDatabase.GenerateUniqueAssetPath($"{dir}/{name}.mat"));
                 }
             }
         }

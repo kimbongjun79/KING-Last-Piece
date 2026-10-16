@@ -79,7 +79,9 @@ namespace KingLastPiece
                 }
             }
             MovePillars(Mathf.Max(15f, half + 7f));
-            ClassroomBlockout.Build(this);   // the room keeps its margin around the bigger board
+            // The classroom's chess table (EndlessMode) widens with the board.
+            var table = FindFirstObjectByType<ChessTableFit>();
+            if (table != null) table.Fit();
             BoardFx.Register(Grid);
         }
 

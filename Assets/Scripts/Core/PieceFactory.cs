@@ -144,7 +144,10 @@ namespace KingLastPiece
         /// materials so hit flashes/glows work), stands it up, scales it to <paramref name="height"/> and puts
         /// its base center at the container origin. Returns null if the model is missing.
         /// </summary>
-        static Transform LoadDesigned(string path, Transform parent, float height, float yaw)
+        static Transform LoadDesigned(string path, Transform parent, float height, float yaw) => LoadModel(path, parent, height, yaw);
+
+        /// <summary>Any model in Resources (pieces, classroom furniture): stood up, scaled to <paramref name="height"/>, base-centred.</summary>
+        public static Transform LoadModel(string path, Transform parent, float height, float yaw = 0f, bool standUp = true)
         {
             var prefab = Resources.Load<GameObject>(path);
             if (prefab == null) return null;
@@ -172,8 +175,8 @@ namespace KingLastPiece
             }
 
             Bounds b = WorldBounds(renderers);
-            // If the model was exported lying down, stand it up.
-            if (b.size.y < Mathf.Max(b.size.x, b.size.z) * 0.8f)
+            // If the model was exported lying down, stand it up (pieces only: furniture is wider than tall).
+            if (standUp && b.size.y < Mathf.Max(b.size.x, b.size.z) * 0.8f)
             {
                 inst.transform.rotation = Quaternion.Euler(b.size.z > b.size.x ? -90f : 0f, 0f, b.size.x >= b.size.z ? 90f : 0f)
                                           * inst.transform.rotation;

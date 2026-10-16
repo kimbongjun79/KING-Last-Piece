@@ -1,84 +1,166 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace KingLastPiece
 {
     /// <summary>
-    /// Grey-box layout of the planned "white chess classroom" (to be replaced by the real models), at true chess scale:
-    /// the battlefield is a real chessboard lying on a table. A board square is 2 m in the game and about 5.5 cm in real
-    /// life, so the world around is <see cref="Scale"/> ≈ 36× real size — the table top is a 44 m plateau 27 m above the
-    /// floor, the room (10 × 10 m, 2.8 m high in real life) is ~360 m across and ~100 m tall, and the trees outside the
-    /// windows are giants. The table grows with the endless board; the room stays.
-    /// It replaces the dark hall (pillars, braziers, black floor) and switches the lighting to daylight.
+    /// Builds the "white chess classroom" of the endless mode at true chess scale — run in edit mode by
+    /// KING ▸ Setup ▸ Bake Classroom, which saves it into the EndlessMode scene (so everything is a real, editable scene
+    /// object). The battlefield is a real chessboard lying on a table: a board square is 2 m in the game and about
+    /// 5.5 cm in real life, so the world is <see cref="Scale"/> ≈ 36× real size — the table top is a 44 m plateau 27 m
+    /// above the floor and the room (10 × 10 m, 2.8 m high in real life) is ~360 m across and ~100 m tall.
+    /// Furniture uses the provided models (desk, chair, door) and the game's own chess piece models; the desks show
+    /// famous games. Walls, windows, ceiling and trees are still grey boxes.
     /// </summary>
     public static class ClassroomBlockout
     {
-        const string RootName = "Classroom (blockout)";
+        public const string RootName = "Classroom";
 
         /// <summary>Game metres per real metre: a 2 m square stands for a 5.5 cm one.</summary>
         public const float Scale = 2f / 0.055f;
 
         /// <summary>Top of the table (the board's underside rests on it).</summary>
-        const float TableTop = -0.4f;
+        public const float TableTop = -0.4f;
+
+        const string DeskModel = "Models/table_v01_with VARCO";
+        const string ChairModel = "Models/chair_v01_with VARCO";
+        const string DoorModel = "Models/door_v01_with VARCO";
 
         static readonly Color WallGrey = new Color(0.86f, 0.86f, 0.84f);
         static readonly Color FloorGrey = new Color(0.66f, 0.64f, 0.6f);
         static readonly Color PropGrey = new Color(0.58f, 0.57f, 0.55f);
-        static readonly Color TableGrey = new Color(0.62f, 0.6f, 0.56f);
+        static readonly Color TableWood = new Color(0.55f, 0.42f, 0.3f);
         static readonly Color DarkGrey = new Color(0.28f, 0.29f, 0.3f);
         static readonly Color CeilingGrey = new Color(0.9f, 0.9f, 0.89f);
         static readonly Color GroundGrey = new Color(0.5f, 0.55f, 0.48f);
         static readonly Color TreeGrey = new Color(0.38f, 0.45f, 0.36f);
         static readonly Color TrunkGrey = new Color(0.4f, 0.36f, 0.32f);
 
-        static float M(float realMetres) => realMetres * Scale;
+        public static float M(float realMetres) => realMetres * Scale;
 
         // Real-life room (metres): the chess table stands in the middle of a 10 × 10 m classroom.
         const float RoomHalf = 5f, RoomHeight = 2.8f, WallThick = 0.15f;
         const float TableHeight = 0.75f, TableThick = 0.03f, TableLeg = 0.05f;
 
-        static float Floor => TableTop - M(TableHeight);
+        public static float Floor => TableTop - M(TableHeight);
 
-        /// <summary>Builds (or rebuilds, for the current board size) the room under the arena.</summary>
-        public static void Build(ArenaBoard board)
+        /// <summary>
+        /// Famous positions set up on the student desks (FEN piece placement, rank 8 first).
+        /// </summary>
+        public static readonly (string name, string fen)[] Games =
         {
-            var arena = board.transform;
-            var old = arena.Find(RootName);
-            if (old != null) Object.Destroy(old.gameObject);
+            ("Opera Game — Morphy, Paris 1858 (17.Rd8#)", "1n1Rkb1r/p4ppp/4q3/4p1B1/4P3/8/PPP2PPP/2K5"),
+            ("Immortal Game — Anderssen v Kieseritzky, London 1851 (23.Be7#)", "r1bk3r/p2pBpNp/n4n2/1p1NP2P/6P1/3P4/P1P1K3/q5b1"),
+            ("Fool's Mate (2...Qh4#)", "rnb1kbnr/pppp1ppp/8/4p3/6Pq/5P2/PPPPP2P/RNBQKBNR"),
+            ("Scholar's Mate (4.Qxf7#)", "r1bqkb1r/pppp1Qpp/2n2n2/4p3/2B1P3/8/PPPP1PPP/RNB1K1NR"),
+            ("Ruy Lopez (1.e4 e5 2.Nf3 Nc6 3.Bb5)", "r1bqkbnr/pppp1ppp/2n5/1B2p3/4P3/5N2/PPPP1PPP/RNBQK2R"),
+            ("Starting position", "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR"),
+        };
 
-            // The dark hall goes away.
-            foreach (var name in new[] { "Pillars", "Hall Floor" })
-            {
-                var t = arena.Find(name);
-                if (t != null) t.gameObject.SetActive(false);
-            }
-
+        /// <summary>Builds the classroom under the arena and returns its root.</summary>
+        public static Transform Build(Transform arena)
+        {
             var root = new GameObject(RootName).transform;
             root.SetParent(arena, false);
             var wall = MaterialLib.Get(WallGrey, 0.2f);
             var prop = MaterialLib.Get(PropGrey, 0.3f);
             var dark = MaterialLib.Get(DarkGrey, 0.4f);
 
-            ChessTable(root, MaterialLib.Get(TableGrey, 0.35f));
-            Room(root, wall, prop, dark);
-            Furniture(root, prop, dark);
-            Trees(root);
-            Daylight();
+            var table = ChessTable(Group(root, "Chess Table"), MaterialLib.Get(TableWood, 0.4f));
+            table.clock = ChessClock(table.transform, dark);
+            Room(Group(root, "Room"), wall, prop, dark);
+            Furniture(Group(root, "Furniture"), prop, dark);
+            Trees(Group(root, "Trees Outside"));
+            root.gameObject.AddComponent<ClassroomAmbience>();
+            return root;
         }
 
-        /// <summary>The table the board lies on: 1.2 m square in real life (≈ 44 m), wider if the endless board outgrows it.</summary>
-        static void ChessTable(Transform root, Material wood)
+        static Transform Group(Transform parent, string name)
         {
-            float half = Mathf.Max(M(0.6f), GameManager.BoardHalf + 6f);
-            float thick = M(TableThick);
-            var top = Box(root, "Chess Table Top", new Vector3(0f, TableTop - thick / 2f, 0f), new Vector3(half * 2f, thick, half * 2f), wood);
-            top.gameObject.AddComponent<BoxCollider>();   // rubble that slides off the board lands on the table
+            var t = new GameObject(name).transform;
+            t.SetParent(parent, false);
+            return t;
+        }
+
+        // ---------------------------------------------------------------- the chess table and its clock
+
+        /// <summary>The table the board lies on: 1.2 m square in real life (≈ 44 m); ChessTableFit widens it for a bigger board.</summary>
+        static ChessTableFit ChessTable(Transform root, Material wood)
+        {
+            var fit = root.gameObject.AddComponent<ChessTableFit>();
+            float half = M(0.6f), thick = M(TableThick);
+            fit.baseHalf = half;
+            fit.legSize = M(TableLeg);
+            fit.top = Box(root, "Table Top", new Vector3(0f, TableTop - thick / 2f, 0f), new Vector3(half * 2f, thick, half * 2f), wood);
+            fit.top.gameObject.AddComponent<BoxCollider>();   // rubble that slides off the board lands on the table
             float leg = M(TableLeg), legH = M(TableHeight) - thick, inset = half - leg;
+            var legs = new List<Transform>();
             for (int i = 0; i < 4; i++)
             {
                 float x = (i % 2 == 0 ? -1 : 1) * inset, z = (i < 2 ? -1 : 1) * inset;
-                Box(root, "Chess Table Leg", new Vector3(x, Floor + legH / 2f, z), new Vector3(leg, legH, leg), wood);
+                legs.Add(Box(root, "Table Leg", new Vector3(x, Floor + legH / 2f, z), new Vector3(leg, legH, leg), wood));
             }
+            fit.legs = legs.ToArray();
+            return fit;
         }
+
+        /// <summary>
+        /// A digital chess clock (real 18 × 6 × 9 cm) beside the board, its sloped face toward the player: a black body
+        /// with chamfered ends, two LED windows (play time and round, see ChessClockDisplay), two rocker buttons
+        /// (one pressed), a centre ridge and feet.
+        /// </summary>
+        static Transform ChessClock(Transform table, Material dark)
+        {
+            var clock = Group(table, "Chess Clock");
+            float b = GameManager.BoardHalf;
+            clock.localPosition = new Vector3(b + (M(0.6f) - b) * 0.5f + 0.6f, TableTop, 2f);
+            clock.localRotation = Quaternion.Euler(0f, -18f, 0f);   // turned a little toward the board's middle
+
+            var body = MaterialLib.Get(new Color(0.07f, 0.07f, 0.08f), 0.65f, 0.1f);
+            var trim = MaterialLib.Get(new Color(0.72f, 0.62f, 0.38f), 0.7f, 0.8f);   // brass
+            var glass = MaterialLib.Get(new Color(0.02f, 0.02f, 0.025f), 0.95f);
+            var cream = MaterialLib.Get(new Color(0.88f, 0.84f, 0.74f), 0.5f);
+            float w = M(0.18f), h = M(0.065f), d = M(0.09f);
+
+            // Feet, body, a chamfered top edge at both ends.
+            for (int i = 0; i < 4; i++)
+                Box(clock, "Foot", new Vector3((i % 2 == 0 ? -1 : 1) * w * 0.42f, M(0.003f), (i < 2 ? -1 : 1) * d * 0.38f),
+                    new Vector3(M(0.012f), M(0.006f), M(0.012f)), dark);
+            Box(clock, "Body", new Vector3(0f, M(0.006f) + h * 0.45f, 0f), new Vector3(w, h * 0.9f, d), body);
+            // Sloped front panel holding the two displays (faces -Z, toward the camera).
+            var face = Group(clock, "Face");
+            face.localPosition = new Vector3(0f, M(0.006f) + h * 0.55f, -d * 0.5f);
+            face.localRotation = Quaternion.Euler(-22f, 0f, 0f);
+            Box(face, "Face Panel", new Vector3(0f, 0f, -M(0.002f)), new Vector3(w * 0.98f, h * 0.75f, M(0.006f)), body);
+            Box(face, "Face Trim", new Vector3(0f, h * 0.38f, -M(0.004f)), new Vector3(w * 0.98f, M(0.002f), M(0.004f)), trim);
+            var display = clock.gameObject.AddComponent<ChessClockDisplay>();
+            for (int side = -1; side <= 1; side += 2)
+            {
+                float x = side * w * 0.24f;
+                Box(face, "Display Bezel", new Vector3(x, -h * 0.02f, -M(0.006f)), new Vector3(w * 0.4f, h * 0.46f, M(0.003f)), trim);
+                Box(face, "Display Glass", new Vector3(x, -h * 0.02f, -M(0.0075f)), new Vector3(w * 0.37f, h * 0.4f, M(0.002f)), glass);
+                var anchor = Group(face, side < 0 ? "Left Digits" : "Right Digits");
+                anchor.localPosition = new Vector3(x, -h * 0.02f, -M(0.009f));
+                if (side < 0) display.leftFace = anchor; else display.rightFace = anchor;
+            }
+            display.digitHeight = h * 0.26f;
+            // Top: centre ridge and the two rocker buttons (the left one pressed: it's the player's move).
+            float top = M(0.006f) + h * 0.9f;
+            Box(clock, "Centre Ridge", new Vector3(0f, top + M(0.004f), d * 0.05f), new Vector3(M(0.012f), M(0.008f), d * 0.7f), trim);
+            for (int side = -1; side <= 1; side += 2)
+            {
+                bool pressed = side < 0;
+                var btn = PieceFactory.Part(PrimitiveType.Cylinder, clock, new Vector3(side * w * 0.27f, top + (pressed ? M(0.004f) : M(0.012f)), d * 0.05f),
+                    new Vector3(M(0.035f), pressed ? M(0.004f) : M(0.012f), M(0.035f)), side < 0 ? cream : dark);
+                btn.name = pressed ? "Button (pressed)" : "Button";
+                PieceFactory.Part(PrimitiveType.Cylinder, clock, new Vector3(side * w * 0.27f, top + M(0.001f), d * 0.05f),
+                    new Vector3(M(0.042f), M(0.001f), M(0.042f)), trim).name = "Button Ring";
+            }
+            Box(clock, "Name Plate", new Vector3(0f, top - h * 0.05f, d * 0.5f + M(0.001f)), new Vector3(w * 0.3f, h * 0.15f, M(0.002f)), trim);
+            return clock;
+        }
+
+        // ---------------------------------------------------------------- room
 
         static void Room(Transform root, Material wall, Material prop, Material dark)
         {
@@ -87,22 +169,23 @@ namespace KingLastPiece
             floor.gameObject.AddComponent<BoxCollider>();
             Box(root, "Outside Ground", new Vector3(0f, floorY - 3f, 0f), new Vector3(half * 12f, 1f, half * 12f), MaterialLib.Get(GroundGrey, 0.1f));
 
-            // Ceiling with grey light panels.
-            // (No shadow from the ceiling: the sun comes in at an angle the windows alone couldn't light the table at.)
-            Box(root, "Ceiling", new Vector3(0f, floorY + height + thick / 2f, 0f), new Vector3(half * 2f + thick, thick, half * 2f + thick), MaterialLib.Get(CeilingGrey, 0.1f), shadows: false);
+            // Ceiling with light panels (no shadow: the sun comes in at an angle the windows alone couldn't light the table at).
+            Box(root, "Ceiling", new Vector3(0f, floorY + height + thick / 2f, 0f), new Vector3(half * 2f + thick, thick, half * 2f + thick),
+                MaterialLib.Get(CeilingGrey, 0.1f), shadows: false);
+            var panel = MaterialLib.Get(new Color(0.97f, 0.97f, 0.95f), 0.1f, 0f, new Color(0.6f, 0.6f, 0.58f));
             for (int i = -1; i <= 1; i++)
                 for (int j = -1; j <= 1; j += 2)
-                    Box(root, "Ceiling Light", new Vector3(i * M(3f), floorY + height - M(0.02f), j * M(1.8f)), new Vector3(M(1.2f), M(0.04f), M(0.3f)),
-                        MaterialLib.Get(new Color(0.97f, 0.97f, 0.95f), 0.1f, 0f, new Color(0.6f, 0.6f, 0.58f)));
+                    Box(root, "Ceiling Light", new Vector3(i * M(3f), floorY + height - M(0.02f), j * M(1.8f)), new Vector3(M(1.2f), M(0.04f), M(0.3f)), panel, shadows: false);
 
-            // North: chalkboard (3.6 × 1.2 m) and the teacher's desk.
+            // North: chalkboard (3.6 × 1.2 m).
             Box(root, "Wall N", new Vector3(0f, floorY + height / 2f, half), new Vector3(half * 2f + thick, height, thick), wall);
             Box(root, "Chalkboard", new Vector3(0f, floorY + M(1.5f), half - thick / 2f - M(0.02f)), new Vector3(M(3.6f), M(1.2f), M(0.03f)), dark);
             Box(root, "Chalk Tray", new Vector3(0f, floorY + M(0.88f), half - thick / 2f - M(0.05f)), new Vector3(M(3.6f), M(0.03f), M(0.08f)), prop);
 
-            // South: door (0.9 × 2.1 m) and bookshelves.
+            // South: the door (provided model) and bookshelves.
             Box(root, "Wall S", new Vector3(0f, floorY + height / 2f, -half), new Vector3(half * 2f + thick, height, thick), wall);
-            Box(root, "Door", new Vector3(M(3f), floorY + M(1.05f), -half + thick / 2f + M(0.02f)), new Vector3(M(0.9f), M(2.1f), M(0.04f)), dark);
+            var door = Model(root, DoorModel, 2.1f, AlignWidthAlongX);
+            if (door != null) door.localPosition = new Vector3(M(3f), floorY, -half + thick / 2f + M(0.03f));
             for (int i = 0; i < 3; i++)
                 Box(root, "Bookshelf", new Vector3(M(-3.6f + i * 1f), floorY + M(1f), -half + thick / 2f + M(0.18f)), new Vector3(M(0.9f), M(2f), M(0.35f)), prop);
 
@@ -133,50 +216,157 @@ namespace KingLastPiece
             }
         }
 
-        /// <summary>Teacher's desk, rows of student desks and chairs (some with chessboards set up), a chess clock.</summary>
+        // ---------------------------------------------------------------- furniture
+
+        /// <summary>
+        /// The teacher's desk by the chalkboard, and two blocks of student desks either side of the chess table, facing
+        /// the chalkboard, each with its chair; half of them have a famous game set up.
+        /// </summary>
         static void Furniture(Transform root, Material prop, Material dark)
         {
-            float floorY = Floor, half = M(RoomHalf);
-            // Teacher's desk in front of the chalkboard.
-            Desk(root, new Vector3(0f, 0f, half - M(1.2f)), 1.4f, 0.7f, prop);
-            // Student desks in two blocks to either side of the chess table, facing the chalkboard.
+            float half = M(RoomHalf);
+            Desk(root, new Vector3(0f, 0f, half - M(1.1f)), withChair: false, game: -1, dark);
+            int game = 0;
             for (int side = -1; side <= 1; side += 2)
                 for (int row = 0; row < 3; row++)
                     for (int col = 0; col < 2; col++)
                     {
-                        var c = new Vector3(side * M(2.4f + col * 1.3f), 0f, M(-2.6f + row * 1.6f));
-                        Desk(root, c, 1.1f, 0.6f, prop);
-                        // Chair behind the desk (seat 0.45 m, back 0.85 m).
-                        Box(root, "Chair Seat", new Vector3(c.x, floorY + M(0.44f), c.z - M(0.55f)), new Vector3(M(0.42f), M(0.04f), M(0.4f)), prop);
-                        Box(root, "Chair Back", new Vector3(c.x, floorY + M(0.65f), c.z - M(0.74f)), new Vector3(M(0.42f), M(0.4f), M(0.03f)), prop);
-                        Box(root, "Chair Legs", new Vector3(c.x, floorY + M(0.21f), c.z - M(0.55f)), new Vector3(M(0.36f), M(0.42f), M(0.34f)), prop);
-                        // Every other desk has a little game set up (board 0.45 m, a few pieces).
-                        if ((row + col) % 2 == 0)
-                        {
-                            float deskTop = floorY + M(0.75f);
-                            Box(root, "Desk Chessboard", new Vector3(c.x, deskTop + M(0.01f), c.z), new Vector3(M(0.45f), M(0.02f), M(0.45f)), dark);
-                            for (int k = 0; k < 4; k++)
-                                Box(root, "Desk Piece", new Vector3(c.x + M(-0.15f + k * 0.1f), deskTop + M(0.06f), c.z + M(k % 2 == 0 ? 0.15f : -0.15f)),
-                                    new Vector3(M(0.03f), M(0.08f), M(0.03f)), k % 2 == 0 ? prop : dark);
-                        }
+                        var c = new Vector3(side * M(2.3f + col * 1.35f), 0f, M(-2.6f + row * 1.6f));
+                        bool hasGame = (row + col) % 2 == 0 && game < Games.Length;
+                        Desk(root, c, withChair: true, game: hasGame ? game++ : -1, dark);
                     }
-            // A chess clock on the chess table, beside the board.
-            float tableHalf = Mathf.Max(M(0.6f), GameManager.BoardHalf + 6f);
-            Box(root, "Chess Clock", new Vector3(GameManager.BoardHalf + (tableHalf - GameManager.BoardHalf) / 2f, TableTop + M(0.03f), 0f),
-                new Vector3(M(0.06f), M(0.06f), M(0.18f)), dark);
         }
 
-        static void Desk(Transform root, Vector3 c, float width, float depth, Material mat)
+        static void Desk(Transform root, Vector3 at, bool withChair, int game, Material dark)
         {
-            float floorY = Floor, h = M(0.75f), top = M(0.03f), leg = M(0.04f);
-            Box(root, "Desk Top", new Vector3(c.x, floorY + h - top / 2f, c.z), new Vector3(M(width), top, M(depth)), mat);
-            for (int i = 0; i < 4; i++)
+            var desk = Model(root, DeskModel, 0.75f, AlignWidthAlongX);
+            float deskTop = Floor + M(0.75f);
+            float depth = M(0.6f);
+            if (desk != null)
             {
-                float x = c.x + (i % 2 == 0 ? -1 : 1) * (M(width) / 2f - leg);
-                float z = c.z + (i < 2 ? -1 : 1) * (M(depth) / 2f - leg);
-                Box(root, "Desk Leg", new Vector3(x, floorY + (h - top) / 2f, z), new Vector3(leg, h - top, leg), mat);
+                desk.localPosition = new Vector3(at.x, Floor, at.z);
+                var b = Bounds(desk);
+                deskTop = b.max.y;
+                depth = b.size.z;
+            }
+            else Box(root, "Desk (box)", new Vector3(at.x, Floor + M(0.75f) / 2f, at.z), new Vector3(M(1.1f), M(0.75f), M(0.6f)), dark);
+
+            if (withChair)
+            {
+                // Chair behind the desk (south of it), its back away from the desk.
+                var chair = Model(root, ChairModel, 0.85f, BackTowardMinusZ);
+                if (chair != null) chair.localPosition = new Vector3(at.x, Floor, at.z - depth * 0.5f - M(0.3f));
+            }
+            if (game >= 0) SetUpGame(root, new Vector3(at.x, deskTop, at.z), Games[game]);
+        }
+
+        /// <summary>A 45 cm board on the desk with the position laid out (white at the south edge, facing the chalkboard).</summary>
+        static void SetUpGame(Transform root, Vector3 top, (string name, string fen) game)
+        {
+            var set = Group(root, "Desk Game — " + game.name);
+            set.localPosition = top;
+            float sq = M(0.05f), edge = M(0.025f);
+            var light = MaterialLib.Get(new Color(0.85f, 0.78f, 0.62f), 0.4f);
+            var darkSq = MaterialLib.Get(new Color(0.42f, 0.26f, 0.16f), 0.4f);
+            Box(set, "Board", new Vector3(0f, M(0.006f), 0f), new Vector3(sq * 8f + edge * 2f, M(0.012f), sq * 8f + edge * 2f), darkSq);
+            for (int f = 0; f < 8; f++)
+                for (int r = 0; r < 8; r++)
+                    if ((f + r) % 2 == 1)
+                        Box(set, "Light Square", new Vector3((f - 3.5f) * sq, M(0.0125f), (r - 3.5f) * sq), new Vector3(sq, M(0.001f), sq), light, shadows: false);
+
+            var white = MaterialLib.Get(PieceFactory.WhitePiece, 0.55f);
+            var black = MaterialLib.Get(PieceFactory.BlackPiece, 0.75f, 0.1f);
+            string[] ranks = game.fen.Split('/');
+            for (int ri = 0; ri < 8 && ri < ranks.Length; ri++)
+            {
+                int rank = 7 - ri, file = 0;
+                foreach (char ch in ranks[ri])
+                {
+                    if (char.IsDigit(ch)) { file += ch - '0'; continue; }
+                    if (file > 7) break;
+                    bool isWhite = char.IsUpper(ch);
+                    var (path, height) = PieceModel(char.ToLower(ch));
+                    var piece = PieceFactory.LoadModel(path, set, M(height), isWhite ? 0f : 180f);
+                    if (piece != null)
+                    {
+                        piece.name = $"{(isWhite ? "White" : "Black")} {char.ToUpper(ch)} {(char)('a' + file)}{rank + 1}";
+                        piece.localPosition = new Vector3((file - 3.5f) * sq, M(0.013f), (rank - 3.5f) * sq);
+                        foreach (var r in piece.GetComponentsInChildren<Renderer>())
+                        {
+                            var mats = r.sharedMaterials;
+                            for (int i = 0; i < mats.Length; i++) mats[i] = isWhite ? white : black;
+                            r.sharedMaterials = mats;
+                        }
+                    }
+                    file++;
+                }
             }
         }
+
+        /// <summary>The game's piece models (the white king's for both kings), at real Staunton heights.</summary>
+        static (string path, float height) PieceModel(char p) => p switch
+        {
+            'k' => ("Models/White_Chess_King_v02", 0.095f),
+            'q' => ("Models/Black_Chess_Queen_v03", 0.085f),
+            'b' => ("Models/Black_Chess_Bishop_v03", 0.07f),
+            'n' => ("Models/Black_Chess_Knight_v03", 0.06f),
+            'r' => ("Models/Black_Chess_Rook_v03", 0.055f),
+            _ => ("Models/Black_Chess_Pawn_v03", 0.05f),
+        };
+
+        // ---------------------------------------------------------------- provided models
+
+        /// <summary>A provided model scaled to a real height, run through <paramref name="orient"/>, base at its origin.</summary>
+        static Transform Model(Transform parent, string path, float realHeight, System.Action<Transform> orient)
+        {
+            var m = PieceFactory.LoadModel(path, parent, M(realHeight), 0f, standUp: false);
+            if (m == null) return null;
+            m.name = System.IO.Path.GetFileName(path).Replace("_with VARCO", "");
+            orient(m);
+            return m;
+        }
+
+        static Bounds Bounds(Transform t)
+        {
+            var rs = t.GetComponentsInChildren<Renderer>();
+            var b = rs[0].bounds;
+            foreach (var r in rs) b.Encapsulate(r.bounds);
+            return b;
+        }
+
+        /// <summary>Turns the model so its widest horizontal side runs along X (desks, the door in a south wall).</summary>
+        static void AlignWidthAlongX(Transform m)
+        {
+            var b = Bounds(m);
+            if (b.size.z > b.size.x) m.localRotation = Quaternion.Euler(0f, 90f, 0f) * m.localRotation;
+        }
+
+        /// <summary>Turns a chair so its back (the tall part) is toward −Z: the sitter faces +Z, the chalkboard.</summary>
+        static void BackTowardMinusZ(Transform m)
+        {
+            var b = Bounds(m);
+            Vector3 sum = Vector3.zero;
+            int n = 0;
+            foreach (var mf in m.GetComponentsInChildren<MeshFilter>())
+            {
+                var mesh = mf.sharedMesh;
+                if (mesh == null) continue;
+                var v = mesh.vertices;
+                for (int i = 0; i < v.Length; i += 7)
+                {
+                    Vector3 w = mf.transform.TransformPoint(v[i]);
+                    if (w.y > b.min.y + b.size.y * 0.75f) { sum += w; n++; }
+                }
+            }
+            if (n == 0) return;
+            Vector3 back = sum / n - b.center;
+            back.y = 0f;
+            if (back.sqrMagnitude < 1e-4f) return;
+            float yaw = Vector3.SignedAngle(back.normalized, Vector3.back, Vector3.up);
+            m.localRotation = Quaternion.Euler(0f, yaw, 0f) * m.localRotation;
+        }
+
+        // ---------------------------------------------------------------- outside
 
         /// <summary>Grey-box trees outside the window walls (6–10 m tall in real life), and a few beyond the others.</summary>
         static void Trees(Transform root)
@@ -200,34 +390,6 @@ namespace KingLastPiece
                 PieceFactory.Part(PrimitiveType.Cylinder, tree, new Vector3(0f, h * 0.3f, 0f), new Vector3(M(0.35f), h * 0.3f, M(0.35f)), trunk).name = "Trunk";
                 PieceFactory.Part(PrimitiveType.Sphere, tree, new Vector3(0f, h * 0.72f, 0f), new Vector3(w, w * 0.85f, w), crown).name = "Crown";
                 PieceFactory.Part(PrimitiveType.Sphere, tree, new Vector3(w * 0.25f, h * 0.72f + w * 0.35f, 0f), Vector3.one * w * 0.65f, crown).name = "Crown";
-            }
-        }
-
-        /// <summary>Bright daylight through the windows, a pale sky and a light haze over the giant room.</summary>
-        static void Daylight()
-        {
-            foreach (var l in Object.FindObjectsByType<Light>(FindObjectsSortMode.None))
-            {
-                if (l.type == LightType.Directional)
-                {
-                    l.transform.rotation = Quaternion.Euler(48f, -62f, 0f);
-                    l.color = new Color(1f, 0.96f, 0.88f);
-                    l.intensity = 1.25f;
-                }
-                else if (l.name == "Brazier Light") l.enabled = false;
-            }
-            RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
-            RenderSettings.ambientLight = new Color(0.58f, 0.6f, 0.64f);
-            RenderSettings.fog = true;
-            RenderSettings.fogMode = FogMode.Linear;
-            RenderSettings.fogColor = new Color(0.82f, 0.88f, 0.94f);
-            RenderSettings.fogStartDistance = 250f;
-            RenderSettings.fogEndDistance = 1600f;
-            var cam = Camera.main;
-            if (cam != null)
-            {
-                cam.backgroundColor = new Color(0.72f, 0.83f, 0.95f);
-                cam.farClipPlane = 2500f;   // the room is ~360 m across, the trees further out
             }
         }
 
