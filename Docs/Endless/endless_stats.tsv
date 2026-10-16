@@ -18,6 +18,7 @@ Round	11	pieces=9	dark=1	board=8	banner=11 라운드
 Round	29	pieces=14	dark=7	board=10	banner=29 라운드  ·  체스판이 넓어진다
 Round	20	pieces=1	dark=1	board=8	banner=20 라운드 — 다크 I 여왕
 Round	21	pieces=14	dark=4	board=10	banner=21 라운드  ·  체스판이 넓어진다
-Offers	공격력 +11%; 회피 충전 횟수 +1; 회복약 개수 +1; 공격 범위 +7%; 공격 속도 +3%; 
+Offers	최대 체력 +11; 최대 기력 +10; 회복약 회복량 +11; 치명타 확률 +5%; 강공격 기력 소모 감소 +10%; 
 Picked	0,2	canConfirm=True	appliedBeforeConfirm=False
-Upgraded	round=4	power 0.70->0.81	hp 70->70	def 0->0	flasks 1->2	rolls 1->1
+Upgraded	round=4	power 0.70->0.70	hp 70->81	def 0->0	flasks 1->1	rolls 1->1
+HeavyGate	[70/48 → heavy] [22/48 → refused] [46/48 → refused] 

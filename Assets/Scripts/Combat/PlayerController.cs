@@ -174,8 +174,17 @@ namespace KingLastPiece
         }
 
         /// <summary>Stamina a light combo hit / the heavy attack costs (for the stats screen).</summary>
-        public float LightAttackCost => (Style ?? AttackStyles.Default).lights[0].cost * LightCostScale;
-        public float HeavyAttackCost => (Style ?? AttackStyles.Default).heavy.cost;
+        public float LightAttackCost => (Style ?? AttackStyles.Default).lights[0].cost * LightCostScale * (1f - Stats.lightCostCut);
+        public float HeavyAttackCost => (Style ?? AttackStyles.Default).heavy.cost * (1f - Stats.heavyCostCut);
+        bool HeavyAffordable => InfiniteStamina || Stamina >= HeavyAttackCost;
+
+        /// <summary>Rolls a critical hit: true with <see cref="PlayerStats.critChance"/>; <paramref name="mult"/> is the damage factor.</summary>
+        bool RollCrit(out float mult)
+        {
+            bool crit = Random.value < Stats.critChance;
+            mult = crit ? Stats.critDamage : 1f;
+            return crit;
+        }
 
         /// <summary>A permanent round-end upgrade: the gain applies right away (more health heals, a new flask is full).</summary>
         public void ApplyUpgrade(Upgrade u)
@@ -229,7 +238,8 @@ namespace KingLastPiece
             if (!held)
             {
                 // Denied presses get their own feedback sound.
-                if ((action == Buffered.Light || action == Buffered.Heavy) && Stamina < 1f && !CounterReady) Sfx.Play("ATK_NoStamina");
+                if (action == Buffered.Light && Stamina < 1f && !CounterReady) Sfx.Play("ATK_NoStamina");
+                if (action == Buffered.Heavy && !HeavyAffordable) Sfx.Play("ATK_NoStamina");
                 if (action == Buffered.Dodge && DodgeCharges <= 0) Sfx.Play("PL_Dodge_Empty");
                 if (action == Buffered.Heal && Flasks <= 0) Sfx.Play("PL_Heal_Empty");
             }
@@ -311,7 +321,8 @@ namespace KingLastPiece
                     StartAttack(false);
                     return true;
                 case Buffered.Heavy:
-                    if (Stamina < 1f) return false;
+                    // The heavy needs its whole stamina cost up front (the light combo only needs some left).
+                    if (!HeavyAffordable) return false;
                     StartAttack(true);
                     return true;
                 case Buffered.Dodge:
@@ -485,7 +496,7 @@ namespace KingLastPiece
                 comboIndex = chain ? (comboIndex + 1) % style.lights.Length : 0;
                 atk = style.lights[comboIndex];
             }
-            Consume(heavy ? atk.cost : atk.cost * LightCostScale);
+            Consume(heavy ? atk.cost * (1f - Stats.heavyCostCut) : atk.cost * LightCostScale * (1f - Stats.lightCostCut));
             atkUsesSlashFx = FxLibrary.Instance != null && System.Array.Exists(atk.hits, h => h.fx != SlashFxKind.None);
             hitStopUsed = false;
 
@@ -726,10 +737,11 @@ namespace KingLastPiece
                     if (ang < lo || ang > hi) continue;
                 }
                 already.Add(e);
-                if (e.TakeHit(damage, w.poise, transform.position))
+                bool crit = RollCrit(out float mult);
+                if (e.TakeHit(damage * mult, w.poise, transform.position))
                 {
                     landed = true;
-                    Game.ReportDamage(e, damage);
+                    Game.ReportDamage(e, damage * mult, crit);
                     Vector3 toE = (e.FlatPos - FlatPos).normalized;
                     Vfx.Hit(e.Visual.position + Vector3.up * 1.0f - toE * e.Radius, toE, atk.heavy, e.Visual);
                     Sfx.Play(e.IsBoss ? "HIT_Boss" : atk.heavy ? "HIT_Heavy" : "HIT_Light", e.transform.position + Vector3.up);
@@ -994,9 +1006,11 @@ namespace KingLastPiece
                     if (e == null || e.IsDead || counterHits.Contains(e)) continue;
                     if ((e.FlatPos - piecePos).magnitude > counterTarget.Radius + e.Radius + 0.5f) continue;
                     counterHits.Add(e);
-                    if (e.TakeHit(SwingHitDamage * Stats.attackPower, 50f, piecePos))
+                    bool crit = RollCrit(out float mult);
+                    float swingDamage = SwingHitDamage * Stats.attackPower * mult;
+                    if (e.TakeHit(swingDamage, 50f, piecePos))
                     {
-                        Game.ReportDamage(e, SwingHitDamage * Stats.attackPower);
+                        Game.ReportDamage(e, swingDamage, crit);
                         Sfx.Play("THR_SwingHit", e.transform.position + Vector3.up);
                         Effects.Sparks(e.transform.position + Vector3.up, Vfx.Accent, 14, 6f);
                         Game.Rig.Shake(0.3f);

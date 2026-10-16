@@ -25,6 +25,10 @@ namespace KingLastPiece
         public int maxDodges = 3;
         /// <summary>Roll charge refill speed multiplier.</summary>
         public float dodgeRecharge = 1f;
+        /// <summary>Stamina cost cut for light / heavy attacks (0.2 = 20% cheaper).</summary>
+        public float lightCostCut, heavyCostCut;
+        /// <summary>Chance a hit is critical, and the damage multiplier of a critical hit.</summary>
+        public float critChance = 0.05f, critDamage = 1.5f;
 
         public static PlayerStats Classic() => new PlayerStats();
 
@@ -48,7 +52,11 @@ namespace KingLastPiece
         public float DamageTaken(float damage) => damage * 100f / (100f + Mathf.Max(0f, defense));
     }
 
-    public enum UpgradeKind { Flask, HealAmount, AttackPower, Defense, MaxHealth, AttackRange, AttackSpeed, DodgeRecharge, MaxDodges, MaxStamina }
+    public enum UpgradeKind
+    {
+        Flask, HealAmount, AttackPower, Defense, MaxHealth, AttackRange, AttackSpeed, DodgeRecharge, MaxDodges, MaxStamina,
+        LightCost, HeavyCost, CritChance, CritDamage,
+    }
 
     /// <summary>One offered upgrade: a stat and the (rolled) amount it grows by.</summary>
     public struct Upgrade
@@ -92,6 +100,10 @@ namespace KingLastPiece
             { UpgradeKind.DodgeRecharge, new UpgradeDef { title = "회피 충전 속도",  min = 0.1f,  max = 0.2f,  cap = 1.6f,  percent = true } },
             { UpgradeKind.MaxDodges,     new UpgradeDef { title = "회피 충전 횟수",  min = 1f,    max = 1f,    cap = 3f,    whole = true } },
             { UpgradeKind.MaxStamina,    new UpgradeDef { title = "최대 기력",       min = 8f,    max = 15f,   cap = float.PositiveInfinity } },
+            { UpgradeKind.LightCost,     new UpgradeDef { title = "약공격 기력 소모 감소", min = 0.06f, max = 0.12f, cap = 0.6f,  percent = true } },
+            { UpgradeKind.HeavyCost,     new UpgradeDef { title = "강공격 기력 소모 감소", min = 0.06f, max = 0.12f, cap = 0.5f,  percent = true } },
+            { UpgradeKind.CritChance,    new UpgradeDef { title = "치명타 확률",     min = 0.03f, max = 0.06f, cap = 0.6f,  percent = true } },
+            { UpgradeKind.CritDamage,    new UpgradeDef { title = "치명타 피해",     min = 0.1f,  max = 0.25f, cap = 3f,    percent = true } },
         };
 
         public static UpgradeDef Def(UpgradeKind k) => defs[k];
@@ -107,6 +119,10 @@ namespace KingLastPiece
             UpgradeKind.AttackSpeed => s.attackSpeed,
             UpgradeKind.DodgeRecharge => s.dodgeRecharge,
             UpgradeKind.MaxDodges => s.maxDodges,
+            UpgradeKind.LightCost => s.lightCostCut,
+            UpgradeKind.HeavyCost => s.heavyCostCut,
+            UpgradeKind.CritChance => s.critChance,
+            UpgradeKind.CritDamage => s.critDamage,
             _ => s.maxStamina,
         };
 
@@ -149,6 +165,10 @@ namespace KingLastPiece
                 case UpgradeKind.DodgeRecharge: s.dodgeRecharge = Mathf.Min(cap, s.dodgeRecharge + u.amount); break;
                 case UpgradeKind.MaxDodges: s.maxDodges = Mathf.Min((int)cap, s.maxDodges + Mathf.RoundToInt(u.amount)); break;
                 case UpgradeKind.MaxStamina: s.maxStamina += u.amount; break;
+                case UpgradeKind.LightCost: s.lightCostCut = Mathf.Min(cap, s.lightCostCut + u.amount); break;
+                case UpgradeKind.HeavyCost: s.heavyCostCut = Mathf.Min(cap, s.heavyCostCut + u.amount); break;
+                case UpgradeKind.CritChance: s.critChance = Mathf.Min(cap, s.critChance + u.amount); break;
+                case UpgradeKind.CritDamage: s.critDamage = Mathf.Min(cap, s.critDamage + u.amount); break;
             }
         }
 

@@ -187,6 +187,22 @@ namespace KingLastPiece
             stats.Append($"Upgraded\tround={game.Round}\tpower {before.attackPower:0.00}->{after.attackPower:0.00}\thp {before.maxHealth}->{after.maxHealth}\t" +
                          $"def {before.defense}->{after.defense}\tflasks {before.maxFlasks}->{after.maxFlasks}\trolls {before.maxDodges}->{after.maxDodges}\n");
             yield return Frames(30);
+
+            // Heavy attacks need their whole stamina cost: two back to back, the second must be refused.
+            var p = game.Player;
+            var heavyLog = new StringBuilder();
+            for (int i = 0; i < 3; i++)
+            {
+                float before2 = p.Stamina;
+                p.Press(PlayerController.Buffered.Heavy);
+                yield return Frames(2);
+                bool started = p.IsAttacking;
+                heavyLog.Append($"[{before2:0}/{p.HeavyAttackCost:0} → {(started ? "heavy" : "refused")}] ");
+                for (int f = 0; f < 120 && p.IsAttacking; f++) yield return null;
+                yield return Frames(30);   // the buffer window runs out before the next press
+            }
+            stats.Append($"HeavyGate\t{heavyLog}\n");
+
             game.DebugTogglePause();
             var hud = game.GetComponent<Hud>();
             if (hud != null) hud.PauseTab = 1;

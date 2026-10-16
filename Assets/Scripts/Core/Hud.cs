@@ -307,6 +307,17 @@ namespace KingLastPiece
                 Vector3 sp = cam.WorldToScreenPoint(p.position + Vector3.up * age * 0.8f);
                 if (sp.z < 0f) continue;
                 float a = Mathf.Clamp01((0.9f - age) / 0.3f);
+                if (p.crit)
+                {
+                    // Critical: bigger, hot orange-red, with a little pop at the start.
+                    float pop = 1f + 0.35f * Mathf.Clamp01(1f - age / 0.15f);
+                    var crit = new GUIStyle(style) { fontSize = Mathf.RoundToInt(34 * scale * pop) };
+                    Text(new Rect(sp.x - 100 * scale, Screen.height - sp.y - 26 * scale, 200 * scale, 44 * scale),
+                        Mathf.RoundToInt(p.amount).ToString(), crit, new Color(1f, 0.45f, 0.15f, a));
+                    Text(new Rect(sp.x - 100 * scale, Screen.height - sp.y - 50 * scale, 200 * scale, 24 * scale), "치명타",
+                        new GUIStyle(style) { fontSize = Mathf.RoundToInt(16 * scale) }, new Color(1f, 0.75f, 0.4f, a));
+                    continue;
+                }
                 Text(new Rect(sp.x - 60 * scale, Screen.height - sp.y - 15 * scale, 120 * scale, 30 * scale),
                     Mathf.RoundToInt(p.amount).ToString(), style, new Color(1f, 0.9f, 0.6f, a));
             }
@@ -532,7 +543,8 @@ namespace KingLastPiece
                 ("공격 속도", $"{Mathf.RoundToInt(s.attackSpeed * 100f)}%   (최대 135%)"),
                 ("공격 범위", $"{Mathf.RoundToInt(s.attackRange * 100f)}%   (최대 130%)"),
                 ("최대 기력", $"{Mathf.RoundToInt(p.MaxStamina)}"),
-                ("공격당 기력 소모", $"약공격 {p.LightAttackCost:0.#}   ·   강공격 {p.HeavyAttackCost:0.#}"),
+                ("치명타", $"확률 {Mathf.RoundToInt(s.critChance * 100f)}% (최대 60%)   ·   피해 {Mathf.RoundToInt(s.critDamage * 100f)}% (최대 300%)"),
+                ("공격당 기력 소모", $"약공격 {p.LightAttackCost:0.#} (−{Mathf.RoundToInt(s.lightCostCut * 100f)}%)   ·   강공격 {p.HeavyAttackCost:0.#} (−{Mathf.RoundToInt(s.heavyCostCut * 100f)}%)"),
                 ("회복약", $"{p.MaxFlasks}개 (최대 5)   ·   회복량 {Mathf.RoundToInt(s.healAmount)}"),
                 ("회피 충전", $"{p.MaxDodges}회 (최대 3)   ·   1회 충전 {p.DodgeRechargeTime:0.00}초"),
             }, area.width * 0.4f);

@@ -63,6 +63,7 @@ namespace KingLastPiece
         {
             public Vector3 position;
             public float amount, time;
+            public bool crit;
         }
 
         public readonly List<DamagePopup> Popups = new List<DamagePopup>();
@@ -397,7 +398,7 @@ namespace KingLastPiece
 
         public int DamageEvents { get; private set; }
 
-        public void ReportDamage(EnemyBase e, float amount)
+        public void ReportDamage(EnemyBase e, float amount, bool crit = false)
         {
             DamageEvents++;
             Sfx.Play("UI_DamagePopup");
@@ -406,6 +407,7 @@ namespace KingLastPiece
                 position = e.transform.position + Vector3.up * (e.IsBoss ? 3.3f : 2.3f) + Random.insideUnitSphere * 0.3f,
                 amount = amount,
                 time = Time.unscaledTime,
+                crit = crit,
             });
             if (Popups.Count > 32) Popups.RemoveAt(0);
         }
