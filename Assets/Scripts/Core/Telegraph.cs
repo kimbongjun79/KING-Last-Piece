@@ -133,6 +133,15 @@ namespace KingLastPiece
             return t;
         }
 
+        /// <summary>Landing area only, without lighting the attacker's own square (queen leap).</summary>
+        public static Telegraph Area(Vector3 center, float radius, float windup)
+        {
+            var t = Create("Telegraph_Area", Kind.Area, windup);
+            t.center = Flat(center);
+            t.RebuildCells(AreaSquares(t.center, radius, t.scratch));
+            return t;
+        }
+
         /// <summary>The knight's leap: the cross it strikes lit, dotted L route, and a ghost on the landing square.</summary>
         public static Telegraph Leap(Vector3 from, Vector3 target, float windup, Transform ghostModel)
         {

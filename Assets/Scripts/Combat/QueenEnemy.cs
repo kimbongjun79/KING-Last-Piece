@@ -91,11 +91,10 @@ namespace KingLastPiece
 
         void Dash(float windup, Vector3 dir)
         {
-            Vector3 to = ToPlayer;
             BeginAttack(new AttackPlan
             {
                 kind = AtkKind.Dash, dir = dir, windup = windup, recover = dashesLeft > 0 ? 0.25f : 1.1f,
-                length = Mathf.Clamp(to.magnitude + 4f, 6f, 12f), speed = 24f, damage = 22f, poise = 40f, radius = 1.0f
+                length = FullLine, speed = 24f, damage = 22f, poise = 40f, radius = 1.0f
             });
         }
 

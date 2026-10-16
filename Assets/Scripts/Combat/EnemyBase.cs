@@ -308,6 +308,9 @@ namespace KingLastPiece
             moving = true;
         }
 
+        /// <summary>Dash length meaning "no range limit": BeginAttack cuts it at the board edge.</summary>
+        protected const float FullLine = 100f;
+
         protected static float DistanceToEdge(Vector3 from, Vector3 dir)
         {
             float h = GameManager.PlayableHalf;
@@ -503,7 +506,7 @@ namespace KingLastPiece
                     // Knights show their L route and a ghost on the landing square; the queen just the landing area.
                     telegraph = Type == PieceType.Knight
                         ? Telegraph.Leap(atkStart, plan.target, plan.windup, model)
-                        : Telegraph.Area(plan.target, plan.radius, plan.windup, atkStart);
+                        : Telegraph.Area(plan.target, plan.radius, plan.windup);
                     break;
                 case AtkKind.Slam:
                     telegraph = Telegraph.Area(atkStart, plan.radius, plan.windup, atkStart);

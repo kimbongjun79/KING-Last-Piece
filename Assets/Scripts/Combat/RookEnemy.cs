@@ -51,7 +51,7 @@ namespace KingLastPiece
                     BeginAttack(new AttackPlan
                     {
                         kind = AtkKind.Dash, dir = BoardSlots.LineDirection(MySquare, KingSquare), windup = 0.75f, recover = 1.1f,
-                        length = 14f, speed = 22f, damage = 26f, poise = 50f, radius = 0.9f
+                        length = FullLine, speed = 22f, damage = 26f, poise = 50f, radius = 0.9f
                     });
                     cooldown = Random.Range(2f, 3f);
                 }
