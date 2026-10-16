@@ -32,7 +32,8 @@ namespace KingLastPiece
             game = GameManager.Instance;
             Application.targetFrameRate = 60;
             LogArmies();
-            yield return null;
+            yield return Frames(90);   // the title fades in
+            yield return Shot("19_Title.png");
             game.DebugStartGame();
             game.Player.GodMode = true;
             yield return Frames(60);
@@ -88,7 +89,7 @@ namespace KingLastPiece
                 spawned.Add(game.SpawnEmpowered(PieceType.Rook, t, new Vector3(x, 0f, 6.5f)));
             }
             foreach (var e in spawned)
-                stats.Append($"Tier\t{e.Type}\tT{e.EliteTier}\thp={e.MaxHealth:0}\t{e.DisplayName}\n");
+                stats.Append($"Tier\t{e.Type}\tT{e.EliteTier}\thp={e.MaxHealth:0}\tradius={e.Radius:0.00}\t{e.DisplayName}\n");
             game.Player.transform.position = new Vector3(0f, 0f, -7f);
             game.Rig.UseOverride = true;
             game.Rig.OverridePosition = new Vector3(0f, 3.4f, -0.8f);
@@ -169,11 +170,18 @@ namespace KingLastPiece
             var offered = new StringBuilder();
             foreach (var o in game.Offers) offered.Append($"{o.Title} {o.AmountText}; ");
             stats.Append($"Offers\t{offered}\n");
-            game.OfferCursor = 2;
+            // Choose 1, choose 4 then cancel it, choose 3: two chosen, nothing applied until the confirm button.
             game.PickUpgrade(0);
-            yield return Frames(10);
-            yield return Shot("26_Upgrade_One_Taken.png");
+            game.PickUpgrade(3);
+            game.PickUpgrade(3);
             game.PickUpgrade(2);
+            game.OfferCursor = game.ConfirmSlot;
+            bool appliedEarly = game.Player.Stats.maxDodges != before.maxDodges || game.Player.Stats.maxStamina != before.maxStamina ||
+                                game.Player.Stats.defense != before.defense || game.Player.Stats.maxHealth != before.maxHealth;
+            stats.Append($"Picked\t{string.Join(",", game.Picked)}\tcanConfirm={game.CanConfirmUpgrades}\tappliedBeforeConfirm={appliedEarly}\n");
+            yield return Frames(10);
+            yield return Shot("26_Upgrade_Two_Chosen.png");
+            game.ConfirmUpgrades();
             for (int f = 0; f < 200 && game.State != GameManager.GameState.Playing; f++) yield return null;
             var after = game.Player.Stats;
             stats.Append($"Upgraded\tround={game.Round}\tpower {before.attackPower:0.00}->{after.attackPower:0.00}\thp {before.maxHealth}->{after.maxHealth}\t" +
@@ -184,6 +192,9 @@ namespace KingLastPiece
             if (hud != null) hud.PauseTab = 1;
             yield return Frames(3);
             yield return Shot("27_Pause_Stats.png");
+            if (hud != null) hud.PauseTab = 2;
+            yield return Frames(3);
+            yield return Shot("28_Pause_Controls.png");
             game.DebugTogglePause();
         }
     }

@@ -7,7 +7,7 @@ namespace KingLastPiece
     {
         protected override void Configure()
         {
-            DisplayName = "Training Dummy";
+            DisplayName = "훈련용 허수아비";
             SetHealth(160f);
             SetRadius(0.45f);
             moveSpeed = 0f;

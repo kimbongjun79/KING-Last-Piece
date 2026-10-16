@@ -12,7 +12,7 @@ namespace KingLastPiece
 
         protected override void Configure()
         {
-            DisplayName = "Black Bishop";
+            DisplayName = "흑색 비숍";
             SetHealth(265f);   // ~4 light-combo cycles
             SetRadius(0.45f);
             moveSpeed = 3.4f;

@@ -16,7 +16,7 @@ namespace KingLastPiece
 
         protected override void Configure()
         {
-            DisplayName = "Black Knight";
+            DisplayName = "흑색 나이트";
             SetHealth(265f);   // ~4 light-combo cycles
             SetRadius(0.5f);
             moveSpeed = 3f;

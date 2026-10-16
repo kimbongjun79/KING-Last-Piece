@@ -12,7 +12,7 @@ namespace KingLastPiece
 
         protected override void Configure()
         {
-            DisplayName = "Black Rook";
+            DisplayName = "흑색 룩";
             SetHealth(380f);   // tougher than knight/bishop (~5.8 cycles)
             SetRadius(0.55f);
             moveSpeed = 2.8f;

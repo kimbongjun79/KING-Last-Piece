@@ -40,10 +40,10 @@ namespace KingLastPiece
             if (IsBossRound(round))
             {
                 int b = round / 10, count = (b - 1) / 4 + 1, tier = (b - 1) % 4;
-                string who = tier == 0 ? "Queen" : $"Dark Queen {new string('I', tier)}";
-                return count == 1 ? $"Round {round} — The {who}" : $"Round {round} — {count} × {who}";
+                string who = tier == 0 ? "흑색 여왕" : $"다크 {new string('I', tier)} 여왕";
+                return count == 1 ? $"{round} 라운드 — {who}" : $"{round} 라운드 — {who} {count}명";
             }
-            return $"Round {round}";
+            return $"{round} 라운드";
         }
 
         public static List<Spawn> Army(int round)

@@ -86,27 +86,27 @@ namespace KingLastPiece
         // Ten rounds. Pieces enter on their real starting squares; difficulty ramps up to the Queen.
         static readonly WaveDef[] Waves =
         {
-            new WaveDef { name = "I. The Opening", pieces = new[] {
+            new WaveDef { name = "I. 오프닝", pieces = new[] {
                 (PieceType.Pawn, "c7"), (PieceType.Pawn, "d7"), (PieceType.Pawn, "e7"), (PieceType.Pawn, "f7") } },
-            new WaveDef { name = "II. Knight's Gambit", pieces = new[] {
+            new WaveDef { name = "II. 나이트 갬빗", pieces = new[] {
                 (PieceType.Knight, "g8"), (PieceType.Pawn, "d7"), (PieceType.Pawn, "e7") } },
-            new WaveDef { name = "III. The Long Diagonal", pieces = new[] {
+            new WaveDef { name = "III. 긴 대각선", pieces = new[] {
                 (PieceType.Bishop, "c8"), (PieceType.Pawn, "c7"), (PieceType.Pawn, "d7"), (PieceType.Pawn, "f7") } },
-            new WaveDef { name = "IV. Minor Pieces", pieces = new[] {
+            new WaveDef { name = "IV. 마이너 피스", pieces = new[] {
                 (PieceType.Knight, "b8"), (PieceType.Bishop, "f8"), (PieceType.Pawn, "d7"), (PieceType.Pawn, "e7") } },
-            new WaveDef { name = "V. Castle Walls", pieces = new[] {
+            new WaveDef { name = "V. 성벽", pieces = new[] {
                 (PieceType.Rook, "a8"), (PieceType.Pawn, "b7"), (PieceType.Pawn, "d7"), (PieceType.Pawn, "f7") } },
-            new WaveDef { name = "VI. Twin Cavalry", pieces = new[] {
+            new WaveDef { name = "VI. 쌍둥이 기병", pieces = new[] {
                 (PieceType.Knight, "b8"), (PieceType.Knight, "g8"), (PieceType.Bishop, "c8") } },
-            new WaveDef { name = "VII. Fianchetto", pieces = new[] {
+            new WaveDef { name = "VII. 피앙케토", pieces = new[] {
                 (PieceType.Bishop, "c8"), (PieceType.Bishop, "f8"), (PieceType.Rook, "h8") } },
-            new WaveDef { name = "VIII. Rook Lift", pieces = new[] {
+            new WaveDef { name = "VIII. 룩 리프트", pieces = new[] {
                 (PieceType.Rook, "a8"), (PieceType.Rook, "h8"), (PieceType.Knight, "g8"), (PieceType.Pawn, "d7"), (PieceType.Pawn, "e7") } },
-            new WaveDef { name = "IX. The Vanguard", pieces = new[] {
+            new WaveDef { name = "IX. 선봉대", pieces = new[] {
                 (PieceType.Knight, "b8"), (PieceType.Knight, "g8"), (PieceType.Bishop, "c8"), (PieceType.Bishop, "f8"),
                 (PieceType.Rook, "a8"), (PieceType.Pawn, "d7"), (PieceType.Pawn, "e7") } },
             // Final round: the Queen with 6 pawns and one rook, knight and bishop.
-            new WaveDef { name = "X. The Black Army", pieces = new[] {
+            new WaveDef { name = "X. 흑색 군대", pieces = new[] {
                 (PieceType.Pawn, "b7"), (PieceType.Pawn, "c7"), (PieceType.Pawn, "d7"),
                 (PieceType.Pawn, "e7"), (PieceType.Pawn, "f7"), (PieceType.Pawn, "g7"),
                 (PieceType.Knight, "b8"), (PieceType.Queen, "d8"), (PieceType.Bishop, "f8"), (PieceType.Rook, "h8") } },
@@ -229,8 +229,8 @@ namespace KingLastPiece
 
             bool boss = EndlessRounds.IsBossRound(round);
             string banner = EndlessRounds.Title(round);
-            if (grew) banner += "  ·  The board grows";
-            if (round % 40 == 0) banner += "  ·  The black army grows stronger";
+            if (grew) banner += "  ·  체스판이 넓어진다";
+            if (round % 40 == 0) banner += "  ·  흑색 군대가 더 강해진다";
             ShowBanner(banner);
             Sfx.Play("GAME_RoundStart");
             if (boss) Sfx.Play("GAME_FinalRound");
@@ -277,14 +277,29 @@ namespace KingLastPiece
                 SpawnEmpowered(summons[i].type, summons[i].tier, BoardSlots.Center(free[i]));
         }
 
-        /// <summary>Takes the upgrade card <paramref name="i"/> (two per round); the next round starts after the second.</summary>
+        /// <summary>How many cards must be chosen before the confirm button unlocks (two, or fewer if fewer are offered).</summary>
+        public int PicksNeeded => Mathf.Min(Upgrades.Picks, Offers.Count);
+        public bool CanConfirmUpgrades => State == GameState.Upgrade && upgradeDoneAt < 0f && Picked.Count == PicksNeeded;
+        /// <summary>The cursor index of the confirm button (after the cards).</summary>
+        public int ConfirmSlot => Offers.Count;
+
+        /// <summary>Selects upgrade card <paramref name="i"/>, or unselects it if it was selected. Two can be held.</summary>
         public void PickUpgrade(int i)
         {
-            if (State != GameState.Upgrade || i < 0 || i >= Offers.Count || Picked.Contains(i)) return;
+            if (State != GameState.Upgrade || upgradeDoneAt >= 0f || i < 0 || i >= Offers.Count) return;
+            if (Picked.Remove(i)) { Sfx.Play("UI_Back"); return; }
+            if (Picked.Count >= PicksNeeded) { Sfx.Play("UI_Back"); return; }   // already holding two: unselect one first
             Picked.Add(i);
-            Player.ApplyUpgrade(Offers[i]);
             Sfx.Play("UI_Confirm");
-            if (Picked.Count >= Mathf.Min(Upgrades.Picks, Offers.Count)) upgradeDoneAt = StateTime;
+        }
+
+        /// <summary>Confirm button: the chosen upgrades become permanent and the next round starts.</summary>
+        public void ConfirmUpgrades()
+        {
+            if (!CanConfirmUpgrades) return;
+            foreach (int i in Picked) Player.ApplyUpgrade(Offers[i]);
+            Sfx.Play("UI_Title_Start");
+            upgradeDoneAt = StateTime;
         }
 
         float upgradeDoneAt = -1f;
@@ -303,19 +318,24 @@ namespace KingLastPiece
         {
             if (upgradeDoneAt >= 0f)
             {
-                // A short beat to see the second pick land, then on to the next round.
-                if (StateTime - upgradeDoneAt > 0.6f) StartWave(WaveIndex + 1);
+                // A short beat to see the upgrades land, then on to the next round.
+                if (StateTime - upgradeDoneAt > 0.5f) StartWave(WaveIndex + 1);
                 return;
             }
             int key = GameInput.NumberPressed;
-            if (key >= 1 && key <= Offers.Count) { PickUpgrade(key - 1); return; }
-            int step = GameInput.MenuStep;
+            if (key >= 1 && key <= Offers.Count) PickUpgrade(key - 1);
+            // ←/→ walk the cards and the confirm button; Enter / A toggles a card or presses the button.
+            int step = GameInput.MenuStep, slots = Offers.Count + 1;
             if (step != 0)
             {
-                OfferCursor = OfferCursor < 0 ? 0 : (OfferCursor + step + Offers.Count) % Offers.Count;
+                OfferCursor = OfferCursor < 0 ? 0 : (OfferCursor + step + slots) % slots;
                 Sfx.Play("UI_Hover");
             }
-            if (GameInput.Confirm && OfferCursor >= 0) PickUpgrade(OfferCursor);
+            if (GameInput.Confirm)
+            {
+                if (OfferCursor == ConfirmSlot || (OfferCursor < 0 && CanConfirmUpgrades)) ConfirmUpgrades();
+                else if (OfferCursor >= 0) PickUpgrade(OfferCursor);
+            }
         }
 
         public EnemyBase SpawnEnemy(PieceType type, Vector3 pos)
@@ -481,7 +501,7 @@ namespace KingLastPiece
                         {
                             Player.Rest();
                             returnedToStart = false;
-                            ShowBanner("Pieces Captured");
+                            ShowBanner("기물 포획");
                             Sfx.Play("GAME_RoundClear");
                             EnterState(GameState.WaveClear);
                         }

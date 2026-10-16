@@ -1,11 +1,11 @@
-Tier	Pawn	T0	hp=100	Black Pawn
-Tier	Rook	T0	hp=380	Black Rook
-Tier	Pawn	T1	hp=160	Black Pawn  ·  Dark I
-Tier	Rook	T1	hp=608	Black Rook  ·  Dark I
-Tier	Pawn	T2	hp=230	Black Pawn  ·  Dark II
-Tier	Rook	T2	hp=874	Black Rook  ·  Dark II
-Tier	Pawn	T3	hp=320	Black Pawn  ·  Dark III
-Tier	Rook	T3	hp=1216	Black Rook  ·  Dark III
+Tier	Pawn	T0	hp=100	radius=0.45	흑색 폰
+Tier	Rook	T0	hp=380	radius=0.55	흑색 룩
+Tier	Pawn	T1	hp=160	radius=0.48	흑색 폰  ·  다크 I
+Tier	Rook	T1	hp=608	radius=0.59	흑색 룩  ·  다크 I
+Tier	Pawn	T2	hp=230	radius=0.52	흑색 폰  ·  다크 II
+Tier	Rook	T2	hp=874	radius=0.64	흑색 룩  ·  다크 II
+Tier	Pawn	T3	hp=320	radius=0.57	흑색 폰  ·  다크 III
+Tier	Rook	T3	hp=1216	radius=0.70	흑색 룩  ·  다크 III
 Aura	Pawn	T0	systems=0	particles=0	readable=True	
 Aura	Rook	T0	systems=0	particles=0	readable=True	
 Aura	Pawn	T1	systems=3	particles=113	readable=True	Dark Aura 1:Cone/- Glow:Mesh/8530 Particle:Mesh/8530 
@@ -14,9 +14,10 @@ Aura	Pawn	T2	systems=4	particles=146	readable=True	Dark Aura 2:Cone/- Glow:Mesh/
 Aura	Rook	T2	systems=4	particles=146	readable=True	Dark Aura 2:Cone/- Glow:Mesh/10453 Particle:Mesh/10453 Particle2:Mesh/10453 
 Aura	Pawn	T3	systems=6	particles=287	readable=True	Dark Aura 3:Cone/- Glow:Mesh/8530 Smoke:Mesh/8530 Particle:Mesh/8530 Particle2:Mesh/8530 Particle3:Mesh/8530 
 Aura	Rook	T3	systems=6	particles=287	readable=True	Dark Aura 3:Cone/- Glow:Mesh/10453 Smoke:Mesh/10453 Particle:Mesh/10453 Particle2:Mesh/10453 Particle3:Mesh/10453 
-Round	11	pieces=8	dark=1	board=8	banner=Round 11
-Round	29	pieces=14	dark=7	board=10	banner=Round 29  ·  The board grows
-Round	20	pieces=1	dark=1	board=8	banner=Round 20 — The Dark Queen I
-Round	21	pieces=14	dark=4	board=10	banner=Round 21  ·  The board grows
-Offers	Attack Power +7%; Flask Potency +6; Attack Speed +4%; Royal Flask +1; Defense +8; 
-Upgraded	round=4	power 0.70->0.77	hp 70->70	def 0->0	flasks 1->1	rolls 1->1
+Round	11	pieces=9	dark=1	board=8	banner=11 라운드
+Round	29	pieces=14	dark=7	board=10	banner=29 라운드  ·  체스판이 넓어진다
+Round	20	pieces=1	dark=1	board=8	banner=20 라운드 — 다크 I 여왕
+Round	21	pieces=14	dark=4	board=10	banner=21 라운드  ·  체스판이 넓어진다
+Offers	공격력 +11%; 회피 충전 횟수 +1; 회복약 개수 +1; 공격 범위 +7%; 공격 속도 +3%; 
+Picked	0,2	canConfirm=True	appliedBeforeConfirm=False
+Upgraded	round=4	power 0.70->0.81	hp 70->70	def 0->0	flasks 1->2	rolls 1->1

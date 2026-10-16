@@ -15,7 +15,7 @@ namespace KingLastPiece
 
         protected override void Configure()
         {
-            DisplayName = "Black Pawn";
+            DisplayName = "흑색 폰";
             SetHealth(100f);   // ~1.5 light-combo cycles (one cycle = 66)
             SetRadius(0.45f);
             moveSpeed = 2.6f;

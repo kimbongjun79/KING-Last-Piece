@@ -14,7 +14,7 @@ namespace KingLastPiece
 
         protected override void Configure()
         {
-            DisplayName = "The Black Queen";
+            DisplayName = "흑색 여왕";
             IsBoss = true;
             SetHealth(700f);
             SetRadius(0.75f);
@@ -37,7 +37,7 @@ namespace KingLastPiece
                 Effects.DarkWave(transform.position, 5f, 0.7f);
                 Game.Rig.Shake(0.5f);
                 // Two pawns in the classic game; in the endless mode more and stronger pieces as the bosses go on.
-                Game.ShowBanner(Game.IsEndless && Game.Round >= 20 ? "The Queen summons her army" : "The Queen summons her pawns");
+                Game.ShowBanner(Game.IsEndless && Game.Round >= 20 ? "여왕이 군대를 부른다" : "여왕이 폰을 부른다");
                 Game.SummonFor(this);
                 cooldown = 1.2f;
                 return;

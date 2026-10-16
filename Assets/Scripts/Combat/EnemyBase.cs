@@ -187,13 +187,12 @@ namespace KingLastPiece
         /// <summary>0 = a normal piece; 1–3 = an empowered piece wrapped in a black aura, stronger at every tier.</summary>
         public int EliteTier { get; private set; }
 
-        // Per tier (index 0 = normal): health, damage, stagger resistance, attack tempo (wind-up/recovery time — barely
-        // faster: attack speed grows very little) and move speed.
+        // Per tier (index 0 = normal): health, damage, stagger resistance and attack tempo (wind-up/recovery time — barely
+        // faster: attack speed grows very little). Size and move speed follow the total health boost (see Empower).
         static readonly float[] EliteHealth = { 1f, 1.6f, 2.3f, 3.2f };
         static readonly float[] EliteDamage = { 1f, 1.25f, 1.5f, 1.8f };
         static readonly float[] EliteStagger = { 1f, 1.5f, 2f, 2.6f };
         static readonly float[] EliteTempo = { 1f, 0.97f, 0.94f, 0.91f };
-        static readonly float[] EliteMove = { 1f, 1.05f, 1.1f, 1.15f };
 
         float damageMult = 1f, tempo = 1f;
         GameObject aura;
@@ -210,7 +209,11 @@ namespace KingLastPiece
             Health = MaxHealth;
             damageMult = EliteDamage[t];
             tempo = EliteTempo[t];
-            moveSpeed *= EliteMove[t];
+            // Tougher pieces are bigger and faster: both grow with the whole health boost (tier × the endless mode's
+            // every-40-rounds bonus), e.g. Dark III ≈ 26% bigger and 15% faster.
+            float boost = EliteHealth[t] * healthMult - 1f;
+            moveSpeed *= Mathf.Min(1.4f, 1f + 0.07f * boost);
+            Grow(Mathf.Min(1.4f, 1f + 0.12f * boost));
             maxPoise *= EliteStagger[t];
             poise = maxPoise;
             if (stagger != null)
@@ -219,8 +222,19 @@ namespace KingLastPiece
                 stagger.Profile.decayPerSecond *= EliteStagger[t];
             }
             if (t == 0) return;
-            DisplayName = $"{DisplayName}  ·  Dark {new string('I', t)}";
+            DisplayName = $"{DisplayName}  ·  다크 {new string('I', t)}";
             aura = EliteAura.Attach(model, Type, t);
+        }
+
+        /// <summary>Scales the piece: model, body radius and the measurements used for tilting and bars.</summary>
+        void Grow(float s)
+        {
+            if (Mathf.Abs(s - 1f) < 0.001f) return;
+            modelBaseScale *= s;
+            model.localScale = modelBaseScale;
+            Radius *= s;
+            modelHeight *= s;
+            baseRadius *= s;
         }
 
         protected virtual void Update()

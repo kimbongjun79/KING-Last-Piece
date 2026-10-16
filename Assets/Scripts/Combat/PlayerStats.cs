@@ -82,16 +82,16 @@ namespace KingLastPiece
 
         static readonly Dictionary<UpgradeKind, UpgradeDef> defs = new Dictionary<UpgradeKind, UpgradeDef>
         {
-            { UpgradeKind.Flask,         new UpgradeDef { title = "Royal Flask",       min = 1f,    max = 1f,    cap = 5f,    whole = true } },
-            { UpgradeKind.HealAmount,    new UpgradeDef { title = "Flask Potency",     min = 6f,    max = 12f,   cap = float.PositiveInfinity } },
-            { UpgradeKind.AttackPower,   new UpgradeDef { title = "Attack Power",      min = 0.06f, max = 0.12f, cap = float.PositiveInfinity, percent = true } },
-            { UpgradeKind.Defense,       new UpgradeDef { title = "Defense",           min = 5f,    max = 12f,   cap = float.PositiveInfinity } },
-            { UpgradeKind.MaxHealth,     new UpgradeDef { title = "Max Health",        min = 10f,   max = 20f,   cap = float.PositiveInfinity } },
-            { UpgradeKind.AttackRange,   new UpgradeDef { title = "Attack Range",      min = 0.04f, max = 0.08f, cap = 1.3f,  percent = true } },
-            { UpgradeKind.AttackSpeed,   new UpgradeDef { title = "Attack Speed",      min = 0.03f, max = 0.06f, cap = 1.35f, percent = true } },
-            { UpgradeKind.DodgeRecharge, new UpgradeDef { title = "Roll Recharge",     min = 0.1f,  max = 0.2f,  cap = 1.6f,  percent = true } },
-            { UpgradeKind.MaxDodges,     new UpgradeDef { title = "Roll Charges",      min = 1f,    max = 1f,    cap = 3f,    whole = true } },
-            { UpgradeKind.MaxStamina,    new UpgradeDef { title = "Max Stamina",       min = 8f,    max = 15f,   cap = float.PositiveInfinity } },
+            { UpgradeKind.Flask,         new UpgradeDef { title = "회복약 개수",     min = 1f,    max = 1f,    cap = 5f,    whole = true } },
+            { UpgradeKind.HealAmount,    new UpgradeDef { title = "회복약 회복량",   min = 6f,    max = 12f,   cap = float.PositiveInfinity } },
+            { UpgradeKind.AttackPower,   new UpgradeDef { title = "공격력",          min = 0.06f, max = 0.12f, cap = float.PositiveInfinity, percent = true } },
+            { UpgradeKind.Defense,       new UpgradeDef { title = "방어력",          min = 5f,    max = 12f,   cap = float.PositiveInfinity } },
+            { UpgradeKind.MaxHealth,     new UpgradeDef { title = "최대 체력",       min = 10f,   max = 20f,   cap = float.PositiveInfinity } },
+            { UpgradeKind.AttackRange,   new UpgradeDef { title = "공격 범위",       min = 0.04f, max = 0.08f, cap = 1.3f,  percent = true } },
+            { UpgradeKind.AttackSpeed,   new UpgradeDef { title = "공격 속도",       min = 0.03f, max = 0.06f, cap = 1.35f, percent = true } },
+            { UpgradeKind.DodgeRecharge, new UpgradeDef { title = "회피 충전 속도",  min = 0.1f,  max = 0.2f,  cap = 1.6f,  percent = true } },
+            { UpgradeKind.MaxDodges,     new UpgradeDef { title = "회피 충전 횟수",  min = 1f,    max = 1f,    cap = 3f,    whole = true } },
+            { UpgradeKind.MaxStamina,    new UpgradeDef { title = "최대 기력",       min = 8f,    max = 15f,   cap = float.PositiveInfinity } },
         };
 
         public static UpgradeDef Def(UpgradeKind k) => defs[k];

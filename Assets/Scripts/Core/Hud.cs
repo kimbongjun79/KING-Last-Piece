@@ -5,7 +5,7 @@ namespace KingLastPiece
     /// <summary>IMGUI HUD: health/stamina with damage trail, flasks, lock-on marker, enemy and boss bars, overlays.</summary>
     public class Hud : MonoBehaviour
     {
-        GUIStyle big, mid, small, label;
+        GUIStyle big, mid, small, label, title;
         float hpTrail = 100f, bossTrail = 1f, rollAlpha = 1f;
         float scale;
 
@@ -32,15 +32,23 @@ namespace KingLastPiece
             scale = Screen.height / 1080f;
             if (big == null)
             {
-                big = new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter, fontStyle = FontStyle.Bold };
+                // Korean UI: NanumSquare Neo (regular / extra bold) for the HUD, Nanum Myeongjo for the title.
+                // The faces are real weights, so no faux bold on top.
+                var bold = Resources.Load<Font>("Fonts/NanumSquareNeo-dEb");
+                var regular = Resources.Load<Font>("Fonts/NanumSquareNeo-bRg");
+                var serif = Resources.Load<Font>("Fonts/NanumMyeongjoExtraBold");
+                FontStyle heavy = bold != null ? FontStyle.Normal : FontStyle.Bold;
+                big = new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter, fontStyle = heavy, font = bold };
                 mid = new GUIStyle(big);
-                small = new GUIStyle(big) { fontStyle = FontStyle.Normal };
-                label = new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleLeft, fontStyle = FontStyle.Bold };
+                small = new GUIStyle(big) { fontStyle = FontStyle.Normal, font = regular };
+                label = new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleLeft, fontStyle = heavy, font = bold };
+                title = new GUIStyle(big) { font = serif ?? bold };
             }
             big.fontSize = Mathf.RoundToInt(96 * scale);
             mid.fontSize = Mathf.RoundToInt(34 * scale);
             small.fontSize = Mathf.RoundToInt(22 * scale);
             label.fontSize = Mathf.RoundToInt(20 * scale);
+            title.fontSize = Mathf.RoundToInt(150 * scale);
         }
 
         void OnGUI()
@@ -52,7 +60,7 @@ namespace KingLastPiece
             switch (g.State)
             {
                 case GameManager.GameState.Title:
-                    DrawTitle();
+                    DrawTitle(g);
                     return;
                 case GameManager.GameState.Victory:
                     DrawVictory(g);
@@ -66,7 +74,7 @@ namespace KingLastPiece
             DrawBossBar(g);
             DrawLockMarker(g);
             DrawJustDodge(g);
-            DrawBanner(g);
+            if (!g.Paused) DrawBanner(g);   // the pause tabs would show it through their panels
             DrawPopups(g);
             if (g.UsesRounds) DrawRound(g);
             DrawControlsHint();
@@ -114,7 +122,7 @@ namespace KingLastPiece
             for (int i = 0; i < p.MaxFlasks; i++)
                 DrawVial(new Rect(bx + i * 28 * u, fy, 19 * u, 30 * u), i < p.Flasks);
             SmallText(new Rect(bx + p.MaxFlasks * 28 * u + 4 * u, fy + 6 * u, 120 * u, 22 * u),
-                $"FLASK  x{p.Flasks}", TextAnchor.MiddleLeft, 15);
+                $"회복약  x{p.Flasks}", TextAnchor.MiddleLeft, 15);
         }
 
         /// <summary>
@@ -284,7 +292,7 @@ namespace KingLastPiece
         void DrawRound(GameManager g)
         {
             var r = new Rect(0, 18 * scale, Screen.width, 30 * scale);
-            string round = g.IsEndless ? $"ROUND {g.Round}     BOARD {BoardSlots.Size}×{BoardSlots.Size}" : $"ROUND {g.WaveIndex + 1} / {g.WaveCount}";
+            string round = g.IsEndless ? $"{g.Round} 라운드     체스판 {BoardSlots.Size}×{BoardSlots.Size}" : $"{g.WaveIndex + 1} / {g.WaveCount} 라운드";
             Text(r, round, small, new Color(0.9f, 0.85f, 0.7f, 0.85f));
         }
 
@@ -312,18 +320,18 @@ namespace KingLastPiece
             float w = 430 * scale, x = Screen.width - w - 24 * scale, y = 24 * scale, line = 26 * scale;
             string[] rows =
             {
-                "1-5   Spawn Pawn / Knight / Bishop / Rook / Queen",
-                "X     Clear pieces          C   Reset arena",
-                $"G     Invincible: {(arena.Invincible ? "ON" : "OFF")}",
-                $"I     Infinite stamina: {(arena.InfiniteStamina ? "ON" : "OFF")}",
-                $"H     Hit-stop: {(g.HitStopEnabled ? "ON" : "OFF")}",
-                $"V     Board slots: {(arena.SlotViewOn ? "ON" : "OFF")}",
-                $"E     Spawn tier: {(arena.SpawnTier == 0 ? "normal" : "Dark " + new string('I', arena.SpawnTier))}",
+                "1-5   폰 / 나이트 / 비숍 / 룩 / 퀸 소환",
+                "X     기물 제거          C   연습장 초기화",
+                $"G     무적: {(arena.Invincible ? "켜짐" : "꺼짐")}",
+                $"I     무한 기력: {(arena.InfiniteStamina ? "켜짐" : "꺼짐")}",
+                $"H     히트스톱: {(g.HitStopEnabled ? "켜짐" : "꺼짐")}",
+                $"V     체스판 슬롯 표시: {(arena.SlotViewOn ? "켜짐" : "꺼짐")}",
+                $"E     소환 단계: {(arena.SpawnTier == 0 ? "일반" : "다크 " + new string('I', arena.SpawnTier))}",
             };
             Fill(new Rect(x, y, w, (rows.Length + 1.6f) * line + 16 * scale), new Color(0f, 0f, 0f, 0.6f));
             x += 14 * scale;
             y += 8 * scale;
-            Text(new Rect(x, y, w, line), "PRACTICE  —  Royal Ensemble", label, Gold);
+            Text(new Rect(x, y, w, line), "연습장  —  로열 앙상블", label, Gold);
             y += line * 1.4f;
             var row = new GUIStyle(label) { fontStyle = FontStyle.Normal };
             foreach (var r in rows)
@@ -345,12 +353,12 @@ namespace KingLastPiece
 
             var p = g.Player;
             if (p.IsCountering) return;
-            Text(new Rect(0, Screen.height * 0.28f, Screen.width, 50 * scale), "PERFECT DODGE", mid,
+            Text(new Rect(0, Screen.height * 0.28f, Screen.width, 50 * scale), "완벽한 회피", mid,
                 new Color(0.6f, 0.9f, 1f, a));
             if (p.CounterReady)
             {
                 float blink = 0.6f + 0.4f * Mathf.Sin(Time.unscaledTime * 14f);
-                Text(new Rect(0, Screen.height * 0.28f + 46 * scale, Screen.width, 36 * scale), "LMB — ROYAL THROW", small,
+                Text(new Rect(0, Screen.height * 0.28f + 46 * scale, Screen.width, 36 * scale), "좌클릭 — 로열 스로", small,
                     new Color(1f, 0.9f, 0.6f, a * blink));
             }
         }
@@ -358,30 +366,67 @@ namespace KingLastPiece
         void DrawControlsHint()
         {
             var r = new Rect(20 * scale, Screen.height - 40 * scale, Screen.width, 30 * scale);
-            Text(r, "WASD Move   Shift Sprint   Mouse Look   LMB Light (hold)   RMB Heavy   Space Roll   Q Lock-on   R Flask   Esc Pause",
+            Text(r, "WASD 이동   Shift 달리기   좌클릭 약공격   우클릭 강공격   Space 회피   Q 락온   R 회복약   Esc 일시정지 · 조작법",
                 new GUIStyle(label) { fontSize = Mathf.RoundToInt(15 * scale), fontStyle = FontStyle.Normal },
                 new Color(1f, 1f, 1f, 0.45f));
         }
 
-        void DrawTitle()
+        /// <summary>
+        /// Title: the hall darkened to a vignette, a serif "KING" between gold rules, the Korean subtitle and tagline, the
+        /// mode, and a framed start prompt over a chess-tile band. (How to play lives in the pause menu now.)
+        /// </summary>
+        void DrawTitle(GameManager g)
         {
-            Fill(new Rect(0, 0, Screen.width, Screen.height), new Color(0, 0, 0, 0.45f));
-            float cy = Screen.height * 0.3f;
-            Text(new Rect(0, cy, Screen.width, 120 * scale), "KING", big, new Color(0.95f, 0.92f, 0.85f));
-            Text(new Rect(0, cy + 105 * scale, Screen.width, 50 * scale), "T H E   L A S T   P I E C E", mid, Gold);
-            Text(new Rect(0, cy + 175 * scale, Screen.width, 40 * scale),
-                "Every white piece has fallen. Only the King remains on the board.", small, new Color(0.8f, 0.78f, 0.72f));
+            float t = Time.unscaledTime;
+            float W = Screen.width, H = Screen.height;
+            Fill(new Rect(0, 0, W, H), new Color(0f, 0f, 0f, 0.5f));
+            var old = GUI.color;
+            GUI.color = new Color(0f, 0f, 0f, 0.85f);
+            GUI.DrawTexture(new Rect(-W * 0.1f, -H * 0.1f, W * 1.2f, H * 1.2f), Vignette, ScaleMode.StretchToFill, true);
+            GUI.color = old;
 
-            string controls =
-                "WASD / Left Stick — Move        Shift / L3 — Sprint        Mouse / Right Stick — Camera\n" +
-                "LMB / R1 — Light attack        RMB / R2 — Heavy attack\n" +
-                "Space / B — Roll (3 charges)        Q / R3 — Lock-on        R / X — Royal Flask\n" +
-                "Roll right before a hit → slow motion → LMB: Royal Throw";
-            Text(new Rect(0, cy + 250 * scale, Screen.width, 160 * scale), controls, small, new Color(0.7f, 0.7f, 0.7f));
+            float fade = Mathf.Clamp01(g.StateTime / 1.2f);
+            float cy = H * 0.24f;
+            var ivory = new Color(0.95f, 0.92f, 0.85f, fade);
+            var gold = new Color(Gold.r, Gold.g, Gold.b, fade);
 
-            float blink = 0.55f + 0.45f * Mathf.Sin(Time.unscaledTime * 3f);
-            Text(new Rect(0, Screen.height * 0.82f, Screen.width, 40 * scale), "Press ENTER / START", mid,
-                new Color(1f, 1f, 1f, blink));
+            // Gold rule with a diamond above the title.
+            float rule = 420 * scale;
+            Fill(new Rect((W - rule) / 2f, cy - 18 * scale, rule, 2 * scale), new Color(Gold.r, Gold.g, Gold.b, 0.7f * fade));
+            Diamond(new Vector2(W / 2f, cy - 17 * scale), 7 * scale, gold);
+
+            Text(new Rect(0, cy, W, 170 * scale), "K I N G", title, ivory);
+            Text(new Rect(0, cy + 168 * scale, W, 56 * scale), "마 지 막   기 물", new GUIStyle(mid) { fontSize = Mathf.RoundToInt(38 * scale) }, gold);
+
+            // Divider: line · three diamonds · line.
+            float dy = cy + 244 * scale, half = 190 * scale;
+            Fill(new Rect(W / 2f - half - 30 * scale, dy, half, 1.5f * scale), new Color(Gold.r, Gold.g, Gold.b, 0.55f * fade));
+            Fill(new Rect(W / 2f + 30 * scale, dy, half, 1.5f * scale), new Color(Gold.r, Gold.g, Gold.b, 0.55f * fade));
+            for (int i = -1; i <= 1; i++) Diamond(new Vector2(W / 2f + i * 18 * scale, dy + 1 * scale), (i == 0 ? 6 : 4) * scale, gold);
+
+            Text(new Rect(0, dy + 22 * scale, W, 40 * scale), "모든 백색 기물이 쓰러졌다.  판 위에 남은 것은 왕 하나뿐.", small,
+                new Color(0.82f, 0.79f, 0.72f, fade));
+            string mode = g.IsEndless ? "무한 모드  —  끝없이 밀려오는 흑색 군대에 맞서라" : "10 라운드  —  흑색 군대와 여왕을 무너뜨려라";
+            Text(new Rect(0, dy + 64 * scale, W, 34 * scale), mode, new GUIStyle(small) { fontSize = Mathf.RoundToInt(19 * scale) },
+                new Color(0.65f, 0.63f, 0.58f, fade));
+
+            // Framed start prompt.
+            float blink = 0.55f + 0.45f * Mathf.Sin(t * 3f);
+            var pr = new Rect((W - 460 * scale) / 2f, H * 0.72f, 460 * scale, 58 * scale);
+            Fill(new Rect(pr.x - 2 * scale, pr.y - 2 * scale, pr.width + 4 * scale, pr.height + 4 * scale), new Color(Gold.r, Gold.g, Gold.b, 0.5f * blink * fade));
+            Fill(pr, new Color(0f, 0f, 0f, 0.65f * fade));
+            Text(pr, "ENTER / START 를 눌러 시작", new GUIStyle(mid) { fontSize = Mathf.RoundToInt(26 * scale) }, new Color(1f, 1f, 1f, (0.5f + 0.5f * blink) * fade));
+            Text(new Rect(0, pr.yMax + 14 * scale, W, 28 * scale), "조작법은 게임 중  Esc  일시정지 메뉴에서 볼 수 있습니다",
+                new GUIStyle(small) { fontSize = Mathf.RoundToInt(16 * scale) }, new Color(1f, 1f, 1f, 0.4f * fade));
+
+            // Chess-tile band along the bottom edge.
+            float tile = 28 * scale;
+            int count = Mathf.CeilToInt(W / tile) + 1;
+            for (int i = 0; i < count; i++)
+            for (int row = 0; row < 2; row++)
+                Fill(new Rect(i * tile, H - (2 - row) * tile, tile, tile),
+                    (i + row) % 2 == 0 ? new Color(0.9f, 0.87f, 0.78f, 0.12f * fade) : new Color(0f, 0f, 0f, 0.35f * fade));
+            Fill(new Rect(0, H - 2 * tile - 2 * scale, W, 2 * scale), new Color(Gold.r, Gold.g, Gold.b, 0.5f * fade));
         }
 
         void DrawDeath(GameManager g)
@@ -389,11 +434,11 @@ namespace KingLastPiece
             float a = Mathf.Clamp01((g.StateTime - 0.6f) / 1.0f);
             float bandH = 200 * scale;
             Fill(new Rect(0, (Screen.height - bandH) / 2f, Screen.width, bandH), new Color(0, 0, 0, 0.75f * a));
-            Text(new Rect(0, (Screen.height - bandH) / 2f, Screen.width, bandH * 0.75f), "CHECKMATE", big,
+            Text(new Rect(0, (Screen.height - bandH) / 2f, Screen.width, bandH * 0.75f), "체크메이트", big,
                 new Color(0.75f, 0.06f, 0.04f, a));
             if (g.StateTime > 1.8f)
                 Text(new Rect(0, Screen.height / 2f + 50 * scale, Screen.width, 40 * scale),
-                    "Press ENTER / START to rise again", small, new Color(0.85f, 0.8f, 0.75f, a));
+                    "ENTER / START 를 눌러 다시 일어서기", small, new Color(0.85f, 0.8f, 0.75f, a));
         }
 
         void DrawVictory(GameManager g)
@@ -401,100 +446,142 @@ namespace KingLastPiece
             float a = Mathf.Clamp01(g.StateTime / 1.5f);
             Fill(new Rect(0, 0, Screen.width, Screen.height), new Color(0, 0, 0, 0.5f * a));
             float cy = Screen.height * 0.32f;
-            Text(new Rect(0, cy, Screen.width, 120 * scale), "THE KING STANDS", big, new Color(Gold.r, Gold.g, Gold.b, a));
+            Text(new Rect(0, cy, Screen.width, 120 * scale), "왕은 살아남았다", big, new Color(Gold.r, Gold.g, Gold.b, a));
             int m = Mathf.FloorToInt(g.RunTime / 60f), s = Mathf.FloorToInt(g.RunTime % 60f);
             Text(new Rect(0, cy + 130 * scale, Screen.width, 40 * scale),
-                $"Time {m:00}:{s:00}     Deaths {g.Deaths}", mid, new Color(0.9f, 0.88f, 0.8f, a));
+                $"시간 {m:00}:{s:00}     사망 {g.Deaths}회", mid, new Color(0.9f, 0.88f, 0.8f, a));
             if (g.StateTime > 2.5f)
-                Text(new Rect(0, Screen.height * 0.8f, Screen.width, 40 * scale), "Press ENTER / START to play again", small,
+                Text(new Rect(0, Screen.height * 0.8f, Screen.width, 40 * scale), "ENTER / START 를 눌러 다시 시작", small,
                     new Color(1f, 1f, 1f, a));
         }
 
-        // ---------------------------------------------------------------- pause (tabs: game / stats)
+        // ---------------------------------------------------------------- pause (tabs: game / stats / controls)
 
         int pauseTab;
-        /// <summary>Pause screen tab: 0 game, 1 stats.</summary>
+        /// <summary>Pause screen tab: 0 game, 1 stats, 2 controls.</summary>
         public int PauseTab { get => pauseTab; set => pauseTab = value; }
         Vector2 lastMouse;
-        static readonly string[] PauseTabs = { "GAME", "STATS" };
+        static readonly string[] PauseTabs = { "게임", "능력치", "조작법" };
 
         void DrawPause(GameManager g)
         {
-            Fill(new Rect(0, 0, Screen.width, Screen.height), new Color(0, 0, 0, 0.6f));
+            Fill(new Rect(0, 0, Screen.width, Screen.height), new Color(0, 0, 0, 0.62f));
 
             // Tab bar: click, ←/→ (A/D) or the pad's shoulders (keys handled in Update).
-            float tw = 200 * scale, th = 44 * scale, tx = (Screen.width - tw * PauseTabs.Length) / 2f, ty = Screen.height * 0.16f;
+            float tw = 190 * scale, th = 46 * scale, tx = (Screen.width - tw * PauseTabs.Length) / 2f, ty = Screen.height * 0.13f;
+            Text(new Rect(0, ty - 64 * scale, Screen.width, 50 * scale), "일시정지", mid, Color.white);
             for (int i = 0; i < PauseTabs.Length; i++)
             {
                 var r = new Rect(tx + i * tw, ty, tw - 8 * scale, th);
                 if (Event.current.type == EventType.MouseDown && r.Contains(Event.current.mousePosition)) { pauseTab = i; Event.current.Use(); }
                 bool on = i == pauseTab;
-                Fill(r, on ? new Color(Gold.r, Gold.g, Gold.b, 0.85f) : new Color(1f, 1f, 1f, 0.08f));
+                Fill(r, on ? new Color(Gold.r, Gold.g, Gold.b, 0.9f) : new Color(1f, 1f, 1f, 0.08f));
                 Text(r, PauseTabs[i], small, on ? new Color(0.08f, 0.06f, 0.05f) : new Color(0.85f, 0.82f, 0.75f));
             }
-            Text(new Rect(0, ty + th + 6 * scale, Screen.width, 26 * scale), "← / →  switch tab", new GUIStyle(small) { fontSize = Mathf.RoundToInt(15 * scale) },
-                new Color(1f, 1f, 1f, 0.4f));
+            Text(new Rect(0, ty + th + 6 * scale, Screen.width, 26 * scale), "← / →  탭 전환      Esc / Start  계속하기",
+                new GUIStyle(small) { fontSize = Mathf.RoundToInt(15 * scale) }, new Color(1f, 1f, 1f, 0.45f));
 
-            if (pauseTab == 0)
-            {
-                Text(new Rect(0, Screen.height * 0.4f, Screen.width, 60 * scale), "PAUSED", mid, Color.white);
-                Text(new Rect(0, Screen.height * 0.4f + 60 * scale, Screen.width, 40 * scale), "Esc / Start to resume", small,
-                    new Color(0.8f, 0.8f, 0.8f));
-            }
-            else DrawStats(g.Player, new Rect((Screen.width - 640 * scale) / 2f, ty + th + 50 * scale, 640 * scale, 0f));
+            var area = new Rect((Screen.width - 760 * scale) / 2f, ty + th + 50 * scale, 760 * scale, 0f);
+            if (pauseTab == 0) DrawPauseGame(g, area);
+            else if (pauseTab == 1) DrawStats(g.Player, area);
+            else DrawControls(area);
         }
 
-        /// <summary>The King's stats (pause ▸ STATS).</summary>
-        void DrawStats(PlayerController p, Rect area)
+        void DrawPauseGame(GameManager g, Rect area)
         {
-            var s = p.Stats;
-            float dmgCut = 1f - s.DamageTaken(100f) / 100f;
-            (string name, string value)[] rows =
-            {
-                ("Attack Power", $"{Mathf.RoundToInt(s.attackPower * 100f)}%"),
-                ("Defense", $"{Mathf.RoundToInt(s.defense)}   (−{Mathf.RoundToInt(dmgCut * 100f)}% damage taken)"),
-                ("Max Health", $"{Mathf.RoundToInt(p.MaxHealth)}"),
-                ("Attack Speed", $"{Mathf.RoundToInt(s.attackSpeed * 100f)}%   (max 135%)"),
-                ("Attack Range", $"{Mathf.RoundToInt(s.attackRange * 100f)}%   (max 130%)"),
-                ("Max Stamina", $"{Mathf.RoundToInt(p.MaxStamina)}"),
-                ("Stamina per Attack", $"light {p.LightAttackCost:0.#}   ·   heavy {p.HeavyAttackCost:0.#}"),
-                ("Royal Flasks", $"{p.MaxFlasks}   (max 5)   ·   heals {Mathf.RoundToInt(s.healAmount)}"),
-                ("Roll Charges", $"{p.MaxDodges}   (max 3)   ·   {p.DodgeRechargeTime:0.00}s to refill"),
-            };
+            string where = g.IsEndless ? $"무한 모드  ·  {g.Round} 라운드  ·  체스판 {BoardSlots.Size}×{BoardSlots.Size}"
+                : g.UsesRounds ? $"{g.WaveIndex + 1} / {g.WaveCount} 라운드" : "연습장";
+            Text(new Rect(0, area.y + 60 * scale, Screen.width, 40 * scale), where, small, new Color(Gold.r, Gold.g, Gold.b));
+            int m = Mathf.FloorToInt(g.RunTime / 60f), s = Mathf.FloorToInt(g.RunTime % 60f);
+            if (g.UsesRounds)
+                Text(new Rect(0, area.y + 104 * scale, Screen.width, 36 * scale), $"진행 시간 {m:00}:{s:00}     사망 {g.Deaths}회", small,
+                    new Color(0.85f, 0.82f, 0.75f));
+            Text(new Rect(0, area.y + 190 * scale, Screen.width, 36 * scale), "능력치와 조작법은 위의 탭에서 볼 수 있습니다", small,
+                new Color(1f, 1f, 1f, 0.5f));
+        }
+
+        /// <summary>A gold-ruled panel of name/value rows.</summary>
+        void DrawTable(Rect area, (string name, string value)[] rows, float nameWidth)
+        {
             float line = 40 * scale;
             var r = new Rect(area.x, area.y, area.width, rows.Length * line + 28 * scale);
             Fill(r, new Color(0f, 0f, 0f, 0.55f));
             Fill(new Rect(r.x, r.y, r.width, 2 * scale), new Color(Gold.r, Gold.g, Gold.b, 0.7f));
             var name = new GUIStyle(label) { fontSize = Mathf.RoundToInt(20 * scale) };
-            var value = new GUIStyle(label) { fontSize = Mathf.RoundToInt(20 * scale), fontStyle = FontStyle.Normal, alignment = TextAnchor.MiddleRight };
+            var value = new GUIStyle(small) { fontSize = Mathf.RoundToInt(20 * scale), alignment = TextAnchor.MiddleRight };
             float y = r.y + 14 * scale;
             for (int i = 0; i < rows.Length; i++)
             {
                 if (i % 2 == 0) Fill(new Rect(r.x + 8 * scale, y, r.width - 16 * scale, line), new Color(1f, 1f, 1f, 0.04f));
-                Text(new Rect(r.x + 24 * scale, y, r.width * 0.45f, line), rows[i].name, name, Gold);
+                Text(new Rect(r.x + 24 * scale, y, nameWidth, line), rows[i].name, name, Gold);
                 Text(new Rect(r.x + 24 * scale, y, r.width - 48 * scale, line), rows[i].value, value, new Color(0.93f, 0.9f, 0.83f));
                 y += line;
             }
         }
 
+        /// <summary>The King's stats (pause ▸ 능력치).</summary>
+        void DrawStats(PlayerController p, Rect area)
+        {
+            var s = p.Stats;
+            float dmgCut = 1f - s.DamageTaken(100f) / 100f;
+            DrawTable(area, new[]
+            {
+                ("공격력", $"{Mathf.RoundToInt(s.attackPower * 100f)}%"),
+                ("방어력", $"{Mathf.RoundToInt(s.defense)}   (받는 피해 −{Mathf.RoundToInt(dmgCut * 100f)}%)"),
+                ("최대 체력", $"{Mathf.RoundToInt(p.MaxHealth)}"),
+                ("공격 속도", $"{Mathf.RoundToInt(s.attackSpeed * 100f)}%   (최대 135%)"),
+                ("공격 범위", $"{Mathf.RoundToInt(s.attackRange * 100f)}%   (최대 130%)"),
+                ("최대 기력", $"{Mathf.RoundToInt(p.MaxStamina)}"),
+                ("공격당 기력 소모", $"약공격 {p.LightAttackCost:0.#}   ·   강공격 {p.HeavyAttackCost:0.#}"),
+                ("회복약", $"{p.MaxFlasks}개 (최대 5)   ·   회복량 {Mathf.RoundToInt(s.healAmount)}"),
+                ("회피 충전", $"{p.MaxDodges}회 (최대 3)   ·   1회 충전 {p.DodgeRechargeTime:0.00}초"),
+            }, area.width * 0.4f);
+        }
+
+        /// <summary>How to play (pause ▸ 조작법): keyboard and mouse, then the gamepad.</summary>
+        void DrawControls(Rect area)
+        {
+            (string action, string keys)[] rows =
+            {
+                ("이동", "W A S D          왼쪽 스틱"),
+                ("카메라", "마우스          오른쪽 스틱"),
+                ("달리기", "Shift (누르고 있기)          L3"),
+                ("약공격 · 콤보", "좌클릭 / J (누르고 있으면 연속)          R1"),
+                ("강공격 · 띄우기", "우클릭 / K          R2"),
+                ("회피 (무적 구르기)", "Space          B"),
+                ("락온", "Q / Tab / 휠 클릭          R3"),
+                ("회복약", "R          X"),
+                ("일시정지", "Esc          Start"),
+            };
+            DrawTable(area, rows, area.width * 0.36f);
+            float y = area.y + rows.Length * 40 * scale + 46 * scale;
+            var tip = new GUIStyle(small) { fontSize = Mathf.RoundToInt(18 * scale) };
+            Text(new Rect(0, y, Screen.width, 30 * scale), "공격이 닿기 직전에 구르면  완벽한 회피  →  느려진 시간 속에서 좌클릭:  로열 스로 (잡아 돌려 던지기)",
+                tip, new Color(0.6f, 0.9f, 1f, 0.9f));
+            Text(new Rect(0, y + 32 * scale, Screen.width, 30 * scale), "적의 경직 게이지가 다 차면 무방비  —  강공격으로 띄워 공중 콤보",
+                tip, new Color(0.85f, 0.82f, 0.75f, 0.85f));
+        }
+
         // ---------------------------------------------------------------- round-end upgrades (endless)
 
-        /// <summary>Five cards; click, press 1–5, or move with ←/→ and confirm. Two are kept.</summary>
+        /// <summary>
+        /// Five cards: click (or 1–5, or ←/→ and Enter) to choose — again to cancel; with two chosen, the confirm button
+        /// makes them permanent and starts the next round.
+        /// </summary>
         void DrawUpgrades(GameManager g)
         {
             var p = g.Player;
             float a = Mathf.Clamp01(g.StateTime / 0.35f);
-            Fill(new Rect(0, 0, Screen.width, Screen.height), new Color(0f, 0f, 0f, 0.55f * a));
-            int left = Mathf.Min(Upgrades.Picks, g.Offers.Count) - g.Picked.Count;
-            Text(new Rect(0, Screen.height * 0.17f, Screen.width, 50 * scale), $"ROUND {g.Round} CLEARED", mid, new Color(Gold.r, Gold.g, Gold.b, a));
-            Text(new Rect(0, Screen.height * 0.17f + 52 * scale, Screen.width, 34 * scale),
-                left > 0 ? $"Choose {left} upgrade{(left > 1 ? "s" : "")}  —  click, 1–{g.Offers.Count}, or ← → and Enter" : "Onward",
-                small, new Color(0.9f, 0.88f, 0.8f, a));
+            Fill(new Rect(0, 0, Screen.width, Screen.height), new Color(0f, 0f, 0f, 0.6f * a));
+            int need = g.PicksNeeded;
+            Text(new Rect(0, Screen.height * 0.15f, Screen.width, 50 * scale), $"{g.Round} 라운드 클리어", mid, new Color(Gold.r, Gold.g, Gold.b, a));
+            Text(new Rect(0, Screen.height * 0.15f + 52 * scale, Screen.width, 34 * scale),
+                $"영구 강화 {need}개를 고르세요  ({g.Picked.Count} / {need})   —   다시 누르면 선택 취소", small, new Color(0.9f, 0.88f, 0.8f, a));
 
             int n = g.Offers.Count;
             float cw = 250 * scale, ch = 300 * scale, gap = 22 * scale;
-            float x0 = (Screen.width - (n * cw + (n - 1) * gap)) / 2f, y0 = Screen.height * 0.36f;
-            var title = new GUIStyle(label) { alignment = TextAnchor.MiddleCenter, fontSize = Mathf.RoundToInt(24 * scale), wordWrap = true };
+            float x0 = (Screen.width - (n * cw + (n - 1) * gap)) / 2f, y0 = Screen.height * 0.32f;
+            var title = new GUIStyle(label) { alignment = TextAnchor.MiddleCenter, fontSize = Mathf.RoundToInt(25 * scale), wordWrap = true };
             var amount = new GUIStyle(big) { fontSize = Mathf.RoundToInt(56 * scale) };
             var info = new GUIStyle(small) { fontSize = Mathf.RoundToInt(19 * scale) };
             var e = Event.current;
@@ -507,9 +594,8 @@ namespace KingLastPiece
                 bool picked = g.Picked.Contains(i);
                 if (mouseMoved && r.Contains(e.mousePosition)) g.OfferCursor = i;
                 if (e.type == EventType.MouseDown && r.Contains(e.mousePosition)) { g.PickUpgrade(i); e.Use(); }
-                bool hot = g.OfferCursor == i && !picked;
-                float lift = hot ? 10 * scale : 0f;
-                r.y -= lift;
+                bool hot = g.OfferCursor == i;
+                r.y -= picked ? 18 * scale : hot ? 8 * scale : 0f;
 
                 Fill(new Rect(r.x - 3 * scale, r.y - 3 * scale, r.width + 6 * scale, r.height + 6 * scale),
                     picked ? new Color(Gold.r, Gold.g, Gold.b, a) : hot ? new Color(0.95f, 0.92f, 0.85f, a) : new Color(Gold.r * 0.5f, Gold.g * 0.5f, Gold.b * 0.5f, a));
@@ -520,15 +606,32 @@ namespace KingLastPiece
 
                 var u = g.Offers[i];
                 Text(new Rect(r.x, r.y + 14 * scale, 34 * scale, 34 * scale), (i + 1).ToString(), info, new Color(1f, 1f, 1f, 0.5f * a));
-                Text(new Rect(r.x + 12 * scale, r.y + 40 * scale, r.width - 24 * scale, 64 * scale), u.Title.ToUpperInvariant(), title, new Color(Gold.r, Gold.g, Gold.b, a));
+                Text(new Rect(r.x + 12 * scale, r.y + 40 * scale, r.width - 24 * scale, 64 * scale), u.Title, title, new Color(Gold.r, Gold.g, Gold.b, a));
                 Text(new Rect(r.x, r.y + 110 * scale, r.width, 80 * scale), u.AmountText, amount, new Color(0.96f, 0.94f, 0.88f, a));
-                Text(new Rect(r.x, r.y + 200 * scale, r.width, 34 * scale), picked ? "TAKEN" : Upgrades.Preview(p.Stats, u), info,
-                    picked ? new Color(Gold.r, Gold.g, Gold.b, a) : new Color(0.75f, 0.73f, 0.68f, a));
+                Text(new Rect(r.x, r.y + 200 * scale, r.width, 34 * scale), Upgrades.Preview(p.Stats, u), info, new Color(0.75f, 0.73f, 0.68f, a));
                 var d = Upgrades.Def(u.kind);
                 if (!float.IsInfinity(d.cap))
-                    Text(new Rect(r.x, r.y + 236 * scale, r.width, 30 * scale), d.percent ? $"max {Mathf.RoundToInt(d.cap * 100f)}%" : $"max {Mathf.RoundToInt(d.cap)}",
+                    Text(new Rect(r.x, r.y + 232 * scale, r.width, 26 * scale), d.percent ? $"최대 {Mathf.RoundToInt(d.cap * 100f)}%" : $"최대 {Mathf.RoundToInt(d.cap)}",
                         new GUIStyle(info) { fontSize = Mathf.RoundToInt(15 * scale) }, new Color(1f, 1f, 1f, 0.35f * a));
+                if (picked)
+                    Text(new Rect(r.x, r.yMax - 40 * scale, r.width, 32 * scale), "선택됨",
+                        new GUIStyle(label) { alignment = TextAnchor.MiddleCenter, fontSize = Mathf.RoundToInt(19 * scale) }, new Color(Gold.r, Gold.g, Gold.b, a));
             }
+
+            // Confirm button: unlocks with two chosen.
+            bool ready = g.CanConfirmUpgrades;
+            var b = new Rect((Screen.width - 300 * scale) / 2f, y0 + ch + 44 * scale, 300 * scale, 62 * scale);
+            if (mouseMoved && b.Contains(e.mousePosition)) g.OfferCursor = g.ConfirmSlot;
+            if (e.type == EventType.MouseDown && b.Contains(e.mousePosition)) { g.ConfirmUpgrades(); e.Use(); }
+            bool bHot = g.OfferCursor == g.ConfirmSlot;
+            float pulse = ready ? 0.75f + 0.25f * Mathf.Sin(Time.unscaledTime * 5f) : 1f;
+            Fill(new Rect(b.x - 3 * scale, b.y - 3 * scale, b.width + 6 * scale, b.height + 6 * scale),
+                ready ? new Color(Gold.r, Gold.g, Gold.b, a * pulse) : bHot ? new Color(0.6f, 0.58f, 0.52f, 0.8f * a) : new Color(0.4f, 0.38f, 0.34f, 0.6f * a));
+            Fill(b, ready ? (bHot ? new Color(0.36f, 0.27f, 0.1f, a) : new Color(0.24f, 0.18f, 0.07f, a)) : new Color(0.08f, 0.08f, 0.08f, 0.9f * a));
+            Text(b, "확인", new GUIStyle(mid) { fontSize = Mathf.RoundToInt(28 * scale) },
+                ready ? new Color(1f, 0.95f, 0.85f, a) : new Color(1f, 1f, 1f, 0.3f * a));
+            Text(new Rect(0, b.yMax + 10 * scale, Screen.width, 26 * scale), "클릭  ·  숫자 1–5  ·  ← → 와 Enter",
+                new GUIStyle(small) { fontSize = Mathf.RoundToInt(15 * scale) }, new Color(1f, 1f, 1f, 0.4f * a));
         }
 
         // ---------------------------------------------------------------- primitives
