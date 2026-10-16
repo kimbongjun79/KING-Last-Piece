@@ -194,9 +194,10 @@ namespace KingLastPiece
             floor.gameObject.AddComponent<BoxCollider>();
             Box(root, "Outside Ground", new Vector3(0f, floorY - 3f, 0f), new Vector3(half * 12f, 1f, half * 12f), MaterialLib.Get(GroundGrey, 0.1f));
 
-            // Ceiling: no lamps — the room is lit only by the sun through the windows, so the ceiling and walls cast shadows.
+            // Ceiling: no lamps — the room is lit only by the sun through the windows. The ceiling casts no shadow so a
+            // sun high enough for natural piece shadows (32°) can still reach the table over the front wall (see below).
             Box(root, "Ceiling", new Vector3(0f, floorY + height + thick / 2f, 0f), new Vector3(half * 2f + thick, thick, half * 2f + thick),
-                MaterialLib.Get(CeilingGrey, 0.1f));
+                MaterialLib.Get(CeilingGrey, 0.1f), shadows: false);
 
             // North: chalkboard (3.6 × 1.2 m).
             Box(root, "Wall N", new Vector3(0f, floorY + height / 2f, half), new Vector3(half * 2f + thick, height, thick), wall);
@@ -227,7 +228,9 @@ namespace KingLastPiece
             float sill = M(0.9f), top = M(2.3f), window = M(1.5f);
             string n = side > 0 ? "E" : "W";
             Box(root, $"Wall {n} Low", new Vector3(x, floorY + sill / 2f, 0f), new Vector3(thick, sill, len), wall);
-            Box(root, $"Wall {n} High", new Vector3(x, floorY + (top + height) / 2f, 0f), new Vector3(thick, height - top, len), wall);
+            // The east wall ends up in front of the battlefield (RoomYaw): above its windows it lets the sun through,
+            // so the light falls on the table between the shadows of the window piers.
+            Box(root, $"Wall {n} High", new Vector3(x, floorY + (top + height) / 2f, 0f), new Vector3(thick, height - top, len), wall, shadows: side < 0);
             const int windows = 3;
             float pier = (len - windows * window) / (windows + 1);
             var glass = MaterialLib.Transparent(new Color(0.75f, 0.88f, 1f, 0.12f));
