@@ -801,7 +801,7 @@ namespace KingLastPiece
             healed = false;
             Enter(State.Heal);
             // Tazo FX healing aura while drinking (falls back to the old gold sparks when the pack isn't there).
-            healFx = Vfx.Attach(FxLibrary.Instance != null ? FxLibrary.Instance.recoverHold : null, transform, Vector3.up * 0.02f, 1f);
+            healFx = Vfx.Attach(FxLibrary.Instance != null ? FxLibrary.Instance.recoverHold : null, transform, Vector3.up * 0.35f, 0.8f);
             SetGlow((healFx != null ? HealGreen : new Color(0.9f, 0.6f, 0.15f)) * 0.6f);
         }
 
@@ -885,8 +885,14 @@ namespace KingLastPiece
             Flash(new Color(0.6f, 1.2f, 2.2f), 0.25f);
             var cyan = new Color(0.45f, 0.8f, 1f);
             Effects.Shockwave(FlatPos, 1.8f, cyan, 0.4f);
-            // Silver-blue wind ring around the King: the attack slipped past.
-            Vfx.Slash(SlashFxKind.SlashD, transform.position + Vector3.up * 0.8f, transform.rotation, 1.3f, cyan);
+            // Ink swirl around the King, sweeping the way he slipped past the attack: it faces the attacker and turns
+            // toward the side the roll went (dodging right → swirls left-to-right, left → right-to-left).
+            Vector3 toAttacker = attacker != null ? attacker.FlatPos - FlatPos : -dodgeDir;
+            toAttacker.y = 0f;
+            if (toAttacker.sqrMagnitude < 0.01f) toAttacker = transform.forward;
+            float side = Vector3.Cross(toAttacker.normalized, dodgeDir).y;
+            bool turnRight = Mathf.Abs(side) > 0.1f ? side > 0f : Random.value < 0.5f;
+            Vfx.Slash(SlashFxKind.Ink, transform.position + Vector3.up * 0.8f, Quaternion.LookRotation(toAttacker), 1.3f, null, mirror: turnRight);
             Effects.Sparks(transform.position + Vector3.up * 1.1f, cyan, 18, 5f);
         }
 
