@@ -82,6 +82,7 @@ namespace KingLastPiece
         AttackDef atk;
         int comboIndex;
         bool hitStopUsed, atkUsesSlashFx;
+        bool atkIsGapCloser;   // the dash covers an exact distance: no dynamism scaling of its root motion
         bool healed;
         GameObject healFx;   // looping healing aura, while the flask is being drunk
         HashSet<EnemyBase>[] hitSets = new HashSet<EnemyBase>[0];
@@ -484,12 +485,14 @@ namespace KingLastPiece
             var style = Style ?? AttackStyles.Default;
             bool chain = state == State.Attack && !atk.heavy && !heavy;
             EnemyBase gapTarget = null;
+            atkIsGapCloser = false;
             if (heavy) atk = style.heavy;
             else if (!chain && style.gapCloser != null && TryFindGapTarget(style, out gapTarget, out float gap))
             {
                 // Mid range: dash in first; the combo continues with hit 1 (index -1 + 1 = 0).
                 comboIndex = -1;
                 atk = style.gapCloser(gap);
+                atkIsGapCloser = true;
             }
             else
             {
@@ -542,8 +545,9 @@ namespace KingLastPiece
                 Vector3 to = e.FlatPos - FlatPos;
                 float d = to.magnitude;
                 if (d < 0.01f) return false;
-                if (first.WouldHit(FlatPos, to, e.FlatPos, e.Radius)) return false;  // hit 1 already reaches someone
-                if (d > style.gapCloserMaxRange + e.Radius) continue;
+                if (first.WouldHit(FlatPos, to, e.FlatPos, e.Radius, Stats.attackRange, Motion)) return false;  // hit 1 already reaches someone
+                // The dash reach shrinks and grows with the attack range, like the hits themselves.
+                if (d > style.gapCloserMaxRange * Stats.attackRange + e.Radius) continue;
                 // With input, only dash at a piece roughly where the player is pointing.
                 float limit = input.sqrMagnitude > 0.01f ? GapInputAngle : GapAngle;
                 if (LockTarget != null ? e != LockTarget : Vector3.Angle(preferred, to) > limit) continue;
@@ -564,7 +568,7 @@ namespace KingLastPiece
         bool TryFindAssistDirection(Vector3 preferred, out Vector3 best)
         {
             best = Vector3.zero;
-            float range = Mathf.Clamp(atk.Reach + 0.6f, AssistMinRange, AssistMaxRange);
+            float range = Mathf.Clamp(atk.Reach * Stats.attackRange + 0.6f, AssistMinRange, AssistMaxRange);
             assistNearby.Clear();
             foreach (var e in Game.Enemies)
                 if (e != null && !e.IsDead && e.Targetable && (e.FlatPos - FlatPos).magnitude <= range + e.Radius)
@@ -592,7 +596,7 @@ namespace KingLastPiece
                 int hits = 0;
                 float off = 0f;
                 foreach (var e in Game.Enemies)
-                    if (e != null && !e.IsDead && e.Targetable && atk.WouldHit(FlatPos, c, e.FlatPos, e.Radius))
+                    if (e != null && !e.IsDead && e.Targetable && atk.WouldHit(FlatPos, c, e.FlatPos, e.Radius, Stats.attackRange, Motion))
                     {
                         hits++;
                         off += Vector3.Angle(c, e.FlatPos - FlatPos);
@@ -664,6 +668,7 @@ namespace KingLastPiece
 
             // Root motion from move segments (stronger / weaker with the motion's dynamism).
             float dyn = Motion, reach = Stats.attackRange;
+            float lunge = atkIsGapCloser ? 1f : dyn;
             bool blocked = LungeBlocked();
             if (!blocked)
             {
@@ -671,7 +676,7 @@ namespace KingLastPiece
                 {
                     float a = PoseTrack.Curve(m.ease, (prevT - m.start) / (m.end - m.start));
                     float b = PoseTrack.Curve(m.ease, (t - m.start) / (m.end - m.start));
-                    transform.position += transform.forward * (m.distance * dyn * (b - a));
+                    transform.position += transform.forward * (m.distance * lunge * (b - a));
                 }
             }
 

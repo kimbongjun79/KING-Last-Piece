@@ -171,13 +171,15 @@ namespace KingLastPiece
             foreach (var c in cases)
             {
                 game.ClearEnemies();
-                game.SpawnEnemy(PieceType.Pawn, GameManager.SquareToWorld("a8"));   // keeps the round live
+                // A still dummy far out of dash range keeps the round live without drawing a gap-closer dash.
+                game.SpawnCustom<TrainingDummy>(PieceType.Pawn, GameManager.SquareToWorld("h8"));
                 p.Stats.attackPower = c.power;
                 p.Stats.attackSpeed = c.speed;
                 p.Stats.attackRange = c.range;
                 p.Stats.lightCostCut = 0f;
                 var at = GameManager.SquareToWorld("e3");
                 p.ReturnToStart(at, 0f);
+                p.Rest();   // full stamina: the previous test may have drained it
                 game.Rig.UseOverride = true;
                 game.Rig.OverridePosition = at + new Vector3(3.2f, 4.6f, -3.6f);
                 game.Rig.OverrideLookAt = at + new Vector3(0f, 0.6f, 0.8f);
@@ -196,6 +198,29 @@ namespace KingLastPiece
                 for (int f = 0; f < 90 && p.IsAttacking; f++) yield return null;
             }
             game.Rig.UseOverride = false;
+
+            // Dash (gap closer) vs plain swing at different distances: the dash limit (7 m) and hit 1's reach both scale
+            // with the attack range, so a far piece gets the dash, a near one the swing.
+            (float range, float dist)[] gaps = { (0.7f, 3.5f), (0.7f, 6f), (1.3f, 6f), (1.3f, 2.4f) };
+            var gapLog = new StringBuilder();
+            foreach (var c in gaps)
+            {
+                game.ClearEnemies();
+                p.Stats.attackRange = c.range;
+                p.Stats.attackSpeed = c.range > 1f ? 1.35f : 0.75f;
+                p.Stats.attackPower = c.range > 1f ? 1.7f : 0.7f;
+                var at = GameManager.SquareToWorld("d2");
+                p.ReturnToStart(at, 0f);
+                var dummy = game.SpawnCustom<TrainingDummy>(PieceType.Pawn, at + Vector3.forward * c.dist);
+                yield return Frames(50);
+                float d = (dummy.FlatPos - p.FlatPos).magnitude;
+                p.Press(PlayerController.Buffered.Light);
+                yield return Frames(2);
+                gapLog.Append($"[range {c.range * 100f:0}% · {d:0.0}m → {(p.CurrentAttack != null ? p.CurrentAttack.name : "-")}] ");
+                for (int f = 0; f < 120 && p.IsAttacking; f++) yield return null;
+            }
+            stats.Append($"GapCloser\tlimit 7m × range\t{gapLog}\n");
+
             p.Stats = saved;
             game.ClearEnemies();
         }
