@@ -3,39 +3,64 @@ using UnityEngine;
 namespace KingLastPiece
 {
     /// <summary>
-    /// The chess table under the board (placed in the EndlessMode scene by KING ▸ Setup ▸ Bake Classroom): keeps its
-    /// top at least a margin wider than the board, so the endless board's growth stays on the table, and keeps the
-    /// legs at the corners and the chess clock beside the board.
+    /// The chess table under the board (placed in the EndlessMode scene by KING ▸ Setup ▸ Bake Classroom): widens the
+    /// table (the desk model, scaled across only) whenever the endless board would outgrow it, keeps the top's
+    /// collider on its surface and the chess clock beside the board.
     /// </summary>
     public class ChessTableFit : MonoBehaviour
     {
+        [Tooltip("The desk model used as the table (scaled across, not up).")]
+        public Transform model;
+        [Tooltip("Box table top, when there is no model.")]
         public Transform top;
-        public Transform[] legs = new Transform[0];
+        public BoxCollider topCollider;
         public Transform clock;
-        [Tooltip("Half width of the table at its real size (game metres).")]
-        public float baseHalf = 22f;
+        [Tooltip("Table depth (Z) at its baked size, in game metres.")]
+        public float baseDepth = 43.6f;
+        [Tooltip("Half of the table's depth at its baked size.")]
+        public float baseHalf = 21.8f;
         [Tooltip("Table space kept around the board's edge.")]
         public float margin = 6f;
-        public float legSize = 1.8f;
+        [Tooltip("Height of the table top (the board's underside).")]
+        public float topY = -0.4f;
+
+        Vector3 modelScale;
+        bool measured;
 
         void Start() => Fit();
 
         public void Fit()
         {
             float board = GameManager.BoardHalf;
-            float half = Mathf.Max(baseHalf, board + margin);
-            if (top != null) top.localScale = new Vector3(half * 2f, top.localScale.y, half * 2f);
-            foreach (var leg in legs)
+            float k = Mathf.Max(1f, (board + margin) / Mathf.Max(0.01f, baseHalf));
+            float width = baseHalf * 2f, depth = baseHalf * 2f;
+            if (model != null)
             {
-                if (leg == null) continue;
-                var p = leg.localPosition;
-                float inset = half - legSize;
-                leg.localPosition = new Vector3(Mathf.Sign(p.x) * inset, p.y, Mathf.Sign(p.z) * inset);
+                if (!measured) { modelScale = model.localScale; measured = true; }
+                model.localScale = new Vector3(modelScale.x * k, modelScale.y, modelScale.z * k);
+                var rs = model.GetComponentsInChildren<Renderer>();
+                if (rs.Length > 0)
+                {
+                    var b = rs[0].bounds;
+                    foreach (var r in rs) b.Encapsulate(r.bounds);
+                    width = b.size.x;
+                    depth = b.size.z;
+                }
+            }
+            else if (top != null)
+            {
+                top.localScale = new Vector3(baseHalf * 2f * k, top.localScale.y, baseHalf * 2f * k);
+                width = depth = baseHalf * 2f * k;
+            }
+            if (topCollider != null)
+            {
+                topCollider.center = new Vector3(0f, topY - 0.5f, 0f);
+                topCollider.size = new Vector3(width, 1f, depth);
             }
             if (clock != null)
             {
                 var p = clock.localPosition;
-                clock.localPosition = new Vector3(board + (half - board) * 0.5f + 0.6f, p.y, p.z);
+                clock.localPosition = new Vector3(board + 6.5f, p.y, p.z);
             }
         }
     }

@@ -25,6 +25,7 @@ namespace KingLastPiece
         const string DeskModel = "Models/table_v01_with VARCO";
         const string ChairModel = "Models/chair_v01_with VARCO";
         const string DoorModel = "Models/door_v01_with VARCO";
+        const string PlantModel = "Models/plant_v01_with VARCO";
 
         static readonly Color WallGrey = new Color(0.86f, 0.86f, 0.84f);
         static readonly Color FloorGrey = new Color(0.66f, 0.64f, 0.6f);
@@ -68,9 +69,15 @@ namespace KingLastPiece
 
             var table = ChessTable(Group(root, "Chess Table"), MaterialLib.Get(TableWood, 0.4f));
             table.clock = ChessClock(table.transform, dark);
-            Room(Group(root, "Room"), wall, prop, dark);
+            table.Fit();
+            // The room (walls, chalkboard, door, teacher's desk, plants, trees) is laid out with the chalkboard at its
+            // north, then turned so a window wall faces the battlefield's front (+Z): the fight looks out on the
+            // trees. The board, the chess table and the student desks keep facing +Z — toward the windows.
+            var room = Group(root, "Room");
+            Room(room, wall, prop, dark);
+            Trees(Group(room, "Trees Outside"));
+            room.localRotation = Quaternion.Euler(0f, RoomYaw, 0f);
             Furniture(Group(root, "Furniture"), prop, dark);
-            Trees(Group(root, "Trees Outside"));
             root.gameObject.AddComponent<ClassroomAmbience>();
             return root;
         }
@@ -85,22 +92,40 @@ namespace KingLastPiece
         // ---------------------------------------------------------------- the chess table and its clock
 
         /// <summary>The table the board lies on: 1.2 m square in real life (≈ 44 m); ChessTableFit widens it for a bigger board.</summary>
+        /// <summary>Yaw of the room around the table: −90° puts the east window wall in front of the battlefield.</summary>
+        const float RoomYaw = -90f;
+
+        /// <summary>
+        /// The table the board lies on: the provided desk model at real height (75 cm) with its top widened to hold the
+        /// board — about 2.4 × 1.2 m in real life (≈ 87 × 44 m). ChessTableFit widens it further for a bigger board.
+        /// Falls back to a box table when the model is missing.
+        /// </summary>
         static ChessTableFit ChessTable(Transform root, Material wood)
         {
             var fit = root.gameObject.AddComponent<ChessTableFit>();
-            float half = M(0.6f), thick = M(TableThick);
-            fit.baseHalf = half;
-            fit.legSize = M(TableLeg);
-            fit.top = Box(root, "Table Top", new Vector3(0f, TableTop - thick / 2f, 0f), new Vector3(half * 2f, thick, half * 2f), wood);
-            fit.top.gameObject.AddComponent<BoxCollider>();   // rubble that slides off the board lands on the table
-            float leg = M(TableLeg), legH = M(TableHeight) - thick, inset = half - leg;
-            var legs = new List<Transform>();
-            for (int i = 0; i < 4; i++)
+            float depth = M(1.2f);
+            var model = Model(root, DeskModel, TableHeight, AlignWidthAlongX);
+            if (model != null)
             {
-                float x = (i % 2 == 0 ? -1 : 1) * inset, z = (i < 2 ? -1 : 1) * inset;
-                legs.Add(Box(root, "Table Leg", new Vector3(x, Floor + legH / 2f, z), new Vector3(leg, legH, leg), wood));
+                model.localPosition = new Vector3(0f, Floor, 0f);
+                // Same height, a footprint deep enough for the board: scale only across.
+                var b = Bounds(model);
+                float k = depth / Mathf.Max(0.01f, b.size.z);
+                model.localScale = new Vector3(model.localScale.x * k, model.localScale.y, model.localScale.z * k);
+                fit.model = model;
+                fit.baseDepth = depth;
             }
-            fit.legs = legs.ToArray();
+            else
+            {
+                float thick = M(TableThick);
+                fit.top = Box(root, "Table Top", new Vector3(0f, TableTop - thick / 2f, 0f), new Vector3(depth, thick, depth), wood);
+            }
+            fit.baseHalf = depth / 2f;
+            // Rubble that slides off the board lands on the table top.
+            var top = new GameObject("Table Top Collider").AddComponent<BoxCollider>();
+            top.transform.SetParent(root, false);
+            fit.topCollider = top;
+            fit.Fit();
             return fit;
         }
 
@@ -186,6 +211,12 @@ namespace KingLastPiece
             Box(root, "Wall S", new Vector3(0f, floorY + height / 2f, -half), new Vector3(half * 2f + thick, height, thick), wall);
             var door = Model(root, DoorModel, 2.1f, AlignWidthAlongX);
             if (door != null) door.localPosition = new Vector3(M(3f), floorY, -half + thick / 2f + M(0.03f));
+            // The teacher's desk in front of the chalkboard, and potted plants in the corners and by the chalkboard.
+            Desk(root, new Vector3(0f, 0f, half - M(0.7f)), withChair: false, game: -1, dark);
+            foreach (var p in new[] { new Vector2(-1f, -1f), new Vector2(1f, -1f), new Vector2(-1f, 1f), new Vector2(1f, 1f) })
+                Plant(root, new Vector3(p.x * (half - M(0.5f)), 0f, p.y * (half - M(0.5f))));
+            Plant(root, new Vector3(-M(2.3f), 0f, half - M(0.45f)));
+            Plant(root, new Vector3(M(2.3f), 0f, half - M(0.45f)));
             for (int i = 0; i < 3; i++)
                 Box(root, "Bookshelf", new Vector3(M(-3.6f + i * 1f), floorY + M(1f), -half + thick / 2f + M(0.18f)), new Vector3(M(0.9f), M(2f), M(0.35f)), prop);
 
@@ -219,22 +250,29 @@ namespace KingLastPiece
         // ---------------------------------------------------------------- furniture
 
         /// <summary>
-        /// The teacher's desk by the chalkboard, and two blocks of student desks either side of the chess table, facing
-        /// the chalkboard, each with its chair; half of them have a famous game set up.
+        /// Two blocks of student desks either side of the chess table, facing the windows like the board, each with its
+        /// chair; half of them have a famous game set up. (The teacher's desk belongs to the room, by the chalkboard.)
         /// </summary>
         static void Furniture(Transform root, Material prop, Material dark)
         {
-            float half = M(RoomHalf);
-            Desk(root, new Vector3(0f, 0f, half - M(1.1f)), withChair: false, game: -1, dark);
             int game = 0;
             for (int side = -1; side <= 1; side += 2)
                 for (int row = 0; row < 3; row++)
                     for (int col = 0; col < 2; col++)
                     {
-                        var c = new Vector3(side * M(2.3f + col * 1.35f), 0f, M(-2.6f + row * 1.6f));
+                        var c = new Vector3(side * M(2.2f + col * 1.15f), 0f, M(-2.6f + row * 1.6f));
                         bool hasGame = (row + col) % 2 == 0 && game < Games.Length;
                         Desk(root, c, withChair: true, game: hasGame ? game++ : -1, dark);
                     }
+        }
+
+        /// <summary>A potted floor plant (the provided model, about 1.4 m tall), turned a little differently each time.</summary>
+        static void Plant(Transform root, Vector3 at)
+        {
+            var plant = Model(root, PlantModel, 1.4f, _ => { });
+            if (plant == null) return;
+            plant.localPosition = new Vector3(at.x, Floor, at.z);
+            plant.localRotation = Quaternion.Euler(0f, (at.x * 7.3f + at.z * 3.1f) % 360f, 0f) * plant.localRotation;
         }
 
         static void Desk(Transform root, Vector3 at, bool withChair, int game, Material dark)

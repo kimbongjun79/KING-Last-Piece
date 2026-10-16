@@ -33,8 +33,79 @@ namespace KingLastPiece.EditorTools
             EditorApplication.Exit(0);
         }
 
+        /// <summary>CLI: logs each furniture model's imported materials and textures (texture troubleshooting).</summary>
+        public static void DiagnoseCli()
+        {
+            foreach (var path in new[] { "table", "chair", "door", "plant" })
+            {
+                string p = $"Assets/Resources/Models/{path}_v01_with VARCO.fbx";
+                foreach (var a in AssetDatabase.LoadAllAssetsAtPath(p))
+                {
+                    if (a is Texture2D tex) Debug.Log($"[Diag] {path} texture {tex.name} {tex.width}x{tex.height}");
+                    if (a is Material m)
+                    {
+                        string props = "";
+                        foreach (var id in m.GetTexturePropertyNames())
+                            props += $"{id}={(m.GetTexture(id) != null ? m.GetTexture(id).name : "-")} ";
+                        Debug.Log($"[Diag] {path} material {m.name} shader={m.shader.name} {props}");
+                    }
+                }
+                var go = AssetDatabase.LoadAssetAtPath<GameObject>(p);
+                var b = new Bounds();
+                bool first = true;
+                foreach (var r in go.GetComponentsInChildren<Renderer>())
+                {
+                    if (first) { b = r.bounds; first = false; } else b.Encapsulate(r.bounds);
+                }
+                Debug.Log($"[Diag] {path} bounds {b.size} rot {go.transform.rotation.eulerAngles}");
+            }
+            EditorApplication.Exit(0);
+        }
+
+        const string ModelDir = "Assets/Resources/Models";
+        const string TextureDir = ModelDir + "/Textures";
+        static readonly string[] FurnitureModels = { "table", "chair", "door", "plant" };
+
+        /// <summary>
+        /// The provided models carry their textures embedded in the FBX, which the importer doesn't pull out on its
+        /// own: extract them into Models/Textures (normal maps flagged as such) and reimport, so the materials find them.
+        /// </summary>
+        static void EnsureTextures()
+        {
+            bool extracted = false;
+            foreach (var name in FurnitureModels)
+            {
+                string p = $"{ModelDir}/{name}_v01_with VARCO.fbx";
+                var importer = AssetImporter.GetAtPath(p) as ModelImporter;
+                if (importer == null) continue;
+                bool hasTextures = false;
+                foreach (var a in AssetDatabase.LoadAllAssetsAtPath(p))
+                    if (a is Material m && m.GetTexture("_BaseMap") != null) hasTextures = true;
+                if (hasTextures) continue;
+                System.IO.Directory.CreateDirectory(TextureDir);
+                importer.ExtractTextures(TextureDir);
+                extracted = true;
+            }
+            if (!extracted) return;
+            AssetDatabase.Refresh();
+            foreach (var guid in AssetDatabase.FindAssets("t:Texture2D", new[] { TextureDir }))
+            {
+                string tp = AssetDatabase.GUIDToAssetPath(guid);
+                if (!tp.ToLowerInvariant().Contains("normal")) continue;
+                var ti = AssetImporter.GetAtPath(tp) as TextureImporter;
+                if (ti != null && ti.textureType != TextureImporterType.NormalMap)
+                {
+                    ti.textureType = TextureImporterType.NormalMap;
+                    ti.SaveAndReimport();
+                }
+            }
+            foreach (var name in FurnitureModels)
+                AssetDatabase.ImportAsset($"{ModelDir}/{name}_v01_with VARCO.fbx", ImportAssetOptions.ForceUpdate);
+        }
+
         static void Bake()
         {
+            EnsureTextures();
             var scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
             var board = Object.FindFirstObjectByType<ArenaBoard>();
             if (board == null) { Debug.LogError("[ClassroomBake] No ArenaBoard in the scene — bake the world first."); return; }

@@ -134,9 +134,9 @@ namespace KingLastPiece
             game.Rig.OverrideLookAt = new Vector3(0f, -0.2f * m, 0f);
             yield return Frames(5);
             yield return Shot("32_Classroom_Wide.png");
-            // From the table's edge toward the east windows.
-            game.Rig.OverridePosition = new Vector3(18f, 6f, -4f);
-            game.Rig.OverrideLookAt = new Vector3(5f * m, 0.8f * m, 0f);
+            // From the table's far edge toward the windows in front of the battlefield.
+            game.Rig.OverridePosition = new Vector3(-4f, 6f, 20f);
+            game.Rig.OverrideLookAt = new Vector3(0f, floor + 1.6f * m, 5f * m);
             yield return Frames(3);
             yield return Shot("33_Classroom_Window.png");
             // A famous game on a student desk (the first desk with a board), seen from close by.
