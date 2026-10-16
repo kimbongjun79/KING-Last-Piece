@@ -78,6 +78,7 @@ namespace KingLastPiece
         int comboIndex;
         bool hitStopUsed, atkUsesSlashFx;
         bool healed;
+        GameObject healFx;   // looping healing aura, while the flask is being drunk
         HashSet<EnemyBase>[] hitSets = new HashSet<EnemyBase>[0];
         bool[] windowStarted = new bool[0];
         readonly List<EnemyBase> scratch = new List<EnemyBase>();
@@ -152,8 +153,7 @@ namespace KingLastPiece
             InitActor(100f);
             Stamina = MaxStamina;
             Flasks = MaxFlasks;
-            state = State.Normal;
-            stateTime = 0f;
+            Enter(State.Normal);
             buffer = Buffered.None;
             LockTarget = null;
             DodgeCharges = MaxDodges;
@@ -393,6 +393,11 @@ namespace KingLastPiece
 
         void Enter(State s)
         {
+            if (state == State.Heal && s != State.Heal)
+            {
+                Vfx.Release(healFx);
+                healFx = null;
+            }
             state = s;
             stateTime = 0f;
         }
@@ -795,8 +800,12 @@ namespace KingLastPiece
             Flasks--;
             healed = false;
             Enter(State.Heal);
-            SetGlow(new Color(0.9f, 0.6f, 0.15f) * 0.6f);
+            // Tazo FX healing aura while drinking (falls back to the old gold sparks when the pack isn't there).
+            healFx = Vfx.Attach(FxLibrary.Instance != null ? FxLibrary.Instance.recoverHold : null, transform, Vector3.up * 0.02f, 1f);
+            SetGlow((healFx != null ? HealGreen : new Color(0.9f, 0.6f, 0.15f)) * 0.6f);
         }
+
+        static readonly Color HealGreen = new Color(0.45f, 1f, 0.35f);
 
         void UpdateHeal(float dt)
         {
@@ -810,9 +819,13 @@ namespace KingLastPiece
                 healed = true;
                 Health = Mathf.Min(MaxHealth, Health + HealAmount);
                 Sfx.Play("PL_Heal", FlatPos);
-                Flash(new Color(1f, 0.8f, 0.3f) * 2f, 0.25f);
-                Effects.Sparks(transform.position + Vector3.up * 1.2f, new Color(1f, 0.8f, 0.3f), 14, 3f);
-                Vfx.Slash(SlashFxKind.SlashD, transform.position + Vector3.up * 0.3f, transform.rotation, 0.9f, new Color(1f, 0.8f, 0.4f));
+                if (healFx != null) Flash(HealGreen * 1.6f, 0.25f);
+                else
+                {
+                    Flash(new Color(1f, 0.8f, 0.3f) * 2f, 0.25f);
+                    Effects.Sparks(transform.position + Vector3.up * 1.2f, new Color(1f, 0.8f, 0.3f), 14, 3f);
+                    Vfx.Slash(SlashFxKind.SlashD, transform.position + Vector3.up * 0.3f, transform.rotation, 0.9f, new Color(1f, 0.8f, 0.4f));
+                }
             }
             if (stateTime >= HealDuration)
             {

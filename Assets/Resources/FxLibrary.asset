@@ -19,6 +19,7 @@ MonoBehaviour:
   slashInk: {fileID: 8587560481101609250, guid: 2204f06b178af014986bf95a7bda8e6e, type: 3}
   slashWater: {fileID: 607914935907159708, guid: 22b9fc8929c1f1e43b844b37ab4cb21b, type: 3}
   slashAoeA: {fileID: 6855955652325114174, guid: f8dc879bd6649cb4782409815764d676, type: 3}
+  recoverHold: {fileID: 100004, guid: d9751637d4fc2de40a234b45e10cb88d, type: 3}
   crackDecal: {fileID: 2100000, guid: 9ec0894b2095afd46bf21847e77c3c2a, type: 2}
   crackTextures:
   - {fileID: 2800000, guid: 8edc32bb14d82ec43960bcdf251ef64a, type: 3}

@@ -153,6 +153,7 @@ namespace KingLastPiece.EditorTools
             lib.slashInk = P("Slash_Ink");
             lib.slashWater = P("Slash_Water");
             lib.slashAoeA = P("Slash_Aoe_A");
+            lib.recoverHold = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Tazo_fx/_Loop_effect/L_Recover_hold.prefab");
             lib.crackDecal = decal;
             lib.crackTextures = cracks;
             EditorUtility.SetDirty(lib);

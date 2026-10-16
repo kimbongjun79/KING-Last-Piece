@@ -18,6 +18,9 @@ namespace KingLastPiece
         public GameObject slashWater;
         public GameObject slashAoeA;
 
+        [Header("Tazo FX")]
+        public GameObject recoverHold;   // the King's healing aura (looping)
+
         [Header("Ground cracks (URP decals)")]
         public Material crackDecal;
         public Texture2D[] crackTextures;

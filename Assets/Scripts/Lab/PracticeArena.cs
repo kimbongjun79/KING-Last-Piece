@@ -715,6 +715,51 @@ namespace KingLastPiece
             for (int f = 0; f < 120; f++) yield return null;   // revive (practice mode) before the next scenario
         }
 
+        /// <summary>The King drinking a flask: healing aura through the drink (0.15–1.0 s) and fading out after.</summary>
+        IEnumerator HealScenario(string dir)
+        {
+            var hud = game.GetComponent<Hud>();
+            if (hud != null) hud.enabled = true;
+            game.ClearEnemies();
+            var player = game.Player;
+            player.ResetForWave(PlayerStart, 0f);
+            player.GodMode = false;
+            // A far-off pawn keeps the round live (with no pieces left the round is over and input is ignored).
+            game.SpawnEnemy(PieceType.Pawn, GameManager.SquareToWorld("h8"));
+            game.Rig.OverridePosition = PlayerStart + new Vector3(3.4f, 2.6f, 3.4f);
+            game.Rig.OverrideLookAt = PlayerStart + new Vector3(0f, 0.8f, 0f);
+            for (int f = 0; f < 20; f++) yield return null;
+            player.TakeHit(40f, 0f, player.transform.position + Vector3.forward);
+            player.GodMode = true;
+            for (int f = 0; f < 90; f++) yield return null;
+            player.Press(PlayerController.Buffered.Heal);
+            Texture2D sheet = null;
+            int tileW = 0, tileH = 0;
+            float[] at = { 0.15f, 0.45f, 0.7f, 1.0f, 1.6f };
+            float t0 = Time.time;
+            for (int i = 0; i < at.Length; i++)
+            {
+                while (Time.time - t0 < at[i]) yield return null;
+                yield return new WaitForEndOfFrame();
+                var tex = ScreenCapture.CaptureScreenshotAsTexture();
+                if (sheet == null)
+                {
+                    tileW = tex.width;
+                    tileH = tex.height;
+                    sheet = new Texture2D(tileW * at.Length, tileH, TextureFormat.RGB24, false);
+                }
+                if (tex.width == tileW && tex.height == tileH) sheet.SetPixels32(i * tileW, 0, tileW, tileH, tex.GetPixels32());
+                Destroy(tex);
+            }
+            if (sheet != null)
+            {
+                sheet.Apply();
+                File.WriteAllBytes(Path.Combine(dir, "17_King_Heal.png"), sheet.EncodeToPNG());
+                Destroy(sheet);
+            }
+            game.ClearEnemies();
+        }
+
         /// <summary>
         /// Attack warnings, one piece at a time against the King on e4 (pawn d5, knight f6, bishop g6, rook e7,
         /// queen b4): top row mid wind-up (lit squares filling in, arrow / L route / ghost), bottom row the final blink.
@@ -867,6 +912,7 @@ namespace KingLastPiece
             yield return SlotScenario(dir, stats, false);   // A/B: pawns walking straight through the King
             yield return SlotScenario(dir, stats);
             yield return TelegraphScenario(dir);
+            yield return HealScenario(dir);
             yield return KingFallScenario(dir);
 
             File.WriteAllText(Path.Combine(dir, "stats.tsv"), stats.ToString());

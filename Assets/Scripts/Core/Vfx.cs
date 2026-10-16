@@ -82,6 +82,36 @@ namespace KingLastPiece
         /// works; <paramref name="tint"/> recolors every system's start color (keeping alpha).
         /// Returns false when the asset isn't available (callers fall back to the primitive crescent).
         /// </summary>
+        /// <summary>
+        /// Starts a looping authored effect riding on <paramref name="parent"/> (particles simulate in its local space so
+        /// they move with it). Null when the prefab isn't there. End it with <see cref="Release"/>.
+        /// </summary>
+        public static GameObject Attach(GameObject prefab, Transform parent, Vector3 localPos, float scale)
+        {
+            if (prefab == null || parent == null) return null;
+            var fx = Object.Instantiate(prefab, parent);
+            fx.transform.localPosition = localPos;
+            fx.transform.localRotation = Quaternion.identity;
+            fx.transform.localScale = Vector3.one * scale;
+            foreach (var ps in fx.GetComponentsInChildren<ParticleSystem>())
+            {
+                var m = ps.main;
+                m.simulationSpace = ParticleSystemSimulationSpace.Local;
+                m.scalingMode = ParticleSystemScalingMode.Hierarchy;
+            }
+            foreach (var a in fx.GetComponentsInChildren<AudioSource>()) a.enabled = false;   // sounds go through Sfx
+            return fx;
+        }
+
+        /// <summary>Stops a looping effect from emitting; what's already out fades, then it's destroyed.</summary>
+        public static void Release(GameObject fx, float linger = 1.2f)
+        {
+            if (fx == null) return;
+            foreach (var ps in fx.GetComponentsInChildren<ParticleSystem>())
+                ps.Stop(false, ParticleSystemStopBehavior.StopEmitting);
+            Object.Destroy(fx, linger);
+        }
+
         /// <param name="mirror">Mirror across the facing's left/right axis: the arc sweeps the other way.</param>
         public static bool Slash(SlashFxKind kind, Vector3 pos, Quaternion rot, float scale, Color? tint = null, bool mirror = false) =>
             Slash(kind, pos, rot, scale, tint, null, mirror);
