@@ -314,8 +314,6 @@ namespace KingLastPiece
                     var crit = new GUIStyle(style) { fontSize = Mathf.RoundToInt(34 * scale * pop) };
                     Text(new Rect(sp.x - 100 * scale, Screen.height - sp.y - 26 * scale, 200 * scale, 44 * scale),
                         Mathf.RoundToInt(p.amount).ToString(), crit, new Color(1f, 0.45f, 0.15f, a));
-                    Text(new Rect(sp.x - 100 * scale, Screen.height - sp.y - 50 * scale, 200 * scale, 24 * scale), "치명타",
-                        new GUIStyle(style) { fontSize = Mathf.RoundToInt(16 * scale) }, new Color(1f, 0.75f, 0.4f, a));
                     continue;
                 }
                 Text(new Rect(sp.x - 60 * scale, Screen.height - sp.y - 15 * scale, 120 * scale, 30 * scale),

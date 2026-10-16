@@ -1028,7 +1028,9 @@ namespace KingLastPiece
                     Sfx.Play("THR_Fly", counterTarget.transform.position + Vector3.up);
                     Vector3 dir = counterTarget.FlatPos - FlatPos;
                     Game.EndSlowMo();
-                    counterTarget.Launch(dir, 17f, 7f, ThrowLandingDamage * Stats.attackPower);
+                    // The landing damage can crit too (rolled now, shown when it lands).
+                    bool crit = RollCrit(out float mult);
+                    counterTarget.Launch(dir, 17f, 7f, ThrowLandingDamage * Stats.attackPower * mult, crit);
                     Game.HitStop(0.12f);
                     Game.Rig.Kick(1f);
                     Game.Rig.Shake(0.5f);

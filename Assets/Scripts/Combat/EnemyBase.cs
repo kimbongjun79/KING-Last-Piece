@@ -743,6 +743,7 @@ namespace KingLastPiece
         // ---------------------------------------------------------------- grab / throw (King's Royal Throw)
 
         float grabTilt, grabLift, launchHeight, launchVy, launchSpin, launchDamage;
+        bool launchCrit;   // the landing damage is a critical hit (shown as one)
         Vector3 launchVelocity;
         bool wallHit;
         readonly System.Collections.Generic.HashSet<EnemyBase> launchHits = new System.Collections.Generic.HashSet<EnemyBase>();
@@ -770,13 +771,14 @@ namespace KingLastPiece
         }
 
         /// <summary>Throws the piece: it flies, bowls over other pieces, slams walls and takes damage on landing.</summary>
-        public void Launch(Vector3 direction, float speed, float upSpeed, float landingDamage)
+        public void Launch(Vector3 direction, float speed, float upSpeed, float landingDamage, bool critical = false)
         {
             direction.y = 0f;
             launchVelocity = direction.normalized * speed;
             launchHeight = Mathf.Max(grabLift, 0.3f);
             launchVy = upSpeed;
             launchDamage = landingDamage;
+            launchCrit = critical;
             launchSpin = grabTilt;
             wallHit = false;
             launchHits.Clear();
@@ -830,7 +832,7 @@ namespace KingLastPiece
                 Game.Rig.Shake(0.4f);
                 // Crash down and lie on the board before getting up (damage only, no stagger reaction).
                 Enter(EState.Getup);
-                if (TakeHit(launchDamage, 0f, transform.position - launchVelocity)) Game.ReportDamage(this, launchDamage);
+                if (TakeHit(launchDamage, 0f, transform.position - launchVelocity)) Game.ReportDamage(this, launchDamage, launchCrit);
             }
         }
 
