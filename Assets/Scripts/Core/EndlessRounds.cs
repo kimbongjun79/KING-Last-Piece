@@ -4,7 +4,7 @@ using UnityEngine;
 namespace KingLastPiece
 {
     /// <summary>
-    /// Level design of the endless mode (scene "teat"). Rounds never end; each one is generated from its number:
+    /// Level design of the endless mode (scene EndlessMode). Rounds never end; each one is generated from its number:
     /// <list type="bullet">
     /// <item>A point budget buys the army (pawn 1, knight/bishop 3, rook 5), unlocking the pieces like the classic
     /// opening rounds; the number of pieces is capped (more room on a bigger board).</item>

@@ -20,7 +20,8 @@ namespace KingLastPiece.EditorTools
 
         static readonly (string scene, GameManager.Mode mode)[] Scenes =
         {
-            ("Assets/Scenes/teat.unity", GameManager.Mode.Endless),
+            ("Assets/Scenes/NormalMode.unity", GameManager.Mode.Game),
+            ("Assets/Scenes/EndlessMode.unity", GameManager.Mode.Endless),
             ("Assets/Scenes/Practice.unity", GameManager.Mode.Practice),
             ("Assets/Scenes/EffectsLab.unity", GameManager.Mode.Effects),
         };

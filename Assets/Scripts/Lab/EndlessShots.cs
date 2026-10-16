@@ -7,7 +7,7 @@ using UnityEngine;
 namespace KingLastPiece
 {
     /// <summary>
-    /// Endless-mode check: a player build of the "teat" scene run with "-autoshot &lt;dir&gt;" logs the generated armies of
+    /// Endless-mode check: a player build of the EndlessMode scene run with "-autoshot &lt;dir&gt;" logs the generated armies of
     /// rounds 1–60 (endless_rounds.tsv) and captures the empowered tiers, a dark round, a boss round, the grown board,
     /// the upgrade cards and the stats tab, then quits.
     /// </summary>

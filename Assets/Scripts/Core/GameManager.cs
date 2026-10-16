@@ -36,7 +36,7 @@ namespace KingLastPiece
         public int Deaths { get; private set; }
         public float RunTime { get; private set; }
 
-        /// <summary>Game: the classic ten rounds. Endless: endless rounds with upgrades (scene "teat").</summary>
+        /// <summary>Game: the classic ten rounds (scene NormalMode). Endless: endless rounds with upgrades (scene EndlessMode).</summary>
         public enum Mode { Game, Practice, Effects, Endless }
 
         /// <summary>Endless mode: the round number (1-based).</summary>

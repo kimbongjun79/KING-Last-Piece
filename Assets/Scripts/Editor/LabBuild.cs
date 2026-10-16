@@ -7,7 +7,8 @@ namespace KingLastPiece.EditorTools
     /// <summary>Builds standalone players for the game, the practice arena and the effects lab.</summary>
     public static class LabBuild
     {
-        const string GameScene = "Assets/Scenes/teat.unity";   // the endless mode (the classic SampleScene was retired)
+        const string NormalScene = "Assets/Scenes/NormalMode.unity";     // the classic ten rounds
+        const string EndlessScene = "Assets/Scenes/EndlessMode.unity";   // endless rounds with upgrades
         const string PracticeScene = "Assets/Scenes/Practice.unity";
         const string EffectsScene = "Assets/Scenes/EffectsLab.unity";
 
@@ -18,7 +19,7 @@ namespace KingLastPiece.EditorTools
         public static void BuildEffectsMenu() => Build(new[] { EffectsScene }, "Builds/EffectsLab/EffectsLab.exe");
 
         [MenuItem("KING/Build Game (Windows)")]
-        public static void BuildGameMenu() => Build(new[] { GameScene }, "Builds/Game/KING.exe");
+        public static void BuildGameMenu() => Build(new[] { NormalScene, EndlessScene }, "Builds/Game/KING.exe");
 
         /// <summary>
         /// CLI: -executeMethod KingLastPiece.EditorTools.LabBuild.BuildLabCli -scene &lt;scene path&gt; -buildPath &lt;exe&gt;
