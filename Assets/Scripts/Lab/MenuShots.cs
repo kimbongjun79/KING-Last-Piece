@@ -41,6 +41,19 @@ namespace KingLastPiece
         IEnumerator Start()
         {
             Application.targetFrameRate = 60;
+            if (SoundRefCapture.GetArg("-boardcheck") != null)
+            {
+                // Read-only check of the online ranking: load it on the title, log it, nothing is submitted.
+                for (int f = 0; f < 900 && (OnlineBoard.State == OnlineBoard.Status.Idle || OnlineBoard.State == OnlineBoard.Status.Loading); f++)
+                    yield return null;
+                yield return Frames(30);
+                log.Append($"Board\tstate={OnlineBoard.State}\terror={OnlineBoard.Error}\tentries={OnlineBoard.Top.Count}\tmine={(OnlineBoard.Mine.HasValue ? OnlineBoard.Mine.Value.rank.ToString() : "-")}\n");
+                foreach (var e in OnlineBoard.Top) log.Append($"Entry\t{e.rank}\t{e.name}\t{e.round}R\t{BestRecord.FormatTime(e.time)}\n");
+                yield return Shot("46_Title_Online_Board.png");
+                File.WriteAllText(Path.Combine(dir, "board.tsv"), log.ToString());
+                Application.Quit();
+                yield break;
+            }
             yield return Frames(90);
             var g = GameManager.Instance;
             log.Append($"Boot\tmode={g.CurrentMode}\tstate={g.State}\tchoice={g.TitleChoice}\n");
