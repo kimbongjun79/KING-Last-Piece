@@ -60,6 +60,45 @@ namespace KingLastPiece
                 if (savedShadowDistance < 0f) savedShadowDistance = urp.shadowDistance;
                 urp.shadowDistance = shadowDistance;
             }
+            if (Application.isPlaying) CalmTheBoard();
+        }
+
+        [Tooltip("Board squares' smoothness under the low sun (the hall's polished squares glare in it).")]
+        public float boardSmoothness = 0.08f;
+        [Tooltip("Sun shadow biases: the low sun over a long shadow distance streaks flat surfaces without them.")]
+        public float sunDepthBias = 1.2f, sunNormalBias = 1.4f;
+
+        static readonly int SmoothnessId = Shader.PropertyToID("_Smoothness");
+
+        /// <summary>
+        /// The board under a 14° sun: its squares (flat, side by side) shadowing one another drew stripes across them,
+        /// and their polish threw a hard glare. Squares and frame stop casting shadows (pieces still shade the board),
+        /// the squares go matte (per renderer, the shared materials stay as they are), and the sun gets more shadow
+        /// bias.
+        /// </summary>
+        public void CalmTheBoard()
+        {
+            var board = FindFirstObjectByType<ArenaBoard>();
+            if (board != null)
+            {
+                var mpb = new MaterialPropertyBlock();
+                foreach (var r in board.GetComponentsInChildren<Renderer>(true))
+                {
+                    if (r.transform.IsChildOf(transform)) continue;   // the classroom itself
+                    r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                    r.GetPropertyBlock(mpb);
+                    mpb.SetFloat(SmoothnessId, boardSmoothness);
+                    r.SetPropertyBlock(mpb);
+                }
+            }
+            foreach (var l in FindObjectsByType<Light>(FindObjectsSortMode.None))
+            {
+                if (l.type != LightType.Directional) continue;
+                var data = l.GetComponent<UniversalAdditionalLightData>();
+                if (data != null) data.usePipelineSettings = false;
+                l.shadowBias = sunDepthBias;
+                l.shadowNormalBias = sunNormalBias;
+            }
         }
 
         void OnDestroy()

@@ -82,6 +82,8 @@ namespace KingLastPiece
             // The classroom's chess table (EndlessMode) widens with the board.
             var table = FindFirstObjectByType<ChessTableFit>();
             if (table != null) table.Fit();
+            var ambience = FindFirstObjectByType<ClassroomAmbience>();
+            if (ambience != null) ambience.CalmTheBoard();   // the new ring of squares too
             BoardFx.Register(Grid);
         }
 
