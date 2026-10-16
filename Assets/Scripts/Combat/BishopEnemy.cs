@@ -19,7 +19,7 @@ namespace KingLastPiece
         }
 
         protected override StaggerProfile CreateStaggerProfile() =>
-            StaggerProfile.Create(maxGauge: 60f, vulnerableDuration: 2.5f, launchForce: 6.5f, flinchDuration: 0.35f);
+            StaggerProfile.Create(maxGauge: 40f, vulnerableDuration: 2.5f, launchForce: 6.5f, flinchDuration: 0.35f);   // one heavy (42) breaks it
 
         protected override void Think(float dt)
         {

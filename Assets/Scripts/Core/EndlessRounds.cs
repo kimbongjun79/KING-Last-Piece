@@ -32,6 +32,9 @@ namespace KingLastPiece
         /// <summary>Health multiplier for every piece: +40% for each 40 rounds reached.</summary>
         public static float HealthMultiplier(int round) => 1f + 0.4f * (round / 40);
 
+        /// <summary>Stagger resistance multiplier for every piece: +30% for each 40 rounds reached (permanent).</summary>
+        public static float StaggerMultiplier(int round) => 1f + 0.3f * (round / 40);
+
         /// <summary>Board size: 8×8, plus a ring of squares (2 per side) for every 20 rounds cleared.</summary>
         public static int BoardSize(int round) => 8 + 2 * ((round - 1) / 20);
 

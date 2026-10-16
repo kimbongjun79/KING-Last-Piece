@@ -27,6 +27,7 @@ namespace KingLastPiece
         const string DoorModel = "Models/door_v01_with VARCO";
         const string PlantModel = "Models/plant_v01_with VARCO";
         const string WindowModel = "Models/window_v01_with VARCO";
+        const string TreeModel = "Models/Green Leafy Tree_with VARCO";
 
         static readonly Color WallGrey = new Color(0.86f, 0.86f, 0.84f);
         static readonly Color FloorGrey = new Color(0.66f, 0.64f, 0.6f);
@@ -73,6 +74,7 @@ namespace KingLastPiece
             // trees. The board, the chess table and the student desks keep facing +Z — toward the windows.
             var room = Group(root, "Room");
             Room(room, wall, prop, dark);
+            TreesOutside(Group(room, "Trees Outside"));
             room.localRotation = Quaternion.Euler(0f, RoomYaw, 0f);
             Furniture(Group(root, "Furniture"), prop, dark);
             var ambience = root.gameObject.AddComponent<ClassroomAmbience>();
@@ -208,12 +210,10 @@ namespace KingLastPiece
             Box(root, "Wall S", new Vector3(0f, floorY + height / 2f, -half), new Vector3(half * 2f + thick, height, thick), wall);
             var door = Model(root, DoorModel, 2.1f, AlignWidthAlongX);
             if (door != null) door.localPosition = new Vector3(M(3f), floorY, -half + thick / 2f + M(0.03f));
-            // The teacher's desk under the portraits, and potted plants in the corners and along the north wall.
+            // The teacher's desk under the portraits, and potted plants in the corners.
             Desk(root, new Vector3(0f, 0f, half - M(0.7f)), withChair: false, game: -1, dark);
             foreach (var p in new[] { new Vector2(-1f, -1f), new Vector2(1f, -1f), new Vector2(-1f, 1f), new Vector2(1f, 1f) })
                 Plant(root, new Vector3(p.x * (half - M(0.5f)), 0f, p.y * (half - M(0.5f))));
-            Plant(root, new Vector3(-M(2.3f), 0f, half - M(0.45f)));
-            Plant(root, new Vector3(M(2.3f), 0f, half - M(0.45f)));
             Portraits(root, side: -1, half, thick, floorY, 5);
 
             // East and west: three windows each (the provided window model, 1.39 × 1.5 m, sill at 0.85 m).
@@ -249,10 +249,53 @@ namespace KingLastPiece
                     // Centred in the opening and in the wall's thickness (the model's pivot is at its base centre).
                     var b = Bounds(frame);
                     frame.position += new Vector3(x - b.center.x, 0f, wz - b.center.z);
+                    ArchSpandrels(root, x, wz, thick, floorY + top, window / 2f, wall);
                 }
                 else Box(root, "Window Glass", new Vector3(x, floorY + (sill + top) / 2f, wz), new Vector3(M(0.01f), top - sill, window),
                     MaterialLib.Transparent(new Color(0.75f, 0.88f, 1f, 0.12f)), shadows: false);
             }
+        }
+
+        /// <summary>
+        /// The window model's top is a round arch, the wall opening a rectangle: fill the two upper corners beside the
+        /// arch with wall, in thin horizontal strips that follow the curve (radius = half the window's width, the arch
+        /// rising from <paramref name="topY"/> − radius to <paramref name="topY"/>).
+        /// </summary>
+        static void ArchSpandrels(Transform root, float x, float centreZ, float thick, float topY, float radius, Material wall)
+        {
+            const int Strips = 10;
+            float h = radius / Strips;
+            for (int k = 0; k < Strips; k++)
+            {
+                float y = (k + 0.5f) * h;                                   // above the arch's spring line
+                float halfWidth = Mathf.Sqrt(Mathf.Max(0f, radius * radius - y * y));
+                float fill = radius - halfWidth;
+                if (fill < 0.02f) continue;
+                float cy = topY - radius + y;
+                for (int s = -1; s <= 1; s += 2)
+                    Box(root, "Arch Spandrel", new Vector3(x, cy, centreZ + s * (halfWidth + fill / 2f)), new Vector3(thick, h * 1.02f, fill), wall);
+            }
+        }
+
+        /// <summary>
+        /// Trees (the provided model, 7–10 m tall in real life) on the lawns outside both window walls, a few rows deep,
+        /// so the windows look out on them over the fields of the sky.
+        /// </summary>
+        static void TreesOutside(Transform root)
+        {
+            float half = M(RoomHalf);
+            var rng = new System.Random(11);
+            float R(float a, float b) => a + (float)rng.NextDouble() * (b - a);
+            for (int side = -1; side <= 1; side += 2)
+                for (int i = 0; i < 9; i++)
+                {
+                    float out_ = half + M(R(3.5f, 16f)), along = M(-8f + i * 2f + R(-0.6f, 0.6f));
+                    var tree = Model(root, TreeModel, R(7f, 10f), _ => { });
+                    if (tree == null) return;
+                    tree.localPosition = new Vector3(side * out_, Floor, along);
+                    tree.localRotation = Quaternion.Euler(0f, R(0f, 360f), 0f) * tree.localRotation;
+                    foreach (var r in tree.GetComponentsInChildren<Renderer>()) r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                }
         }
 
         // ---------------------------------------------------------------- portraits
@@ -276,12 +319,12 @@ namespace KingLastPiece
 
         /// <summary>
         /// Five framed portraits along a wall (north: side 1, south: side −1), starting at champion <paramref name="first"/>:
-        /// a 40 × 50 cm photo in a dark wooden frame with a gilt inner edge, hung with its centre at 1.6 m, and a brass
+        /// an 80 × 100 cm photo in a dark wooden frame with a gilt inner edge, hung with its centre at 1.6 m, and a brass
         /// name plate below. The south row stays clear of the door.
         /// </summary>
         static void Portraits(Transform root, int side, float half, float thick, float floorY, int first)
         {
-            float[] xs = side > 0 ? new[] { -3.2f, -1.6f, 0f, 1.6f, 3.2f } : new[] { -3.6f, -2.2f, -0.8f, 0.6f, 2.0f };
+            float[] xs = side > 0 ? new[] { -3.4f, -1.7f, 0f, 1.7f, 3.4f } : new[] { -3.4f, -2.1f, -0.8f, 0.5f, 1.8f };
             float wallFace = side * (half - thick / 2f);
             var wood = MaterialLib.Get(new Color(0.16f, 0.1f, 0.06f), 0.45f);
             var gilt = MaterialLib.Get(new Color(0.78f, 0.62f, 0.32f), 0.7f, 0.8f);
@@ -294,7 +337,7 @@ namespace KingLastPiece
                 var p = Group(root, $"Portrait {Ordinal(c.n)} — {c.name}");
                 p.localPosition = new Vector3(M(xs[i]), floorY + M(1.6f), wallFace);
                 p.localRotation = Quaternion.Euler(0f, side > 0 ? 180f : 0f, 0f);   // facing into the room
-                float w = M(0.4f), h = M(0.5f), border = M(0.045f), depth = M(0.025f);
+                float w = M(0.8f), h = M(1f), border = M(0.09f), depth = M(0.04f);
                 // Frame: four wooden bars, a gilt lip, the photo.
                 Box(p, "Frame Top", new Vector3(0f, h / 2f + border / 2f, depth / 2f), new Vector3(w + border * 2f, border, depth), wood);
                 Box(p, "Frame Bottom", new Vector3(0f, -h / 2f - border / 2f, depth / 2f), new Vector3(w + border * 2f, border, depth), wood);
@@ -304,9 +347,9 @@ namespace KingLastPiece
                 var photo = Box(p, "Photo", new Vector3(0f, 0f, depth * 0.55f), new Vector3(w, h, M(0.002f)), tex != null ? PhotoMaterial(tex) : wood, shadows: false);
                 photo.localRotation = Quaternion.Euler(0f, 180f, 180f);   // the cube's −Z face toward the room, upright
                 // Name plate and its engraving.
-                var plateT = Box(p, "Name Plate", new Vector3(0f, -h / 2f - border - M(0.05f), M(0.004f)), new Vector3(M(0.34f), M(0.045f), M(0.006f)), plate);
-                Engrave(p, font, $"{Ordinal(c.n).ToUpperInvariant()} WORLD CHAMPION", new Vector3(0f, plateT.localPosition.y + M(0.011f), M(0.0075f)), M(0.0075f));
-                Engrave(p, font, $"{c.name}   {c.years}", new Vector3(0f, plateT.localPosition.y - M(0.008f), M(0.0075f)), M(0.0105f));
+                var plateT = Box(p, "Name Plate", new Vector3(0f, -h / 2f - border - M(0.1f), M(0.008f)), new Vector3(M(0.68f), M(0.09f), M(0.012f)), plate);
+                Engrave(p, font, $"{Ordinal(c.n).ToUpperInvariant()} WORLD CHAMPION", new Vector3(0f, plateT.localPosition.y + M(0.022f), M(0.015f)), M(0.015f));
+                Engrave(p, font, $"{c.name}   {c.years}", new Vector3(0f, plateT.localPosition.y - M(0.016f), M(0.015f)), M(0.021f));
             }
         }
 

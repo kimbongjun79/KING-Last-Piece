@@ -180,6 +180,19 @@ namespace KingLastPiece
         bool HeavyAffordable => InfiniteStamina || Stamina >= HeavyAttackCost;
 
         /// <summary>Rolls a critical hit: true with <see cref="PlayerStats.critChance"/>; <paramref name="mult"/> is the damage factor.</summary>
+        // Stagger (guard damage) per attack, whatever the style: the combo opens light and finishes heavy, the heavy
+        // breaks guards, the Royal Throw (after a perfect dodge) most of all — its swing hits and its crash landing.
+        const float StaggerLightEarly = 9f, StaggerLightMid = 16f, StaggerLightFinish = 26f;   // hits 1–2, 3, 4
+        const float StaggerHeavy = 42f, StaggerCounterSwing = 55f, StaggerCounterThrow = 75f;
+        float atkStagger;   // per hit window of the current attack
+
+        /// <summary>Combo hit <paramref name="i"/> of <paramref name="count"/>: the last one heavy, the one before medium, the rest light.</summary>
+        static float ComboStagger(int i, int count) =>
+            i >= count - 1 ? StaggerLightFinish : i == count - 2 && count >= 3 ? StaggerLightMid : StaggerLightEarly;
+
+        /// <summary>Critical hits stagger twice as much; attack power above 100% adds a little (+15% per +100%).</summary>
+        float StaggerScale(bool crit) => (1f + 0.15f * Mathf.Max(0f, Stats.attackPower - 1f)) * (crit ? 2f : 1f);
+
         bool RollCrit(out float mult)
         {
             bool crit = Random.value < Stats.critChance;
@@ -498,6 +511,9 @@ namespace KingLastPiece
                 comboIndex = chain ? (comboIndex + 1) % style.lights.Length : 0;
                 atk = style.lights[comboIndex];
             }
+            // Stagger this attack deals, spread over its hit windows.
+            float stagger = heavy ? StaggerHeavy : atkIsGapCloser ? StaggerLightEarly : ComboStagger(comboIndex, style.lights.Length);
+            atkStagger = stagger / Mathf.Max(1, atk.hits.Length);
             Consume(heavy ? atk.cost * (1f - Stats.heavyCostCut) : atk.cost * LightCostScale * (1f - Stats.lightCostCut));
             atkUsesSlashFx = FxLibrary.Instance != null && System.Array.Exists(atk.hits, h => h.fx != SlashFxKind.None);
             hitStopUsed = false;
@@ -760,7 +776,7 @@ namespace KingLastPiece
                 }
                 already.Add(e);
                 bool crit = RollCrit(out float mult);
-                if (e.TakeHit(damage * mult, w.poise, transform.position))
+                if (e.TakeHit(damage * mult, atkStagger * StaggerScale(crit), transform.position))
                 {
                     landed = true;
                     Game.ReportDamage(e, damage * mult, crit);
@@ -1029,7 +1045,7 @@ namespace KingLastPiece
                     counterHits.Add(e);
                     bool crit = RollCrit(out float mult);
                     float swingDamage = SwingHitDamage * Stats.attackPower * mult;
-                    if (e.TakeHit(swingDamage, 50f, piecePos))
+                    if (e.TakeHit(swingDamage, StaggerCounterSwing * StaggerScale(crit), piecePos))
                     {
                         Game.ReportDamage(e, swingDamage, crit);
                         Sfx.Play("THR_SwingHit", e.transform.position + Vector3.up);
@@ -1051,7 +1067,7 @@ namespace KingLastPiece
                     Game.EndSlowMo();
                     // The landing damage can crit too (rolled now, shown when it lands).
                     bool crit = RollCrit(out float mult);
-                    counterTarget.Launch(dir, 17f, 7f, ThrowLandingDamage * Stats.attackPower * mult, crit);
+                    counterTarget.Launch(dir, 17f, 7f, ThrowLandingDamage * Stats.attackPower * mult, crit, StaggerCounterThrow * StaggerScale(crit));
                     Game.HitStop(0.12f);
                     Game.Rig.Kick(1f);
                     Game.Rig.Shake(0.5f);

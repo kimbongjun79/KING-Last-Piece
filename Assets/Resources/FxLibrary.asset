@@ -34,6 +34,15 @@ MonoBehaviour:
   - {fileID: 2100000, guid: 42a7c19bc8451c74b8c713b900e9af6d, type: 2}
   - {fileID: 2100000, guid: 97b655c6ed10d5b43bde68dd21c87b01, type: 2}
   - {fileID: 2100000, guid: 3e00f4fac1b4d41499fcf8dd93191858, type: 2}
+  dizzy: {fileID: 100016, guid: 29af8d70388777e4484c46eb0c38b74c, type: 3}
+  dizzySource:
+  - {fileID: 10301, guid: 0000000000000000f000000000000000, type: 0}
+  - {fileID: 2100000, guid: beac52e3a0d379642b89cf2cd3e961f6, type: 2}
+  - {fileID: 2100000, guid: e22c30e0921ff4d4198b34d4f91bf7db, type: 2}
+  dizzyBlack:
+  - {fileID: 2100000, guid: be7b0b2a30fa2b34ba235260fac4738d, type: 2}
+  - {fileID: 2100000, guid: cf7507aac75fd0146b1ca56ac948b086, type: 2}
+  - {fileID: 2100000, guid: 4280b67df86fc8444b84931004574b6f, type: 2}
   crackDecal: {fileID: 2100000, guid: 9ec0894b2095afd46bf21847e77c3c2a, type: 2}
   crackTextures:
   - {fileID: 2800000, guid: 8edc32bb14d82ec43960bcdf251ef64a, type: 3}

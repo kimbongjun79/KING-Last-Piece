@@ -111,7 +111,7 @@ namespace KingLastPiece
         float poiseRegenTimer, hopPhase, modelY, squash = 1f;
         Quaternion modelTilt = Quaternion.identity, vulnWobble = Quaternion.identity;
         StaggerController stagger;
-        float currentStagger, airHeight, airVy, vulnFxTimer;
+        float currentStagger, airHeight, airVy;
         int airHits;
         bool wasMoving;  // for the slide sound when a piece starts moving
         float modelHeight = 1.5f;
@@ -202,7 +202,7 @@ namespace KingLastPiece
         /// Makes this piece an empowered piece of the given tier (0 leaves it normal) and scales its health by
         /// <paramref name="healthMult"/> on top (the endless mode's every-40-rounds boost). Call right after spawning.
         /// </summary>
-        public void Empower(int tier, float healthMult = 1f)
+        public void Empower(int tier, float healthMult = 1f, float staggerMult = 1f)
         {
             int t = Mathf.Clamp(tier, 0, 3);
             EliteTier = t;
@@ -215,12 +215,13 @@ namespace KingLastPiece
             float boost = EliteHealth[t] * healthMult - 1f;
             moveSpeed *= Mathf.Min(1.4f, 1f + 0.07f * boost);
             Grow(Mathf.Min(1.4f, 1f + 0.12f * boost));
-            maxPoise *= EliteStagger[t];
+            float st = EliteStagger[t] * staggerMult;
+            maxPoise *= st;
             poise = maxPoise;
             if (stagger != null)
             {
-                stagger.Profile.maxGauge *= EliteStagger[t];
-                stagger.Profile.decayPerSecond *= EliteStagger[t];
+                stagger.Profile.maxGauge *= st;
+                stagger.Profile.decayPerSecond *= st;
             }
             if (t == 0) return;
             DisplayName = $"{DisplayName}  ·  다크 {new string('I', t)}";
@@ -260,7 +261,7 @@ namespace KingLastPiece
                 if (stagger.Vulnerable && state != EState.Airborne) AnimateVulnerable(dt);
             }
             else if (poiseRegenTimer > 0f) poiseRegenTimer -= dt;
-            else poise = Mathf.Min(maxPoise, poise + maxPoise * 0.5f * dt);
+            else poise = Mathf.Min(maxPoise, poise + maxPoise * 0.04f * dt);   // the boss's poise refills slowly
 
             switch (state)
             {
@@ -325,6 +326,7 @@ namespace KingLastPiece
             model.localPosition = new Vector3(0f, modelY, 0f);
             model.localRotation = modelTilt * vulnWobble;
             model.localScale = new Vector3(modelBaseScale.x / Mathf.Sqrt(squash), modelBaseScale.y * squash, modelBaseScale.z / Mathf.Sqrt(squash));
+            UpdateDizzy();
             ClampToBoard();
         }
 
@@ -753,6 +755,7 @@ namespace KingLastPiece
 
         float grabTilt, grabLift, launchHeight, launchVy, launchSpin, launchDamage;
         bool launchCrit;   // the landing damage is a critical hit (shown as one)
+        float launchStagger;   // stagger dealt when it crashes down (the Royal Throw)
         Vector3 launchVelocity;
         bool wallHit;
         readonly System.Collections.Generic.HashSet<EnemyBase> launchHits = new System.Collections.Generic.HashSet<EnemyBase>();
@@ -780,8 +783,9 @@ namespace KingLastPiece
         }
 
         /// <summary>Throws the piece: it flies, bowls over other pieces, slams walls and takes damage on landing.</summary>
-        public void Launch(Vector3 direction, float speed, float upSpeed, float landingDamage, bool critical = false)
+        public void Launch(Vector3 direction, float speed, float upSpeed, float landingDamage, bool critical = false, float landingStagger = 0f)
         {
+            launchStagger = landingStagger;
             direction.y = 0f;
             launchVelocity = direction.normalized * speed;
             launchHeight = Mathf.Max(grabLift, 0.3f);
@@ -842,6 +846,7 @@ namespace KingLastPiece
                 // Crash down and lie on the board before getting up (damage only, no stagger reaction).
                 Enter(EState.Getup);
                 if (TakeHit(launchDamage, 0f, transform.position - launchVelocity)) Game.ReportDamage(this, launchDamage, launchCrit);
+                if (!IsDead && launchStagger > 0f) AddStagger(launchStagger, transform.position - launchVelocity);
             }
         }
 
@@ -884,7 +889,7 @@ namespace KingLastPiece
 
             // Bosses: classic poise (separate from the stagger system).
             poise -= poiseDamage;
-            poiseRegenTimer = 2f;
+            poiseRegenTimer = 3f;
             bool armored = hyperArmor && (state == EState.Attack || state == EState.Windup);
             if (poise <= 0f && !armored)
             {
@@ -1136,19 +1141,58 @@ namespace KingLastPiece
             Game.Rig.Shake(0.15f);
         }
 
-        /// <summary>While Vulnerable: dizzy wobble and white sparks circling the head.</summary>
+        /// <summary>While Vulnerable: dizzy wobble (the swirl over the head is the Dizzy effect, see UpdateDizzy).</summary>
         void AnimateVulnerable(float dt)
         {
             float w = Time.time * 9f;
             vulnWobble = Quaternion.Euler(Mathf.Sin(w) * 7f, 0f, Mathf.Cos(w) * 7f);
-            vulnFxTimer -= dt;
-            if (vulnFxTimer <= 0f)
+        }
+
+        /// <summary>
+        /// Adds stagger without a hit reaction — the Royal Throw's crash landing. Regular pieces fill their gauge (and
+        /// break into Vulnerable when it's full); the boss loses poise and staggers when it's gone.
+        /// </summary>
+        public void AddStagger(float amount, Vector3 source)
+        {
+            if (IsDead || amount <= 0f) return;
+            if (stagger != null)
             {
-                vulnFxTimer = 0.12f;
-                float a = Time.time * 6f;
-                Vector3 head = transform.position + Vector3.up * (modelHeight + 0.25f);
-                Effects.Sparks(head + new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a)) * 0.45f, VulnerableColor, 1, 0.6f);
+                if (stagger.Add(amount)) VulnerableBurst();
+                return;
             }
+            poise -= amount;
+            poiseRegenTimer = 3f;
+            if (poise > 0f) return;
+            poise = maxPoise;
+            Flinch(source, staggerDuration);
+        }
+
+        GameObject dizzy;
+        float dizzySize = 0.42f;
+        // The prefab's swirl sits 1.02 units above its root: put the root so the swirl circles just over the head.
+        Vector3 DizzyOffset => Vector3.up * (model.localPosition.y + modelHeight + 0.3f - 1.02f * dizzySize);
+
+        /// <summary>
+        /// Tazo FX "L_Dizzy" swirling over the head, recoloured black, while the guard is broken: a regular piece's
+        /// Vulnerable, the boss's stagger.
+        /// </summary>
+        void UpdateDizzy()
+        {
+            bool on = !IsDead && (stagger != null ? stagger.Vulnerable : IsBoss && state == EState.Stagger);
+            if (on && dizzy == null)
+            {
+                var lib = FxLibrary.Instance;
+                dizzySize = Mathf.Clamp(Radius / 0.45f, 0.8f, 2f) * 0.42f;
+                dizzy = Vfx.Attach(lib != null ? lib.dizzy : null, transform, DizzyOffset, dizzySize);
+                if (dizzy != null && lib != null) EliteAura.Blacken(dizzy, lib.dizzySource, lib.dizzyBlack, 1.4f);
+            }
+            else if (!on && dizzy != null)
+            {
+                Vfx.Release(dizzy, 0.4f);
+                dizzy = null;
+            }
+            // Rides on the piece's head as it pops up, juggles and wobbles.
+            if (dizzy != null) dizzy.transform.localPosition = DizzyOffset;
         }
 
         void Die(Vector3 source)
@@ -1156,6 +1200,7 @@ namespace KingLastPiece
             IsDead = true;
             if (Game != null) Game.ReportKill(this);
             if (aura != null) Destroy(aura);
+            if (dizzy != null) Destroy(dizzy);
             BoardSlots.Release(this);
             ClearTelegraph();
             SetGlow(Color.black);

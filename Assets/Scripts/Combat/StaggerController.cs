@@ -37,6 +37,20 @@ namespace KingLastPiece
             return superArmor ? Reaction.None : Reaction.Flinch;
         }
 
+        /// <summary>Fills the gauge without a hit reaction (e.g. a thrown piece crashing down). True if it broke.</summary>
+        public bool Add(float staggerDamage)
+        {
+            JustBecameVulnerable = false;
+            if (Vulnerable) return false;
+            Gauge += staggerDamage;
+            decayTimer = Profile.decayDelay;
+            if (Gauge < Profile.maxGauge) return false;
+            Gauge = Profile.maxGauge;
+            vulnerableTimer = Profile.vulnerableDuration;
+            JustBecameVulnerable = true;
+            return true;
+        }
+
         /// <summary>Back to normal (after getting up, or when Vulnerable times out).</summary>
         public void ResetGauge()
         {

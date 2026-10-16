@@ -253,7 +253,7 @@ namespace KingLastPiece
         {
             var e = SpawnEnemy(type, pos);
             float hp = IsEndless ? EndlessRounds.HealthMultiplier(Round) * (type == PieceType.Queen ? EndlessRounds.QueenHealthBoost : 1f) : 1f;
-            e.Empower(tier, hp);
+            e.Empower(tier, hp, IsEndless ? EndlessRounds.StaggerMultiplier(Round) : 1f);
             return e;
         }
 

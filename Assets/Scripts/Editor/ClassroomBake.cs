@@ -66,7 +66,11 @@ namespace KingLastPiece.EditorTools
 
         const string ModelDir = "Assets/Resources/Models";
         const string TextureDir = ModelDir + "/Textures";
-        static readonly string[] FurnitureModels = { "table", "chair", "door", "plant", "window" };
+        static readonly string[] FurnitureModels =
+        {
+            "table_v01_with VARCO", "chair_v01_with VARCO", "door_v01_with VARCO", "plant_v01_with VARCO", "window_v01_with VARCO",
+            "Green Leafy Tree_with VARCO",
+        };
 
         /// <summary>
         /// The provided models carry their textures embedded in the FBX, which the importer doesn't pull out on its
@@ -77,7 +81,7 @@ namespace KingLastPiece.EditorTools
             bool extracted = false;
             foreach (var name in FurnitureModels)
             {
-                string p = $"{ModelDir}/{name}_v01_with VARCO.fbx";
+                string p = $"{ModelDir}/{name}.fbx";
                 var importer = AssetImporter.GetAtPath(p) as ModelImporter;
                 if (importer == null) continue;
                 bool hasTextures = false;
@@ -102,7 +106,7 @@ namespace KingLastPiece.EditorTools
                 }
             }
             foreach (var name in FurnitureModels)
-                AssetDatabase.ImportAsset($"{ModelDir}/{name}_v01_with VARCO.fbx", ImportAssetOptions.ForceUpdate);
+                AssetDatabase.ImportAsset($"{ModelDir}/{name}.fbx", ImportAssetOptions.ForceUpdate);
         }
 
         static void Bake()
@@ -112,6 +116,13 @@ namespace KingLastPiece.EditorTools
             var board = Object.FindFirstObjectByType<ArenaBoard>();
             if (board == null) { Debug.LogError("[ClassroomBake] No ArenaBoard in the scene — bake the world first."); return; }
             var arena = board.transform;
+            // The chess clock may have been placed by hand: keep its placement through the rebake.
+            var oldClock = arena.Find(ClassroomBlockout.RootName + "/Chess Table/Chess Clock");
+            bool keepClock = oldClock != null;
+            Vector3 clockPos = keepClock ? oldClock.localPosition : Vector3.zero, clockScale = keepClock ? oldClock.localScale : Vector3.one;
+            Quaternion clockRot = keepClock ? oldClock.localRotation : Quaternion.identity;
+            var oldFit = keepClock ? oldClock.GetComponentInParent<ChessTableFit>() : null;
+            float clockBoardHalf = oldFit != null ? oldFit.clockBoardHalf : 8f;
             foreach (var name in new[] { ClassroomBlockout.RootName, "Classroom (blockout)", "Pillars", "Hall Floor" })
             {
                 var t = arena.Find(name);
@@ -120,6 +131,15 @@ namespace KingLastPiece.EditorTools
 
             if (AssetDatabase.IsValidFolder(MaterialDir)) AssetDatabase.DeleteAsset(MaterialDir);
             var root = ClassroomBlockout.Build(arena);
+            var newClock = root.Find("Chess Table/Chess Clock");
+            if (keepClock && newClock != null)
+            {
+                newClock.localPosition = clockPos;
+                newClock.localRotation = clockRot;
+                newClock.localScale = clockScale;
+                var fit = newClock.GetComponentInParent<ChessTableFit>();
+                if (fit != null) fit.clockBoardHalf = clockBoardHalf;
+            }
             var ambience = root.GetComponent<ClassroomAmbience>();
             ambience.skybox = AssetDatabase.LoadAssetAtPath<Material>(SkyboxPath);
             ambience.Apply();   // so the scene view shows the daylight too

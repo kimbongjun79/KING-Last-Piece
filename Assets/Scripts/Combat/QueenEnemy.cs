@@ -20,7 +20,8 @@ namespace KingLastPiece
             SetRadius(0.75f);
             SetModelScale(1.35f);
             moveSpeed = 3.2f;
-            maxPoise = 220f;   // twice the rook's gauge: the hardest piece to stagger
+            // Very hard to stagger: about two breaks over a whole round-10 fight (its poise refills only slowly).
+            maxPoise = 420f;
             staggerDuration = 1.6f;
         }
 

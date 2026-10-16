@@ -23,6 +23,8 @@ namespace KingLastPiece
         public float margin = 6f;
         [Tooltip("Height of the table top (the board's underside).")]
         public float topY = -0.4f;
+        [Tooltip("Board half-width the clock's placement is for (it follows the board's edge from there).")]
+        public float clockBoardHalf = 8f;
 
         Vector3 modelScale;
         bool measured;
@@ -57,10 +59,15 @@ namespace KingLastPiece
                 topCollider.center = new Vector3(0f, topY - 0.5f, 0f);
                 topCollider.size = new Vector3(width, 1f, depth);
             }
-            if (clock != null)
+            // The clock stays where it was placed (by hand in the scene); it only moves out with the board's edge when
+            // the endless board grows, and back when it shrinks.
+            if (clock != null && !Mathf.Approximately(board, clockBoardHalf))
             {
                 var p = clock.localPosition;
-                clock.localPosition = new Vector3(board + 6.5f, p.y, p.z);
+                var away = new Vector3(p.x, 0f, p.z);
+                away = away.sqrMagnitude > 0.01f ? away.normalized : Vector3.right;
+                clock.localPosition = p + away * (board - clockBoardHalf);
+                clockBoardHalf = board;
             }
         }
     }

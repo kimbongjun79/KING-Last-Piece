@@ -15,6 +15,7 @@ namespace KingLastPiece.EditorTools
         const string LibraryPath = "Assets/Resources/FxLibrary.asset";
         const string AuraPrefabs = "Assets/AC Little Enchant Mesh VFX/Prefabs/";
         const string MaterialDir = "Assets/Materials/EliteAura";
+        const string DizzyPrefab = "Assets/Tazo_fx/_Loop_effect/L_Dizzy(click play).prefab";
         static readonly Color Ink = new Color(0.03f, 0.03f, 0.035f, 1f);
 
         [MenuItem("KING/Setup/Endless Assets")]
@@ -48,6 +49,36 @@ namespace KingLastPiece.EditorTools
                         if (m != null && !sources.Contains(m)) sources.Add(m);
             }
 
+            var black = MakeBlack(sources);
+
+            lib.eliteAura = auras;
+            lib.eliteAuraSource = sources.ToArray();
+            lib.eliteAuraBlack = black;
+
+            // The Dizzy swirl over a staggered piece (Tazo FX), recoloured black the same way.
+            var dizzy = AssetDatabase.LoadAssetAtPath<GameObject>(DizzyPrefab);
+            var dizzySources = new List<Material>();
+            if (dizzy != null)
+                foreach (var r in dizzy.GetComponentsInChildren<ParticleSystemRenderer>(true))
+                {
+                    foreach (var m in r.sharedMaterials)
+                        if (m != null && !dizzySources.Contains(m)) dizzySources.Add(m);
+                    if (r.trailMaterial != null && !dizzySources.Contains(r.trailMaterial)) dizzySources.Add(r.trailMaterial);
+                }
+            if (dizzy != null)
+                foreach (var t in dizzy.GetComponentsInChildren<TrailRenderer>(true))
+                    foreach (var m in t.sharedMaterials)
+                        if (m != null && !dizzySources.Contains(m)) dizzySources.Add(m);
+            lib.dizzy = dizzy;
+            lib.dizzySource = dizzySources.ToArray();
+            lib.dizzyBlack = MakeBlack(dizzySources);
+            EditorUtility.SetDirty(lib);
+            Debug.Log($"[EndlessSetup] {auras.Length} auras, {black.Length} black materials; dizzy {(dizzy != null)} with {lib.dizzyBlack.Length}.");
+        }
+
+        /// <summary>Alpha-blended black URP particle copies of (additive) effect materials, keeping their textures.</summary>
+        static Material[] MakeBlack(List<Material> sources)
+        {
             Directory.CreateDirectory(MaterialDir);
             var shader = Shader.Find("Universal Render Pipeline/Particles/Unlit");
             var black = new Material[sources.Count];
@@ -73,12 +104,7 @@ namespace KingLastPiece.EditorTools
                 EditorUtility.SetDirty(m);
                 black[i] = m;
             }
-
-            lib.eliteAura = auras;
-            lib.eliteAuraSource = sources.ToArray();
-            lib.eliteAuraBlack = black;
-            EditorUtility.SetDirty(lib);
-            Debug.Log($"[EndlessSetup] {auras.Length} auras, {black.Length} black materials.");
+            return black;
         }
     }
 }

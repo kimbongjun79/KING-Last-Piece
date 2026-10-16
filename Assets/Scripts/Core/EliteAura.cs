@@ -90,15 +90,69 @@ namespace KingLastPiece
             }
         }
 
-        static Material[] Swap(FxLibrary lib, Material[] mats)
+        static Material[] Swap(FxLibrary lib, Material[] mats) => Swap(mats, lib.eliteAuraSource, lib.eliteAuraBlack);
+
+        static Material[] Swap(Material[] mats, Material[] sources, Material[] blacks)
         {
-            if (lib.eliteAuraSource == null || lib.eliteAuraBlack == null) return mats;
+            if (sources == null || blacks == null) return mats;
             for (int i = 0; i < mats.Length; i++)
             {
-                int k = System.Array.IndexOf(lib.eliteAuraSource, mats[i]);
-                if (k >= 0 && k < lib.eliteAuraBlack.Length && lib.eliteAuraBlack[k] != null) mats[i] = lib.eliteAuraBlack[k];
+                int k = System.Array.IndexOf(sources, mats[i]);
+                if (k >= 0 && k < blacks.Length && blacks[k] != null) mats[i] = blacks[k];
             }
             return mats;
+        }
+
+        /// <summary>
+        /// Turns an effect black (e.g. the Dizzy swirl): black start colour (alpha × <paramref name="alphaBoost"/>), fades
+        /// kept but hues dropped, and its additive materials swapped for alpha-blended black copies (black would vanish
+        /// in additive). Trails too.
+        /// </summary>
+        public static void Blacken(GameObject fx, Material[] sources, Material[] blacks, float alphaBoost = 1f)
+        {
+            if (fx == null) return;
+            foreach (var ps in fx.GetComponentsInChildren<ParticleSystem>(true))
+            {
+                var main = ps.main;
+                float a = main.startColor.mode == ParticleSystemGradientMode.Color ? main.startColor.color.a : 1f;
+                main.startColor = new ParticleSystem.MinMaxGradient(new Color(Ink.r, Ink.g, Ink.b, Mathf.Min(0.95f, a * alphaBoost)));
+                var col = ps.colorOverLifetime;
+                if (col.enabled)
+                {
+                    var src = col.color.mode == ParticleSystemGradientMode.TwoGradients ? col.color.gradientMax : col.color.gradient;
+                    if (src != null)
+                    {
+                        var g = new Gradient();
+                        g.SetKeys(new[] { new GradientColorKey(Color.white, 0f), new GradientColorKey(Color.white, 1f) }, src.alphaKeys);
+                        col.color = new ParticleSystem.MinMaxGradient(g);
+                    }
+                }
+                var trails = ps.trails;
+                if (trails.enabled)
+                {
+                    trails.inheritParticleColor = true;
+                    trails.colorOverLifetime = new ParticleSystem.MinMaxGradient(Color.white);
+                }
+                var r = ps.GetComponent<ParticleSystemRenderer>();
+                if (r == null) continue;
+                r.sharedMaterials = Swap(r.sharedMaterials, sources, blacks);
+                if (r.trailMaterial != null)
+                {
+                    var t = Swap(new[] { r.trailMaterial }, sources, blacks);
+                    r.trailMaterial = t[0];
+                }
+            }
+            // Trail renderers (the swirl's ribbons): black copies of their materials, black along the whole trail.
+            foreach (var tr in fx.GetComponentsInChildren<TrailRenderer>(true))
+            {
+                tr.sharedMaterials = Swap(tr.sharedMaterials, sources, blacks);
+                var g = tr.colorGradient;
+                var alphas = g.alphaKeys;
+                for (int i = 0; i < alphas.Length; i++) alphas[i].alpha = Mathf.Min(0.95f, alphas[i].alpha * alphaBoost);
+                var ng = new Gradient();
+                ng.SetKeys(new[] { new GradientColorKey(Ink, 0f), new GradientColorKey(Ink, 1f) }, alphas);
+                tr.colorGradient = ng;
+            }
         }
 
         /// <summary>The model's parts merged into one mesh in its own space (cached per piece type), for the aura to emit from.</summary>

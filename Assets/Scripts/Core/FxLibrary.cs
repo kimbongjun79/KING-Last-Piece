@@ -26,6 +26,11 @@ namespace KingLastPiece
         public Material[] eliteAuraSource;      // the pack's (additive) materials…
         public Material[] eliteAuraBlack;       // …and their alpha-blended black replacements
 
+        [Header("Tazo FX Dizzy (guard broken)")]
+        public GameObject dizzy;
+        public Material[] dizzySource;
+        public Material[] dizzyBlack;
+
         [Header("Ground cracks (URP decals)")]
         public Material crackDecal;
         public Texture2D[] crackTextures;

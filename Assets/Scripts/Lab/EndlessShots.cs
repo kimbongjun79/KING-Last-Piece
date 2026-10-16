@@ -41,6 +41,7 @@ namespace KingLastPiece
             yield return ClassroomShots();
             yield return EliteTiers();
             yield return DarkWindup();
+            yield return DizzyShot();
             yield return RoundShot(11, "21_Round11_First_Dark_Pawn.png", closeOnElite: true);
             yield return RoundShot(29, "22_Round29_Half_Dark.png", closeOnElite: false);
             yield return RoundShot(20, "23_Round20_Dark_Queen.png", closeOnElite: true);
@@ -154,8 +155,8 @@ namespace KingLastPiece
             if (portrait != null)
             {
                 Vector3 c = portrait.transform.position;
-                game.Rig.OverridePosition = c + portrait.transform.forward * (1.1f * m) + Vector3.up * (0.05f * m);
-                game.Rig.OverrideLookAt = c - Vector3.up * (0.06f * m);
+                game.Rig.OverridePosition = c + portrait.transform.forward * (2.1f * m) + Vector3.up * (0.05f * m);
+                game.Rig.OverrideLookAt = c - Vector3.up * (0.12f * m);
                 yield return Frames(3);
                 yield return Shot("37_Champion_Portrait.png");
             }
@@ -173,6 +174,38 @@ namespace KingLastPiece
             yield return Frames(20);
             yield return Shot("34_Classroom_Play_View.png");
             if (hud != null) hud.enabled = true;
+        }
+
+        /// <summary>A pawn whose guard is broken (gauge filled at once): the black Dizzy swirl over its head.</summary>
+        IEnumerator DizzyShot()
+        {
+            game.ClearEnemies();
+            var at = GameManager.SquareToWorld("e4");
+            game.Player.ReturnToStart(GameManager.SquareToWorld("e1"), 0f);
+            var pawn = game.SpawnEmpowered(PieceType.Pawn, 0, at);
+            yield return Frames(50);   // dropped in
+            pawn.AddStagger(9999f, game.Player.transform.position);
+            yield return Frames(25);
+            game.Rig.UseOverride = true;
+            game.Rig.OverridePosition = pawn.FlatPos + new Vector3(1.6f, 2.6f, -3.2f);
+            game.Rig.OverrideLookAt = pawn.FlatPos + Vector3.up * 1.7f;
+            var hud = game.GetComponent<Hud>();
+            if (hud != null) hud.enabled = false;
+            yield return Frames(2);
+            yield return Shot("38_Dizzy.png");
+            if (hud != null) hud.enabled = true;
+            string where = "-";
+            foreach (var t in pawn.GetComponentsInChildren<Transform>())
+            {
+                if (!t.name.StartsWith("L_Dizzy")) continue;
+                var rs = t.GetComponentsInChildren<Renderer>();
+                var b = rs.Length > 0 ? rs[0].bounds : new Bounds(t.position, Vector3.zero);
+                foreach (var r in rs) b.Encapsulate(r.bounds);
+                where = $"root={t.position} bounds={b.center} size={b.size}";
+            }
+            stats.Append($"Dizzy\tvulnerable={pawn.IsVulnerable}\tpawn={pawn.transform.position}\t{where}\n");
+            game.Rig.UseOverride = false;
+            game.ClearEnemies();
         }
 
         /// <summary>A Dark III rook winding up next to the King: the aura should step back so the red glow shows.</summary>
