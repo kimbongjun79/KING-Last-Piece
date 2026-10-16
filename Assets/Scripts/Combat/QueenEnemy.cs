@@ -89,12 +89,12 @@ namespace KingLastPiece
             if (!ReadyAtAttackSlot) MoveToSlot(Gait.Direct, moveSpeed, dt);
         }
 
-        void Dash(float windup, Vector3 dir)
+        void Dash(float windup, Vector3 dir, float length = FullLine)
         {
             BeginAttack(new AttackPlan
             {
                 kind = AtkKind.Dash, dir = dir, windup = windup, recover = dashesLeft > 0 ? 0.25f : 1.1f,
-                length = FullLine, speed = 24f, damage = 22f, poise = 40f, radius = 1.0f
+                length = length, speed = 24f, damage = 22f, poise = 40f, radius = 1.0f
             });
         }
 
@@ -102,8 +102,8 @@ namespace KingLastPiece
         {
             if (dashesLeft <= 0) return false;
             dashesLeft--;
-            // Follow-up dashes stay on chess lines too (nearest of the 8 directions).
-            Dash(0.44f * Speed, BoardSlots.Snap8(ToPlayer));
+            // Follow-up dashes stay on chess lines too (nearest of the 8 directions), and stay short: just past the King.
+            Dash(0.44f * Speed, BoardSlots.Snap8(ToPlayer), Mathf.Clamp(ToPlayer.magnitude + 4f, 6f, 12f));
             return true;
         }
     }
