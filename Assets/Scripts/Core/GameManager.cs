@@ -573,11 +573,8 @@ namespace KingLastPiece
                         break;
                     }
                     // Endless: the run ends — the results screen's confirm goes back to the title. Classic: retry the round.
-                    if (StateTime > 1.8f && GameInput.Confirm)
-                    {
-                        if (IsEndless) BackToTitle();
-                        else StartWave(WaveIndex);
-                    }
+                    // (The endless results screen takes the nickname and its own confirm — see SubmitRun.)
+                    if (!IsEndless && StateTime > 1.8f && GameInput.Confirm) StartWave(WaveIndex);
                     break;
 
                 case GameState.Victory:
@@ -615,6 +612,27 @@ namespace KingLastPiece
             }
             startFromMenu = true;
             UnityEngine.SceneManagement.SceneManager.LoadScene(endless ? EndlessScene : NormalScene);
+        }
+
+        /// <summary>True while the finished run is on its way to the online ranking.</summary>
+        public bool Submitting { get; private set; }
+
+        /// <summary>
+        /// Endless results confirm: sends the run to the online ranking under <paramref name="nickname"/> (at most a
+        /// few seconds — offline just skips it), then back to the title.
+        /// </summary>
+        public async void SubmitRun(string nickname)
+        {
+            if (Submitting || State != GameState.Dead || !IsEndless) return;
+            Submitting = true;
+            nickname = OnlineBoard.Sanitize(nickname);
+            if (nickname.Length > 0) OnlineBoard.SavedName = nickname;
+            Sfx.Play("UI_Confirm");
+            var send = OnlineBoard.Submit(nickname, Round, RunTime, Record.kills, Record.damageDealt);
+            await System.Threading.Tasks.Task.WhenAny(send, System.Threading.Tasks.Task.Delay(6000));
+            if (this == null) return;   // the scene went away meanwhile
+            Submitting = false;
+            BackToTitle();
         }
 
         /// <summary>Endless results → the title: the scene reloads (a fresh board, King and run).</summary>

@@ -5,7 +5,8 @@ namespace KingLastPiece
     /// <summary>IMGUI HUD: health/stamina with damage trail, flasks, lock-on marker, enemy and boss bars, overlays.</summary>
     public class Hud : MonoBehaviour
     {
-        GUIStyle big, mid, small, label, title;
+        GUIStyle big, mid, small, label, title, fieldStyle;
+        string nickname;   // results screen: the name the run goes online under
         float hpTrail = 100f, bossTrail = 1f, rollAlpha = 1f;
         float scale;
 
@@ -460,6 +461,8 @@ namespace KingLastPiece
             Text(new Rect(0, by - 42 * scale, W, 32 * scale), best, new GUIStyle(small) { fontSize = Mathf.RoundToInt(18 * scale) },
                 new Color(Gold.r, Gold.g, Gold.b, 0.9f * fade));
 
+            DrawOnlineRanking(new Rect(W - 400 * scale, H * 0.2f, 360 * scale, 0f), fade);
+
             // Chess-tile band along the bottom edge.
             float tile = 28 * scale;
             int count = Mathf.CeilToInt(W / tile) + 1;
@@ -502,18 +505,93 @@ namespace KingLastPiece
                 ("획득한 강화", $"{r.upgrades}개"),
             }, 260 * scale);
 
-            // Confirm → title.
+            // Nickname for the online ranking, then confirm → the run is sent and the title comes back.
             var e = Event.current;
-            var b = new Rect((W - 300 * scale) / 2f, H * 0.07f + 168 * scale + 9 * 40 * scale + 56 * scale, 300 * scale, 60 * scale);
-            bool ready = g.StateTime > 1.8f;
-            if (ready && e.type == EventType.MouseDown && b.Contains(e.mousePosition)) { g.BackToTitle(); e.Use(); }
+            float fy = H * 0.07f + 168 * scale + 9 * 40 * scale + 44 * scale;
+            bool ready = g.StateTime > 1.8f && !g.Submitting;
+            nickname ??= OnlineBoard.SavedName;
+            var nameLabel = new GUIStyle(label) { fontSize = Mathf.RoundToInt(20 * scale), alignment = TextAnchor.MiddleRight };
+            var field = new Rect(W / 2f - 120 * scale, fy, 300 * scale, 46 * scale);
+            Text(new Rect(field.x - 190 * scale, fy, 176 * scale, 46 * scale), "닉네임", nameLabel, Gold);
+            Fill(new Rect(field.x - 2 * scale, field.y - 2 * scale, field.width + 4 * scale, field.height + 4 * scale), new Color(Gold.r, Gold.g, Gold.b, 0.7f * a));
+            Fill(field, new Color(0.04f, 0.035f, 0.04f, 0.95f * a));
+            fieldStyle ??= new GUIStyle(GUI.skin.textField) { font = small.font, alignment = TextAnchor.MiddleLeft };
+            fieldStyle.fontSize = Mathf.RoundToInt(22 * scale);
+            fieldStyle.normal.textColor = fieldStyle.focused.textColor = fieldStyle.hover.textColor = new Color(1f, 0.96f, 0.88f);
+            fieldStyle.normal.background = fieldStyle.focused.background = fieldStyle.hover.background = Texture2D.blackTexture;
+            fieldStyle.padding = new RectOffset(Mathf.RoundToInt(12 * scale), 0, 0, 0);
+            Input.imeCompositionMode = IMECompositionMode.On;   // Korean names
+            // Enter inside the field confirms too.
+            bool enter = e.type == EventType.KeyDown && (e.keyCode == KeyCode.Return || e.keyCode == KeyCode.KeypadEnter);
+            GUI.SetNextControlName("Nickname");
+            if (!g.Submitting) nickname = GUI.TextField(field, nickname, 12, fieldStyle);
+            else GUI.Label(field, nickname, fieldStyle);
+            if (ready && g.StateTime < 2.2f) GUI.FocusControl("Nickname");
+
+            var b = new Rect((W - 300 * scale) / 2f, fy + 68 * scale, 300 * scale, 58 * scale);
+            bool click = e.type == EventType.MouseDown && b.Contains(e.mousePosition);
+            bool padConfirm = e.type == EventType.Repaint && GameInput.Confirm;   // gamepad A / Start (keys come as events)
+            if (ready && (click || enter || padConfirm))
+            {
+                g.SubmitRun(nickname);
+                if (e.type != EventType.Repaint) e.Use();
+            }
             float pulse = 0.75f + 0.25f * Mathf.Sin(Time.unscaledTime * 5f);
             Fill(new Rect(b.x - 3 * scale, b.y - 3 * scale, b.width + 6 * scale, b.height + 6 * scale),
                 new Color(Gold.r, Gold.g, Gold.b, (ready ? pulse : 0.3f) * a));
             Fill(b, new Color(0.22f, 0.16f, 0.07f, a));
-            Text(b, "확인", new GUIStyle(mid) { fontSize = Mathf.RoundToInt(28 * scale) }, new Color(1f, 0.95f, 0.85f, (ready ? 1f : 0.4f) * a));
-            Text(new Rect(0, b.yMax + 10 * scale, W, 26 * scale), "ENTER / START 또는 클릭  —  타이틀로",
+            Text(b, g.Submitting ? "기록 전송 중…" : "확인", new GUIStyle(mid) { fontSize = Mathf.RoundToInt(26 * scale) },
+                new Color(1f, 0.95f, 0.85f, (ready || g.Submitting ? 1f : 0.4f) * a));
+            Text(new Rect(0, b.yMax + 10 * scale, W, 26 * scale), "닉네임을 입력하고 확인  —  온라인 순위에 기록하고 타이틀로",
                 new GUIStyle(small) { fontSize = Mathf.RoundToInt(15 * scale) }, new Color(1f, 1f, 1f, 0.45f * a));
+        }
+
+        bool rankingRequested;
+
+        /// <summary>Title side panel: the endless mode's online top 10 and this player's own rank (UGS Leaderboards).</summary>
+        void DrawOnlineRanking(Rect area, float fade)
+        {
+            if (!rankingRequested) { rankingRequested = true; OnlineBoard.Refresh(); }
+            float line = 30 * scale;
+            int rows = Mathf.Max(1, OnlineBoard.Top.Count);
+            var r = new Rect(area.x, area.y, area.width, 58 * scale + rows * line + 54 * scale);
+            Fill(r, new Color(0f, 0f, 0f, 0.55f * fade));
+            Fill(new Rect(r.x, r.y, r.width, 2 * scale), new Color(Gold.r, Gold.g, Gold.b, 0.7f * fade));
+            Text(new Rect(r.x, r.y + 10 * scale, r.width, 36 * scale), "무한 모드  온라인 순위", new GUIStyle(label) { alignment = TextAnchor.MiddleCenter, fontSize = Mathf.RoundToInt(20 * scale) },
+                new Color(Gold.r, Gold.g, Gold.b, fade));
+            var row = new GUIStyle(small) { fontSize = Mathf.RoundToInt(17 * scale), alignment = TextAnchor.MiddleLeft };
+            var right = new GUIStyle(row) { alignment = TextAnchor.MiddleRight };
+            float y = r.y + 54 * scale;
+            var dim = new Color(0.85f, 0.82f, 0.75f, fade);
+            switch (OnlineBoard.State)
+            {
+                case OnlineBoard.Status.Idle:
+                case OnlineBoard.Status.Loading:
+                    Text(new Rect(r.x, y, r.width, line), "불러오는 중…", new GUIStyle(row) { alignment = TextAnchor.MiddleCenter }, dim);
+                    break;
+                case OnlineBoard.Status.Unavailable:
+                    Text(new Rect(r.x, y, r.width, line), "온라인 순위를 불러올 수 없습니다", new GUIStyle(row) { alignment = TextAnchor.MiddleCenter }, dim);
+                    break;
+                default:
+                    if (OnlineBoard.Top.Count == 0)
+                        Text(new Rect(r.x, y, r.width, line), "아직 기록이 없습니다", new GUIStyle(row) { alignment = TextAnchor.MiddleCenter }, dim);
+                    foreach (var en in OnlineBoard.Top)
+                    {
+                        var c = en.mine ? new Color(1f, 0.85f, 0.45f, fade) : dim;
+                        if (en.mine) Fill(new Rect(r.x + 6 * scale, y, r.width - 12 * scale, line), new Color(Gold.r, Gold.g, Gold.b, 0.12f * fade));
+                        Text(new Rect(r.x + 16 * scale, y, 44 * scale, line), $"{en.rank}", row, c);
+                        Text(new Rect(r.x + 58 * scale, y, r.width * 0.5f, line), en.name, row, c);
+                        Text(new Rect(r.x, y, r.width - 16 * scale, line), $"{en.round}R  {BestRecord.FormatTime(en.time)}", right, c);
+                        y += line;
+                    }
+                    break;
+            }
+            float my = r.yMax - 40 * scale;
+            Fill(new Rect(r.x + 12 * scale, my - 4 * scale, r.width - 24 * scale, 1 * scale), new Color(Gold.r, Gold.g, Gold.b, 0.4f * fade));
+            string mine = OnlineBoard.Mine.HasValue
+                ? $"내 순위  {OnlineBoard.Mine.Value.rank}위  ·  {OnlineBoard.Mine.Value.round}R  {BestRecord.FormatTime(OnlineBoard.Mine.Value.time)}"
+                : OnlineBoard.State == OnlineBoard.Status.Ready ? "내 순위  기록 없음" : "";
+            Text(new Rect(r.x, my, r.width, 32 * scale), mine, new GUIStyle(row) { alignment = TextAnchor.MiddleCenter }, new Color(1f, 0.9f, 0.6f, fade));
         }
 
         void DrawDeath(GameManager g)

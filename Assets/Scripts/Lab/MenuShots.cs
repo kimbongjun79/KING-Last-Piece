@@ -64,8 +64,11 @@ namespace KingLastPiece
             var rec = g.Record;
             log.Append($"Dead\tstate={g.State}\tround={g.Round}\tdealt={rec.damageDealt:0}\ttaken={rec.damageTaken:0}\tkills={rec.kills}\ttime={g.RunTime:0.0}\n");
             yield return Shot("44_Endless_Results.png");
-            g.BackToTitle();
+            // Nickname + confirm: the run goes to the online ranking (offline / unlinked: skipped after a moment).
+            g.SubmitRun("테스트킹");
+            for (int f = 0; f < 600 && GameManager.Instance != null && GameManager.Instance.State == GameManager.GameState.Dead; f++) yield return null;
             yield return Frames(90);
+            log.Append($"Online\tstate={OnlineBoard.State}\terror={OnlineBoard.Error}\tsaved_name={OnlineBoard.SavedName}\n");
             g = GameManager.Instance;
             log.Append($"AfterResults\tmode={g.CurrentMode}\tstate={g.State}\n");
             yield return Shot("45_Back_To_Title.png");
