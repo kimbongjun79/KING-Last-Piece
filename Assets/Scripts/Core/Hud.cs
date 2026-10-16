@@ -375,7 +375,7 @@ namespace KingLastPiece
         void DrawControlsHint()
         {
             var r = new Rect(20 * scale, Screen.height - 40 * scale, Screen.width, 30 * scale);
-            Text(r, "WASD 이동   Shift 달리기   좌클릭 약공격   우클릭 강공격   Space 회피   Q 락온   R 회복약   Esc 일시정지 · 조작법",
+            Text(r, "WASD 이동   Shift 달리기   좌클릭 일반공격   우클릭 강공격   Space 회피   Q 락온   R 회복약   Esc 일시정지 · 조작법",
                 new GUIStyle(label) { fontSize = Mathf.RoundToInt(15 * scale), fontStyle = FontStyle.Normal },
                 new Color(1f, 1f, 1f, 0.45f));
         }
@@ -542,7 +542,7 @@ namespace KingLastPiece
                 ("공격 범위", $"{Mathf.RoundToInt(s.attackRange * 100f)}%   (최대 130%)"),
                 ("최대 기력", $"{Mathf.RoundToInt(p.MaxStamina)}"),
                 ("치명타", $"확률 {Mathf.RoundToInt(s.critChance * 100f)}% (최대 60%)   ·   피해 {Mathf.RoundToInt(s.critDamage * 100f)}% (최대 300%)"),
-                ("공격당 기력 소모", $"약공격 {p.LightAttackCost:0.#} (−{Mathf.RoundToInt(s.lightCostCut * 100f)}%)   ·   강공격 {p.HeavyAttackCost:0.#} (−{Mathf.RoundToInt(s.heavyCostCut * 100f)}%)"),
+                ("공격당 기력 소모", $"일반공격 {p.LightAttackCost:0.#} (−{Mathf.RoundToInt(s.lightCostCut * 100f)}%)   ·   강공격 {p.HeavyAttackCost:0.#} (−{Mathf.RoundToInt(s.heavyCostCut * 100f)}%)"),
                 ("회복약", $"{p.MaxFlasks}개 (최대 5)   ·   회복량 {Mathf.RoundToInt(s.healAmount)}"),
                 ("회피 충전", $"{p.MaxDodges}회 (최대 3)   ·   1회 충전 {p.DodgeRechargeTime:0.00}초"),
             }, area.width * 0.4f);
@@ -556,7 +556,7 @@ namespace KingLastPiece
                 ("이동", "W A S D          왼쪽 스틱"),
                 ("카메라", "마우스          오른쪽 스틱"),
                 ("달리기", "Shift (누르고 있기)          L3"),
-                ("약공격 · 콤보", "좌클릭 / J (누르고 있으면 연속)          R1"),
+                ("일반공격 · 콤보", "좌클릭 / J (누르고 있으면 연속)          R1"),
                 ("강공격 · 띄우기", "우클릭 / K          R2"),
                 ("회피 (무적 구르기)", "Space          B"),
                 ("락온", "Q / Tab / 휠 클릭          R3"),

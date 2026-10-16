@@ -100,7 +100,7 @@ namespace KingLastPiece
             { UpgradeKind.DodgeRecharge, new UpgradeDef { title = "회피 충전 속도",  min = 0.1f,  max = 0.2f,  cap = 1.6f,  percent = true } },
             { UpgradeKind.MaxDodges,     new UpgradeDef { title = "회피 충전 횟수",  min = 1f,    max = 1f,    cap = 3f,    whole = true } },
             { UpgradeKind.MaxStamina,    new UpgradeDef { title = "최대 기력",       min = 8f,    max = 15f,   cap = float.PositiveInfinity } },
-            { UpgradeKind.LightCost,     new UpgradeDef { title = "약공격 기력 소모 감소", min = 0.06f, max = 0.12f, cap = 0.6f,  percent = true } },
+            { UpgradeKind.LightCost,     new UpgradeDef { title = "일반공격 기력 소모 감소", min = 0.06f, max = 0.12f, cap = 0.6f,  percent = true } },
             { UpgradeKind.HeavyCost,     new UpgradeDef { title = "강공격 기력 소모 감소", min = 0.06f, max = 0.12f, cap = 0.5f,  percent = true } },
             { UpgradeKind.CritChance,    new UpgradeDef { title = "치명타 확률",     min = 0.03f, max = 0.06f, cap = 0.6f,  percent = true } },
             { UpgradeKind.CritDamage,    new UpgradeDef { title = "치명타 피해",     min = 0.1f,  max = 0.25f, cap = 3f,    percent = true } },
