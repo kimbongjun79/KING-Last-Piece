@@ -383,7 +383,7 @@ namespace KingLastPiece
 
         /// <summary>
         /// Title: the hall darkened to a vignette, a serif "KING" between gold rules, the Korean subtitle and tagline, the
-        /// mode, and a framed start prompt over a chess-tile band. (How to play lives in the pause menu now.)
+        /// mode cards, the best run and the online ranking. (How to play lives in the pause menu now.)
         /// </summary>
         void DrawTitle(GameManager g)
         {
@@ -462,15 +462,6 @@ namespace KingLastPiece
                 new Color(Gold.r, Gold.g, Gold.b, 0.9f * fade));
 
             DrawOnlineRanking(new Rect(W - 400 * scale, H * 0.2f, 360 * scale, 0f), fade);
-
-            // Chess-tile band along the bottom edge.
-            float tile = 28 * scale;
-            int count = Mathf.CeilToInt(W / tile) + 1;
-            for (int i = 0; i < count; i++)
-            for (int row = 0; row < 2; row++)
-                Fill(new Rect(i * tile, H - (2 - row) * tile, tile, tile),
-                    (i + row) % 2 == 0 ? new Color(0.9f, 0.87f, 0.78f, 0.12f * fade) : new Color(0f, 0f, 0f, 0.35f * fade));
-            Fill(new Rect(0, H - 2 * tile - 2 * scale, W, 2 * scale), new Color(Gold.r, Gold.g, Gold.b, 0.5f * fade));
         }
 
         /// <summary>
