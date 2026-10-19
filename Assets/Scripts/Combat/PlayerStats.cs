@@ -48,7 +48,7 @@ namespace KingLastPiece
             maxHealth = 70f,
             maxStamina = 70f,
             attackPower = 0.7f,
-            attackSpeed = 0.75f,
+            attackSpeed = 0.9f,
             attackRange = 0.7f,
             scalesMotion = true,
             defense = 0f,
@@ -68,7 +68,7 @@ namespace KingLastPiece
             {
                 if (!scalesMotion) return 1.2f;
                 float p = Mathf.InverseLerp(0.7f, 1.7f, attackPower);
-                float s = Mathf.InverseLerp(0.75f, 1.35f, attackSpeed);
+                float s = Mathf.InverseLerp(0.9f, 1.35f, attackSpeed);
                 float r = Mathf.InverseLerp(0.7f, 1.3f, attackRange);
                 return Mathf.Lerp(0.8f, 1.4f, (p + s + r) / 3f);
             }

@@ -219,9 +219,18 @@ namespace KingLastPiece
             if (u.kind == UpgradeKind.MaxStamina) Stamina = MaxStamina;
         }
 
-        /// <summary>Between waves: one flask back (up to the max) and full stamina — no health back (flasks heal).</summary>
+        /// <summary>
+        /// Between waves: one flask back and full stamina. No health back as such — but with every flask slot already
+        /// full, the flask that would have come back is drunk at once (its heal amount restored).
+        /// </summary>
         public void Rest()
         {
+            if (Flasks >= MaxFlasks && Health < MaxHealth)
+            {
+                Restore(HealAmount);
+                Effects.Sparks(transform.position + Vector3.up, HealGreen, 18, 3f);
+                Sfx.Play("PL_Heal", FlatPos);
+            }
             Flasks = Mathf.Min(MaxFlasks, Flasks + 1);
             Stamina = MaxStamina;
             LockTarget = null;
