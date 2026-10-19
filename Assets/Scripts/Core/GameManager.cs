@@ -418,7 +418,11 @@ namespace KingLastPiece
         {
             Record.kills++;
             if (e.EliteTier > 0) Record.darkKills++;
-            if (Player != null) Player.Restore(Player.Stats.lifeSteal);   // life steal: a fixed amount of health back for every capture
+            if (Player != null)
+            {
+                Player.Restore(Player.Stats.lifeSteal);   // life steal: a fixed amount of health back for every capture
+                Player.OnCapture();
+            }
         }
 
         public void ReportPlayerDamage(float amount) => Record.damageTaken += amount;

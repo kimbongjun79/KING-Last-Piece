@@ -15,7 +15,7 @@ namespace KingLastPiece
 
         PlayerStats stats = PlayerStats.Classic();
         /// <summary>The King's stats; setting a fresh set (a new run) also forgets the items picked.</summary>
-        public PlayerStats Stats { get => stats; set { stats = value; Items.Clear(); } }
+        public PlayerStats Stats { get => stats; set { stats = value; Items.Clear(); Momentum = 0; } }
         public float MaxStamina => Stats.maxStamina;
         public int MaxFlasks => Stats.maxFlasks;
         public float HealAmount => Stats.healAmount;
@@ -167,6 +167,7 @@ namespace KingLastPiece
             Stamina = MaxStamina;
             stalemateUsed = gambitUsed = false;
             stalemateTimer = 0f;
+            if (crownInFlight != null) { Destroy(crownInFlight.gameObject); crownInFlight = null; }
             Flasks = MaxFlasks;
             Enter(State.Normal);
             buffer = Buffered.None;
@@ -239,6 +240,66 @@ namespace KingLastPiece
                 if (e == null || e.IsDead || !e.Targetable) continue;
                 if ((e.FlatPos - FlatPos).magnitude <= StalemateRadius + e.Radius) e.AddStagger(9999f, transform.position);
             }
+        }
+
+        // ---------------------------------------------------------------- Momentum (special item)
+
+        const int MomentumMax = 5;
+        const float MomentumStep = 0.05f;
+        /// <summary>Momentum stacks: each capture without being hit (up to 5), lost when hit.</summary>
+        public int Momentum { get; private set; }
+        /// <summary>Attack and move speed factor from Momentum (×1 … ×1.25).</summary>
+        float MomentumSpeed => 1f + MomentumStep * Momentum;
+
+        /// <summary>A piece was captured (any way the King did it).</summary>
+        public void OnCapture()
+        {
+            if (Has(Special.Momentum) && Momentum < MomentumMax) Momentum++;
+        }
+
+        // ---------------------------------------------------------------- Boomerang Crown (special item)
+
+        const float CrownRange = 9f, CrownDamage = 30f, StaggerCrown = 20f;
+        /// <summary>The heavy button's throw: a quick fling with no hit windows of its own (the crown does the hitting).</summary>
+        static readonly AttackDef CrownThrowDef = new AttackDef
+        {
+            name = "Crown Throw", duration = 0.42f, cancelAt = 0.26f, cost = 18f, heavy = true, sfx = "ATK_Charge",
+            pose = new PoseTrack()
+                .Key(0f, BodyPose.P())
+                .Key(0.12f, BodyPose.P(tilt: -16f, squash: -0.1f), Ease.Out)
+                .Key(0.2f, BodyPose.P(tilt: 26f), Ease.In)
+                .Key(0.42f, BodyPose.P(), Ease.OutBack),
+            hits = new HitWindow[0],
+            moves = new MoveSeg[0],
+        };
+        CrownBoomerang crownInFlight;
+        public bool CrownOut => crownInFlight != null;
+        float CrownThrowCost => CrownThrowDef.cost * (1f - Stats.heavyCostCut);
+
+        void ThrowCrown()
+        {
+            crownInFlight = CrownBoomerang.Spawn(this, transform.forward, CrownRange * Stats.attackRange);
+            Sfx.Play("THR_Release", FlatPos);
+        }
+
+        /// <summary>The crown is back in the King's hand.</summary>
+        public void CatchCrown()
+        {
+            crownInFlight = null;
+            Sfx.Play("UI_Confirm", FlatPos);
+            Effects.Sparks(transform.position + Vector3.up * 1.6f, Vfx.Accent, 6, 3f);
+        }
+
+        /// <summary>The flying crown passes through a piece.</summary>
+        public void CrownStrike(EnemyBase e, Vector3 at)
+        {
+            bool crit = RollCrit(out float mult);
+            float damage = CrownDamage * DamageMult * mult;
+            if (!e.TakeHit(damage, StaggerCrown * StaggerScale(crit), at)) return;
+            Game.ReportDamage(e, damage, crit);
+            Vector3 dir = e.FlatPos - new Vector3(at.x, 0f, at.z);
+            Vfx.Hit(e.Visual.position + Vector3.up * 1.0f, dir.sqrMagnitude > 0.01f ? dir.normalized : transform.forward, false, e.Visual);
+            Sfx.Play(e.IsBoss ? "HIT_Boss" : "HIT_Light", e.transform.position + Vector3.up);
         }
 
         /// <summary>Holds the special item <paramref name="s"/>.</summary>
@@ -365,7 +426,7 @@ namespace KingLastPiece
             if (InputEnabled) ReadInput(dt);
             else { buffer = Buffered.None; LockTarget = null; }
             // Attack speed plays the whole attack (wind-up, swing, recovery, cancel points) faster.
-            float atkDt = state == State.Attack ? dt * Stats.attackSpeed : dt;
+            float atkDt = state == State.Attack ? dt * Stats.attackSpeed * MomentumSpeed : dt;
             stateTime += atkDt;
             UpdateStamina(dt);
             UpdateDodgeCharges(dt);
@@ -418,6 +479,13 @@ namespace KingLastPiece
                     StartAttack(false);
                     return true;
                 case Buffered.Heavy:
+                    // Boomerang Crown (special item): the heavy button throws the crown (once it is back in hand).
+                    if (Has(Special.BoomerangCrown))
+                    {
+                        if (CrownOut || !(InfiniteStamina || Stamina >= CrownThrowCost)) { buffer = Buffered.None; return false; }
+                        StartAttack(true);
+                        return true;
+                    }
                     // King's Dance (special item): no heavy button — the heavy comes as the light combo's 5th hit.
                     if (Has(Special.KingsDance)) { buffer = Buffered.None; return false; }
                     // The heavy needs its whole stamina cost up front (the light combo only needs some left).
@@ -552,7 +620,7 @@ namespace KingLastPiece
                 if (Stamina <= 0f) sprintExhausted = true;
             }
 
-            float speed = (IsSprinting ? SprintSpeed : LockTarget != null ? LockedMoveSpeed : MoveSpeed) * Stats.moveSpeed;
+            float speed = (IsSprinting ? SprintSpeed : LockTarget != null ? LockedMoveSpeed : MoveSpeed) * Stats.moveSpeed * MomentumSpeed;
             transform.position += dir * (speed * dt);
 
             // Sprinting breaks the lock-on facing, like souls games.
@@ -594,7 +662,8 @@ namespace KingLastPiece
             if (danceFinisher) heavy = true;
             EnemyBase gapTarget = null;
             atkIsGapCloser = false;
-            if (heavy) atk = style.heavy;
+            bool crownThrow = heavy && !danceFinisher && Has(Special.BoomerangCrown);
+            if (heavy) atk = crownThrow ? CrownThrowDef : style.heavy;
             else if (!chain && style.gapCloser != null && TryFindGapTarget(style, out gapTarget, out float gap))
             {
                 // Mid range: dash in first; the combo continues with hit 1 (index -1 + 1 = 0).
@@ -638,6 +707,7 @@ namespace KingLastPiece
             else if (LockTarget != null) dir = LockTarget.FlatPos - FlatPos;
             else if (!steering && TryFindAssistDirection(transform.forward, out var best)) dir = best;
             if (dir.sqrMagnitude > 0.01f) transform.rotation = Quaternion.LookRotation(new Vector3(dir.x, 0f, dir.z));
+            if (crownThrow) ThrowCrown();
         }
 
         /// <summary>
@@ -776,7 +846,7 @@ namespace KingLastPiece
             }
 
             // Dodge can cancel the attack at any time except during its first active hit frames.
-            bool inActive = t >= atk.FirstHit && t <= atk.hits[0].end;
+            bool inActive = atk.hits.Length > 0 && t >= atk.FirstHit && t <= atk.hits[0].end;
             if (buffer == Buffered.Dodge && !inActive && TryAct()) return;
 
             // Root motion from move segments (stronger / weaker with the motion's dynamism).
@@ -1320,6 +1390,7 @@ namespace KingLastPiece
                 return true;
             }
             Health -= taken;
+            Momentum = 0;   // Momentum (special item) is lost on a hit
             Game.ReportPlayerDamage(taken);
             Flash(new Color(2f, 0.1f, 0.05f), 0.15f);
             SetGlow(Color.black);

@@ -124,6 +124,13 @@ namespace KingLastPiece
                 DrawVial(new Rect(bx + i * 28 * u, fy, 19 * u, 30 * u), i < p.Flasks);
             SmallText(new Rect(bx + p.MaxFlasks * 28 * u + 4 * u, fy + 6 * u, 120 * u, 22 * u),
                 $"회복약  x{p.Flasks}", TextAnchor.MiddleLeft, 15);
+
+            // Special items with a live state: Momentum stacks, the Boomerang Crown in hand or in flight.
+            string status = "";
+            if (p.Has(Special.Momentum)) status += $"기세 {p.Momentum}/5 (+{p.Momentum * 5}%)    ";
+            if (p.Has(Special.BoomerangCrown)) status += p.CrownOut ? "왕관: 비행 중" : "왕관: 준비";
+            if (status.Length > 0)
+                SmallText(new Rect(bx + p.MaxFlasks * 28 * u + 120 * u, fy + 6 * u, 260 * u, 22 * u), status, TextAnchor.MiddleLeft, 15);
         }
 
         /// <summary>
