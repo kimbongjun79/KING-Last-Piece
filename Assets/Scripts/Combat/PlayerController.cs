@@ -416,6 +416,9 @@ namespace KingLastPiece
         // The 3rd light hit (the cyclone) becomes the finisher: far wider and harder, at twice its stamina; no 4th hit.
         const int WhirlHit = 2;
         const float WhirlRange = 1.8f, WhirlDamage = 1.6f, WhirlCost = 2f;
+        // The Tempest cyclone is drawn out: a slow wind-up, then the spin a little slower than usual.
+        const float WhirlWindupTempo = 0.4f, WhirlSpinTempo = 0.8f;
+        float WhirlTempo => stateTime < atk.FirstHit ? WhirlWindupTempo : WhirlSpinTempo;
         bool atkWhirl;
         float atkRangeMul = 1f, atkDamageMul = 1f;   // the current attack's reach and damage factors
 
@@ -444,6 +447,24 @@ namespace KingLastPiece
             Vfx.GroundImpact(c, r, 1.3f);
             Effects.Shockwave(c, r, Vfx.Accent, 0.35f);
             Game.Rig.Shake(0.45f);
+        }
+
+        /// <summary>
+        /// The cyclone's second window: three more big slashes low over the board between the first ones, left lying
+        /// on the squares as blade marks, with the ground cracking under them.
+        /// </summary>
+        void WhirlGroundFx(HitWindow w, float reach)
+        {
+            float r = w.range * reach;
+            Vector3 c = FlatPos;
+            float spin = transform.eulerAngles.y + 60f;
+            for (int k = 0; k < 3; k++)
+            {
+                Quaternion rot = Quaternion.Euler(0f, spin + k * 120f, 0f);
+                Vfx.Slash(k % 2 == 0 ? SlashFxKind.SlashA : SlashFxKind.SlashB, c + rot * Vector3.forward * (r * 0.5f) + Vector3.up * 0.25f,
+                    rot, 1.4f * reach, null, k % 2 == 0);
+            }
+            Vfx.GroundImpact(c, r, 1f);
         }
 
         // ---------------------------------------------------------------- Chain Lightning (special item)
@@ -627,7 +648,7 @@ namespace KingLastPiece
             if (InputEnabled) ReadInput(dt);
             else { buffer = Buffered.None; LockTarget = null; }
             // Attack speed plays the whole attack (wind-up, swing, recovery, cancel points) faster.
-            float atkDt = state == State.Attack ? dt * Stats.attackSpeed * MomentumSpeed : dt;
+            float atkDt = state == State.Attack ? dt * Stats.attackSpeed * MomentumSpeed * (atkWhirl ? WhirlTempo : 1f) : dt;
             stateTime += atkDt;
             UpdateStamina(dt);
             UpdateDodgeCharges(dt);
@@ -1116,7 +1137,7 @@ namespace KingLastPiece
                     // Sword Wave (special item): each attack's last window sends the blade light flying.
                     if (atkSwordWave && i == atk.hits.Length - 1) LaunchSwordWave();
                     // Tempest (special item): the 3rd hit's first window opens with a storm of NamuFX slashes over the whole reach.
-                    if (atkWhirl && i == 0) WhirlFx(w, reach);
+                    if (atkWhirl) { if (i == 0) WhirlFx(w, reach); else WhirlGroundFx(w, reach); }
                 }
                 if (w.sparkTrail)
                 {
