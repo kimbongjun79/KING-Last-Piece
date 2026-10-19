@@ -81,36 +81,40 @@ namespace KingLastPiece
         struct WaveDef
         {
             public string name;
-            public (PieceType type, string square)[] pieces;
+            /// <summary>Piece, starting square and Dark tier (0 = a plain piece, 1–3 = Dark I–III with its aura).</summary>
+            public (PieceType type, string square, int tier)[] pieces;
         }
 
-        // Ten rounds. Pieces enter on their real starting squares; difficulty ramps up to the Queen.
+        const PieceType P = PieceType.Pawn, N = PieceType.Knight, B = PieceType.Bishop, R = PieceType.Rook, Q = PieceType.Queen;
+
+        // Ten rounds. Pieces enter on their real starting squares; difficulty ramps up to the Queen, with more and darker
+        // Dark-aura pieces mixed in as the rounds go on.
         static readonly WaveDef[] Waves =
         {
             new WaveDef { name = "I. 오프닝", pieces = new[] {
-                (PieceType.Pawn, "c7"), (PieceType.Pawn, "d7"), (PieceType.Pawn, "e7"), (PieceType.Pawn, "f7") } },
+                (P, "c7", 0), (P, "d7", 0), (P, "e7", 0), (P, "f7", 0) } },
             new WaveDef { name = "II. 나이트 갬빗", pieces = new[] {
-                (PieceType.Knight, "g8"), (PieceType.Pawn, "d7"), (PieceType.Pawn, "e7") } },
+                (N, "g8", 0), (P, "d7", 1), (P, "e7", 0) } },
             new WaveDef { name = "III. 긴 대각선", pieces = new[] {
-                (PieceType.Bishop, "c8"), (PieceType.Pawn, "c7"), (PieceType.Pawn, "d7"), (PieceType.Pawn, "f7") } },
+                (B, "c8", 1), (P, "c7", 0), (P, "d7", 0), (P, "f7", 0) } },
             new WaveDef { name = "IV. 마이너 피스", pieces = new[] {
-                (PieceType.Knight, "b8"), (PieceType.Bishop, "f8"), (PieceType.Pawn, "d7"), (PieceType.Pawn, "e7") } },
+                (N, "b8", 1), (B, "f8", 0), (P, "d7", 0), (P, "e7", 1) } },
             new WaveDef { name = "V. 성벽", pieces = new[] {
-                (PieceType.Rook, "a8"), (PieceType.Pawn, "b7"), (PieceType.Pawn, "d7"), (PieceType.Pawn, "f7") } },
+                (R, "a8", 1), (P, "b7", 0), (P, "d7", 1), (P, "f7", 0) } },
             new WaveDef { name = "VI. 쌍둥이 기병", pieces = new[] {
-                (PieceType.Knight, "b8"), (PieceType.Knight, "g8"), (PieceType.Bishop, "c8") } },
+                (N, "b8", 1), (N, "g8", 1), (B, "c8", 0) } },
             new WaveDef { name = "VII. 피앙케토", pieces = new[] {
-                (PieceType.Bishop, "c8"), (PieceType.Bishop, "f8"), (PieceType.Rook, "h8") } },
+                (B, "c8", 1), (B, "f8", 0), (R, "h8", 2) } },
             new WaveDef { name = "VIII. 룩 리프트", pieces = new[] {
-                (PieceType.Rook, "a8"), (PieceType.Rook, "h8"), (PieceType.Knight, "g8"), (PieceType.Pawn, "d7"), (PieceType.Pawn, "e7") } },
+                (R, "a8", 1), (R, "h8", 0), (N, "g8", 2), (P, "d7", 1), (P, "e7", 0) } },
             new WaveDef { name = "IX. 선봉대", pieces = new[] {
-                (PieceType.Knight, "b8"), (PieceType.Knight, "g8"), (PieceType.Bishop, "c8"), (PieceType.Bishop, "f8"),
-                (PieceType.Rook, "a8"), (PieceType.Pawn, "d7"), (PieceType.Pawn, "e7") } },
+                (N, "b8", 1), (N, "g8", 0), (B, "c8", 0), (B, "f8", 2),
+                (R, "a8", 2), (P, "d7", 1), (P, "e7", 0) } },
             // Final round: the Queen with 6 pawns and one rook, knight and bishop.
             new WaveDef { name = "X. 흑색 군대", pieces = new[] {
-                (PieceType.Pawn, "b7"), (PieceType.Pawn, "c7"), (PieceType.Pawn, "d7"),
-                (PieceType.Pawn, "e7"), (PieceType.Pawn, "f7"), (PieceType.Pawn, "g7"),
-                (PieceType.Knight, "b8"), (PieceType.Queen, "d8"), (PieceType.Bishop, "f8"), (PieceType.Rook, "h8") } },
+                (P, "b7", 0), (P, "c7", 0), (P, "d7", 1),
+                (P, "e7", 1), (P, "f7", 0), (P, "g7", 0),
+                (N, "b8", 1), (Q, "d8", 0), (B, "f8", 2), (R, "h8", 2) } },
         };
 
         public static Vector3 SquareToWorld(string sq)
@@ -209,8 +213,8 @@ namespace KingLastPiece
                 return;
             }
 
-            foreach (var (type, square) in Waves[index].pieces)
-                SpawnEnemy(type, SquareToWorld(square));
+            foreach (var (type, square, tier) in Waves[index].pieces)
+                SpawnEmpowered(type, tier, SquareToWorld(square));
 
             ShowBanner(Waves[index].name);
             Sfx.Play("GAME_RoundStart");
@@ -587,7 +591,8 @@ namespace KingLastPiece
                     break;
 
                 case GameState.Victory:
-                    if (StateTime > 2.5f && GameInput.Confirm) StartWave(0);
+                    // The run is won: back to the title.
+                    if (StateTime > 2.5f && GameInput.Confirm) BackToTitle();
                     break;
             }
         }

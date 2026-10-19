@@ -736,12 +736,12 @@ namespace KingLastPiece
             float a = Mathf.Clamp01(g.StateTime / 1.5f);
             Fill(new Rect(0, 0, Screen.width, Screen.height), new Color(0, 0, 0, 0.5f * a));
             float cy = Screen.height * 0.32f;
-            Text(new Rect(0, cy, Screen.width, 120 * scale), "왕은 살아남았다", big, new Color(Gold.r, Gold.g, Gold.b, a));
+            Text(new Rect(0, cy, Screen.width, 120 * scale), "승리!", big, new Color(Gold.r, Gold.g, Gold.b, a));
             int m = Mathf.FloorToInt(g.RunTime / 60f), s = Mathf.FloorToInt(g.RunTime % 60f);
             Text(new Rect(0, cy + 130 * scale, Screen.width, 40 * scale),
                 $"시간 {m:00}:{s:00}     사망 {g.Deaths}회", mid, new Color(0.9f, 0.88f, 0.8f, a));
             if (g.StateTime > 2.5f)
-                Text(new Rect(0, Screen.height * 0.8f, Screen.width, 40 * scale), "ENTER / START 를 눌러 다시 시작", small,
+                Text(new Rect(0, Screen.height * 0.8f, Screen.width, 40 * scale), "ENTER / START 를 눌러 타이틀로", small,
                     new Color(1f, 1f, 1f, a));
         }
 
