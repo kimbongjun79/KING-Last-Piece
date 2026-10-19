@@ -427,7 +427,7 @@ namespace KingLastPiece
 
         /// <summary>
         /// A storm over the whole reach, in the NamuFX prefabs' own colours: a huge area slash layered twice (mirrored)
-        /// and three big slashes around it, with dust, a ground impact and a heavier shake.
+        /// and three big slashes around it, with dust, a shockwave and a heavier shake.
         /// </summary>
         void WhirlFx(HitWindow w, float reach)
         {
@@ -444,14 +444,13 @@ namespace KingLastPiece
                     rot, 1.4f * reach, null, k % 2 == 1);
             }
             Vfx.Dust(c, r);
-            Vfx.GroundImpact(c, r, 1.3f);
             Effects.Shockwave(c, r, Vfx.Accent, 0.35f);
             Game.Rig.Shake(0.45f);
         }
 
         /// <summary>
         /// The cyclone's second window: three more big slashes low over the board between the first ones, left lying
-        /// on the squares as blade marks, with the ground cracking under them.
+        /// on the squares as blade marks.
         /// </summary>
         void WhirlGroundFx(HitWindow w, float reach)
         {
@@ -464,7 +463,6 @@ namespace KingLastPiece
                 Vfx.Slash(k % 2 == 0 ? SlashFxKind.SlashA : SlashFxKind.SlashB, c + rot * Vector3.forward * (r * 0.5f) + Vector3.up * 0.25f,
                     rot, 1.4f * reach, null, k % 2 == 0);
             }
-            Vfx.GroundImpact(c, r, 1f);
         }
 
         // ---------------------------------------------------------------- Chain Lightning (special item)
