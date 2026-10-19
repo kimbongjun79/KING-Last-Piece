@@ -197,6 +197,8 @@ namespace KingLastPiece
             I("sharp_edge",     "날 선 칼날",     C, E(Dmg, 2)),
             I("vampire_fang",   "흡혈귀의 송곳니", C, E(Ls, 2)),
             I("loot_pouch",     "전리품 주머니",  C, E(Ls, 1), E(Heal, 1)),
+            I("iron_flail",     "쇠사슬 철퇴",    C, E(Stg, 2)),
+            I("waterskin",      "가죽 수통",      C, E(St, 2)),
             // Rare (≈ 3 steps)
             I("knight_sword",   "기사의 검",      R, E(Pow, 2), E(CrC, 2)),
             I("herald_wings",   "전령의 날개",    R, E(Mv, 2), E(DRc, 2)),
@@ -211,6 +213,10 @@ namespace KingLastPiece
             I("headsman_blade", "처형인의 칼날",  R, E(Dmg, 3)),
             I("mad_seal",       "광기의 인장",    R, E(Dmg, 4), E(Def_, -1)),
             I("blood_cup",      "피의 잔",        R, E(Ls, 3)),
+            I("battering_ram",  "파성추",         R, E(Stg, 4), E(Spd, -1)),
+            I("incense",        "명상의 향로",    R, E(StR, 2), E(St, 1)),
+            I("rapier",         "가벼운 세검",    R, E(LC, 2), E(Spd, 1)),
+            I("assassin_poison","암살자의 독",    R, E(CrD, 3)),
             // Epic (≈ 4–5 steps)
             I("apothecary_bag", "약제사의 가방",  H, E(Fl, 1), E(Heal, 1)),
             I("guard_insignia", "근위대 휘장",    H, E(Pow, 2), E(Def_, 2), E(Hp, 1)),
@@ -219,10 +225,14 @@ namespace KingLastPiece
             I("berserker_blood","광전사의 피",    H, E(Ls, 3), E(Pow, 3), E(Def_, -2)),
             I("running_king",   "질주하는 왕",    H, E(Mv, 4), E(StR, 3), E(St, 1), E(Def_, -2)),
             I("black_oath",     "검은 서약",      H, E(Dmg, 3), E(CrC, 1), E(CrD, 2)),
+            I("kings_warhammer","왕의 전쟁망치",  H, E(Stg, 3), E(HC, 2)),
+            I("war_drum",       "전쟁의 북",      H, E(LC, 2), E(HC, 2), E(StR, 1)),
+            I("shadow_cloak",   "그림자 망토",    H, E(Dg, 1), E(Mv, 2), E(DRc, 1)),
             // Legendary (≈ 6–7 steps)
             I("kings_seal",     "왕의 인장",      L, E(Pow, 1), E(Spd, 1), E(Rng, 1), E(Hp, 1), E(Def_, 1), E(Heal, 1), E(Stg, 1)),
             I("sacrifice",      "희생",           L, E(Pow, 9), E(CrC, 1), E(Hp, -3)),
             I("crown_wrath",    "왕관의 분노",    L, E(Dmg, 4), E(Pow, 2), E(Rng, 1)),
+            I("fountain_of_life","생명의 샘",     L, E(Fl, 1), E(Heal, 2), E(Hp, 2)),
         };
 
         /// <summary>
