@@ -101,11 +101,19 @@ namespace KingLastPiece
     }
 
     /// <summary>A round-end item: a fixed set of stat steps and a grade set by how much they are worth.</summary>
+    /// <summary>What a special item does (none: a stat item).</summary>
+    public enum Special { None, Stalemate, KingsDance, MartyrCrown, Execution }
+
     public class Item
     {
         public string id, name;
         public UpgradeGrade grade;
         public ItemEffect[] effects;
+        /// <summary>Special items change how the King fights instead of his stats; one of each at most.</summary>
+        public Special special;
+        /// <summary>A special item's description (shown on its card).</summary>
+        public string desc;
+        public bool IsSpecial => special != Special.None;
         public string GradeName => Upgrades.GradeName(grade);
         Texture2D icon;
         bool iconLoaded;
@@ -172,6 +180,8 @@ namespace KingLastPiece
         public static string GradeName(UpgradeGrade g) => GradeNames[(int)g];
 
         static Item I(string id, string name, UpgradeGrade grade, params ItemEffect[] fx) => new Item { id = id, name = name, grade = grade, effects = fx };
+        static Item S(string id, string name, UpgradeGrade grade, Special special, string desc) =>
+            new Item { id = id, name = name, grade = grade, effects = new ItemEffect[0], special = special, desc = desc };
         static ItemEffect E(UpgradeKind k, int steps) => new ItemEffect(k, steps);
 
         const UpgradeGrade C = UpgradeGrade.Common, R = UpgradeGrade.Rare, H = UpgradeGrade.Epic, L = UpgradeGrade.Legendary;
@@ -242,6 +252,12 @@ namespace KingLastPiece
             I("kings_seal",     "왕의 인장",      L, E(Pow, 1), E(Spd, 1), E(Rng, 1), E(Hp, 1), E(Def_, 1), E(Heal, 1), E(Stg, 1)),
             I("sacrifice",      "희생",           L, E(Pow, 9), E(CrC, 1), E(Hp, -3)),
             I("crown_wrath",    "왕관의 분노",    L, E(Dmg, 4), E(Pow, 2), E(Rng, 1)),
+
+            // Special items: a new way to fight, not more of a stat. Offered like the others, never twice.
+            S("stalemate",      "스테일메이트",   L, Special.Stalemate, "라운드마다 1번, 치명상을 받아도 체력 1로 버팁니다. 발동하면 2초간 무적이 되고 주변 2칸의 적이 모두 기절합니다."),
+            S("kings_dance",    "왕의 연무",      L, Special.KingsDance, "강공격 버튼이 사라지고, 일반공격 4타 뒤에 5타로 강공격(띄우기 포함)이 이어집니다. 이 5타 강공격의 기력 소모는 50% 줄어듭니다."),
+            S("martyr_crown",   "순교자의 왕관",  H, Special.MartyrCrown, "체력이 낮을수록 주는 피해가 커집니다 (체력이 바닥에 가까울수록 최대 +50%). 체력 30% 이하에서는 받는 피해가 20% 줄어듭니다."),
+            S("execution",      "처형",           H, Special.Execution, "기절한 적을 강공격으로 치면 피해가 100% 추가됩니다."),
             I("fountain_of_life","생명의 샘",     L, E(Fl, 1), E(Heal, 2), E(Hp, 2)),
         };
 
@@ -319,8 +335,9 @@ namespace KingLastPiece
         }
 
         /// <summary>Worth offering: at least one of its gains still has room under its cap.</summary>
-        public static bool Useful(PlayerStats s, Item item)
+        public static bool Useful(PlayerStats s, Item item, IList<Item> owned = null)
         {
+            if (item.IsSpecial) return owned == null || !owned.Contains(item);   // a special item only once
             foreach (var fx in item.effects)
                 if (fx.steps > 0 && Current(s, fx.kind) < Def(fx.kind).cap - 0.0001f) return true;
             return false;
@@ -330,7 +347,7 @@ namespace KingLastPiece
         /// Three different items, each of a rolled grade (falling back to a neighbouring grade when every item of that
         /// grade is useless now). <paramref name="bossCleared"/>: the first one is epic or better.
         /// </summary>
-        public static List<Item> Roll(PlayerStats s, int round = 1, bool bossCleared = false)
+        public static List<Item> Roll(PlayerStats s, IList<Item> owned, int round = 1, bool bossCleared = false)
         {
             var offer = new List<Item>();
             for (int slot = 0; slot < Offered; slot++)
@@ -346,7 +363,7 @@ namespace KingLastPiece
                     if (g < 0 || g > 3 || pick != null) continue;
                     var pool = new List<Item>();
                     foreach (var it in All)
-                        if ((int)it.grade == g && !offer.Contains(it) && Useful(s, it)) pool.Add(it);
+                        if ((int)it.grade == g && !offer.Contains(it) && Useful(s, it, owned)) pool.Add(it);
                     if (pool.Count > 0) pick = pool[Random.Range(0, pool.Count)];
                 }
                 if (pick == null) break;

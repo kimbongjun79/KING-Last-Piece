@@ -315,7 +315,7 @@ namespace KingLastPiece
         void EnterUpgrade()
         {
             Offers.Clear();
-            Offers.AddRange(Upgrades.Roll(Player.Stats, Round, EndlessRounds.IsBossRound(Round)));
+            Offers.AddRange(Upgrades.Roll(Player.Stats, Player.Items, Round, EndlessRounds.IsBossRound(Round)));
             Picked.Clear();
             OfferCursor = -1;
             upgradeDoneAt = Offers.Count == 0 ? 0f : -1f;

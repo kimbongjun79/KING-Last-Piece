@@ -190,6 +190,8 @@ namespace KingLastPiece
         protected virtual StaggerProfile CreateStaggerProfile() => StaggerProfile.Create(40f, 2.5f, 7f, 0.35f);
 
         public bool IsVulnerable => stagger != null && stagger.Vulnerable;
+        /// <summary>Stunned: a broken guard, or the boss knocked out of its poise.</summary>
+        public bool IsStunned => IsVulnerable || bossStunned;
         public bool IsAirborne => state == EState.Airborne;
         public float AirHeight => state == EState.Airborne ? Mathf.Max(0f, airHeight) : 0f;
         /// <summary>One-letter state code for lab timelines.</summary>

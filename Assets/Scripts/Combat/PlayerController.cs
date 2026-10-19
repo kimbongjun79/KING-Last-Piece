@@ -56,7 +56,7 @@ namespace KingLastPiece
         public EnemyBase LockTarget { get; private set; }
         public AttackStyle Style { get; set; } = AttackStyles.Default;
         public bool IsInvulnerable =>
-            (state == State.Dodge && stateTime >= IFrameStart && stateTime <= IFrameEnd) || state == State.Counter;
+            (state == State.Dodge && stateTime >= IFrameStart && stateTime <= IFrameEnd) || state == State.Counter || stalemateTimer > 0f;
         public int DodgeCharges { get; private set; }
         public float DodgeRechargeProgress => DodgeCharges >= MaxDodges ? 1f : Mathf.Clamp01(dodgeRecharge / DodgeRechargeTime);
         public int JustDodgeCount { get; private set; }
@@ -165,6 +165,8 @@ namespace KingLastPiece
             crumbled = false;
             InitActor(Stats.maxHealth);
             Stamina = MaxStamina;
+            stalemateUsed = false;
+            stalemateTimer = 0f;
             Flasks = MaxFlasks;
             Enter(State.Normal);
             buffer = Buffered.None;
@@ -217,6 +219,55 @@ namespace KingLastPiece
         public readonly List<Item> Items = new List<Item>();
 
         /// <summary>
+        /// Stalemate: the lethal blow leaves the King at 1 health, invincible for <see cref="StalemateGuard"/> seconds, and
+        /// every piece within <see cref="StalemateRadius"/> is stunned. Once a round.
+        /// </summary>
+        void TriggerStalemate()
+        {
+            stalemateUsed = true;
+            stalemateTimer = StalemateGuard;
+            Health = 1f;
+            Flash(new Color(1.6f, 1.5f, 1.2f), 0.5f);
+            Game.ShowBanner("스테일메이트!");
+            Sfx.Play("PL_PerfectDodge");
+            Game.HitStop(0.12f);
+            Game.Rig.Shake(0.5f);
+            Effects.Shockwave(FlatPos, StalemateRadius, Vfx.Accent, 0.5f);
+            Effects.Sparks(transform.position + Vector3.up, Vfx.Accent, 30, 7f);
+            foreach (var e in Game.Enemies)
+            {
+                if (e == null || e.IsDead || !e.Targetable) continue;
+                if ((e.FlatPos - FlatPos).magnitude <= StalemateRadius + e.Radius) e.AddStagger(9999f, transform.position);
+            }
+        }
+
+        /// <summary>Holds the special item <paramref name="s"/>.</summary>
+        public bool Has(Special s)
+        {
+            foreach (var it in Items) if (it.special == s) return true;
+            return false;
+        }
+
+        /// <summary>
+        /// What every blow is multiplied by: attack power × damage bonus, and with the Martyr's Crown up to ×1.5 as the
+        /// King's health runs out.
+        /// </summary>
+        float DamageMult
+        {
+            get
+            {
+                float m = Stats.DamageMultiplier;
+                if (Has(Special.MartyrCrown) && MaxHealth > 0f) m *= 1f + 0.5f * (1f - Mathf.Clamp01(Health / MaxHealth));
+                return m;
+            }
+        }
+
+        // Stalemate (special item): once a round a lethal blow leaves the King at 1 health, invincible for a moment.
+        const float StalemateGuard = 2f, StalemateRadius = 4f;
+        bool stalemateUsed;
+        float stalemateTimer;
+
+        /// <summary>
         /// A round-end item, kept for good: its gains apply right away (more health heals, a new flask or roll is
         /// ready, more stamina fills up); a drawback that lowers the maximum health cuts the health down with it.
         /// </summary>
@@ -240,6 +291,7 @@ namespace KingLastPiece
         /// </summary>
         public void Rest()
         {
+            stalemateUsed = false;   // Stalemate is ready again for the next round
             if (Flasks >= MaxFlasks && Health < MaxHealth)
             {
                 Restore(HealAmount);
@@ -296,6 +348,7 @@ namespace KingLastPiece
         void Update()
         {
             float dt = Time.deltaTime;
+            if (stalemateTimer > 0f) stalemateTimer -= dt;
             if (state == State.Dead)
             {
                 stateTime += dt;
@@ -365,6 +418,8 @@ namespace KingLastPiece
                     StartAttack(false);
                     return true;
                 case Buffered.Heavy:
+                    // King's Dance (special item): no heavy button — the heavy comes as the light combo's 5th hit.
+                    if (Has(Special.KingsDance)) { buffer = Buffered.None; return false; }
                     // The heavy needs its whole stamina cost up front (the light combo only needs some left).
                     if (!HeavyAffordable) return false;
                     StartAttack(true);
@@ -533,6 +588,10 @@ namespace KingLastPiece
         {
             var style = Style ?? AttackStyles.Default;
             bool chain = state == State.Attack && !atk.heavy && !heavy;
+            // King's Dance (special item): after the 4th light hit the combo goes on into the heavy, at half its stamina.
+            bool danceFinisher = chain && Has(Special.KingsDance) && comboIndex == style.lights.Length - 1 &&
+                                 (InfiniteStamina || Stamina >= HeavyAttackCost * 0.5f);
+            if (danceFinisher) heavy = true;
             EnemyBase gapTarget = null;
             atkIsGapCloser = false;
             if (heavy) atk = style.heavy;
@@ -551,7 +610,7 @@ namespace KingLastPiece
             // Stagger this attack deals, spread over its hit windows.
             float stagger = heavy ? StaggerHeavy : atkIsGapCloser ? StaggerLightEarly : ComboStagger(comboIndex, style.lights.Length);
             atkStagger = stagger / Mathf.Max(1, atk.hits.Length);
-            Consume(heavy ? atk.cost * (1f - Stats.heavyCostCut) : atk.cost * LightCostScale * (1f - Stats.lightCostCut));
+            Consume(heavy ? atk.cost * (1f - Stats.heavyCostCut) * (danceFinisher ? 0.5f : 1f) : atk.cost * LightCostScale * (1f - Stats.lightCostCut));
             atkUsesSlashFx = FxLibrary.Instance != null && System.Array.Exists(atk.hits, h => h.fx != SlashFxKind.None);
             hitStopUsed = false;
 
@@ -809,7 +868,7 @@ namespace KingLastPiece
             bool landed = false;
             int hitCount = 0;
             // Attack range scales the reach (and how far ahead the hit is centred); attack power the damage.
-            float range = w.range * Stats.attackRange, damage = w.damage * Stats.DamageMultiplier;
+            float range = w.range * Stats.attackRange, damage = w.damage * DamageMult;
             Vector3 center = FlatPos + transform.forward * (w.forward * Stats.attackRange);
             scratch.Clear();
             scratch.AddRange(Game.Enemies);
@@ -830,6 +889,8 @@ namespace KingLastPiece
                 }
                 already.Add(e);
                 bool crit = RollCrit(out float mult);
+                // Execution (special item): a heavy on a stunned piece deals double.
+                if (atk.heavy && Has(Special.Execution) && e.IsStunned) mult *= 2f;
                 if (e.TakeHit(damage * mult, atkStagger * StaggerScale(crit), transform.position))
                 {
                     landed = true;
@@ -1084,7 +1145,7 @@ namespace KingLastPiece
                 if (counterTarget != null && !counterTarget.IsDead)
                 {
                     bool crit = RollCrit(out float mult);
-                    float damage = LeapCounterDamage * Stats.DamageMultiplier * mult;
+                    float damage = LeapCounterDamage * DamageMult * mult;
                     Vector3 toQ = (counterTarget.FlatPos - FlatPos).normalized;
                     if (counterTarget.TakeHit(damage, StaggerLeapCounter * StaggerScale(crit), transform.position))
                     {
@@ -1166,7 +1227,7 @@ namespace KingLastPiece
                     if ((e.FlatPos - piecePos).magnitude > counterTarget.Radius + e.Radius + 0.5f) continue;
                     counterHits.Add(e);
                     bool crit = RollCrit(out float mult);
-                    float swingDamage = SwingHitDamage * Stats.DamageMultiplier * mult;
+                    float swingDamage = SwingHitDamage * DamageMult * mult;
                     if (e.TakeHit(swingDamage, StaggerCounterSwing * StaggerScale(crit), piecePos))
                     {
                         Game.ReportDamage(e, swingDamage, crit);
@@ -1189,7 +1250,7 @@ namespace KingLastPiece
                     Game.EndSlowMo();
                     // The landing damage can crit too (rolled now, shown when it lands).
                     bool crit = RollCrit(out float mult);
-                    counterTarget.Launch(dir, 17f, 7f, ThrowLandingDamage * Stats.DamageMultiplier * mult, crit, StaggerCounterThrow * StaggerScale(crit));
+                    counterTarget.Launch(dir, 17f, 7f, ThrowLandingDamage * DamageMult * mult, crit, StaggerCounterThrow * StaggerScale(crit));
                     Game.HitStop(0.12f);
                     Game.Rig.Kick(1f);
                     Game.Rig.Shake(0.5f);
@@ -1238,7 +1299,15 @@ namespace KingLastPiece
         {
             if (IsDead || IsInvulnerable || GodMode || Game.State != GameManager.GameState.Playing) return false;
 
-            float taken = Mathf.Min(Health, Stats.DamageTaken(damage));
+            float taken = Stats.DamageTaken(damage);
+            // Martyr's Crown: at 30% health or less, blows hurt 20% less.
+            if (Has(Special.MartyrCrown) && Health <= MaxHealth * 0.3f) taken *= 0.8f;
+            taken = Mathf.Min(Health, taken);
+            if (taken >= Health && Has(Special.Stalemate) && !stalemateUsed)
+            {
+                TriggerStalemate();
+                return true;
+            }
             Health -= taken;
             Game.ReportPlayerDamage(taken);
             Flash(new Color(2f, 0.1f, 0.05f), 0.15f);

@@ -901,11 +901,20 @@ namespace KingLastPiece
                     picked ? new Color(Gold.r, Gold.g, Gold.b, a) : hot ? new Color(Mathf.Lerp(gc.r, 1f, 0.45f), Mathf.Lerp(gc.g, 1f, 0.45f), Mathf.Lerp(gc.b, 1f, 0.45f), a)
                         : new Color(gc.r * 0.75f, gc.g * 0.75f, gc.b * 0.75f, a));
                 Fill(r, picked ? new Color(0.22f, 0.17f, 0.08f, 0.97f * a) : new Color(0.06f + gc.r * 0.05f, 0.055f + gc.g * 0.05f, 0.06f + gc.b * 0.05f, 0.97f * a));
-                // Chess-tile header strip in the grade's colour.
-                for (int k = 0; k < 8; k++)
-                    Fill(new Rect(r.x + k * r.width / 8f, r.y, r.width / 8f, 10 * scale), k % 2 == 0 ? new Color(gc.r, gc.g, gc.b, a) : new Color(0.12f, 0.1f, 0.1f, a));
+                // A solid grade-coloured band across the top, a soft glow under it fading into the card.
+                Fill(new Rect(r.x, r.y, r.width, 6 * scale), new Color(gc.r, gc.g, gc.b, a));
+                for (int k = 0; k < 4; k++)
+                    Fill(new Rect(r.x, r.y + (6 + k * 10) * scale, r.width, 10 * scale), new Color(gc.r, gc.g, gc.b, (0.16f - k * 0.04f) * a));
+                if (item.IsSpecial)
+                {
+                    // Special items: a gold "특수" tag at the top left.
+                    var tag = new Rect(r.x + 10 * scale, r.y + 14 * scale, 52 * scale, 26 * scale);
+                    Fill(tag, new Color(Gold.r, Gold.g, Gold.b, a));
+                    Text(tag, "특수", new GUIStyle(info) { alignment = TextAnchor.MiddleCenter, fontStyle = FontStyle.Bold, fontSize = Mathf.RoundToInt(16 * scale) },
+                        new Color(0.1f, 0.07f, 0.03f, a));
+                }
 
-                Text(new Rect(r.x + 4 * scale, r.y + 14 * scale, 34 * scale, 30 * scale), (i + 1).ToString(), info, new Color(1f, 1f, 1f, 0.5f * a));
+                Text(new Rect(r.x + 4 * scale, r.yMax - 34 * scale, 34 * scale, 30 * scale), (i + 1).ToString(), info, new Color(1f, 1f, 1f, 0.4f * a));
                 Text(new Rect(r.x, r.y + 14 * scale, r.width - 12 * scale, 30 * scale), item.GradeName,
                     new GUIStyle(info) { alignment = TextAnchor.MiddleRight, fontStyle = FontStyle.Bold }, new Color(gc.r, gc.g, gc.b, a));
 
@@ -927,6 +936,9 @@ namespace KingLastPiece
 
                 // Stat steps: ▲ gains in green, ▼ drawbacks in red, with the value before → after.
                 float fy = plate.yMax + 58 * scale, lh = 27 * scale;
+                if (item.IsSpecial)
+                    Text(new Rect(r.x + 16 * scale, fy, r.width - 32 * scale, r.yMax - fy - 40 * scale), item.desc,
+                        new GUIStyle(small) { fontSize = Mathf.RoundToInt(17 * scale), wordWrap = true, alignment = TextAnchor.UpperCenter }, new Color(0.92f, 0.89f, 0.82f, a));
                 foreach (var fx in item.effects)
                 {
                     var c = fx.steps >= 0 ? Gain : Loss;
