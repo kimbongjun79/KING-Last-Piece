@@ -13,12 +13,17 @@ namespace KingLastPiece
         static readonly Color Ink = new Color(0.02f, 0.02f, 0.025f);
         static readonly Dictionary<PieceType, Mesh> silhouettes = new Dictionary<PieceType, Mesh>();
 
-        /// <summary>Wraps <paramref name="model"/> in the tier's aura (null when the pack isn't there).</summary>
+        /// <summary>
+        /// Wraps <paramref name="model"/> in the tier's aura (null when the pack isn't there). Two tiers: Dark I wears the
+        /// pack's "Dark Lvl 1" at 0.6× size, Dark II its "Dark Lvl 3" at full size.
+        /// </summary>
         public static GameObject Attach(Transform model, PieceType type, int tier)
         {
             var lib = FxLibrary.Instance;
-            if (lib == null || lib.eliteAura == null || tier < 1 || tier > lib.eliteAura.Length) return null;
-            var prefab = lib.eliteAura[tier - 1];
+            if (lib == null || lib.eliteAura == null || tier < 1 || lib.eliteAura.Length == 0) return null;
+            int index = Mathf.Min(tier >= 2 ? 2 : 0, lib.eliteAura.Length - 1);
+            float size = tier >= 2 ? 1f : 0.6f;
+            var prefab = lib.eliteAura[index];
             if (prefab == null) return null;
 
             Mesh mesh = Silhouette(model, type);
@@ -35,6 +40,7 @@ namespace KingLastPiece
                 // Black on a black piece barely shows: denser, darker smoke that rises off the piece like dark fire, so it
                 // reads against the squares and the hall around it. The pack's big glow/smoke puffs are trimmed a little.
                 if (main.startSizeMultiplier >= 1f) main.startSizeMultiplier *= 0.8f;
+                main.startSizeMultiplier *= size;
                 float a = main.startColor.mode == ParticleSystemGradientMode.Color ? main.startColor.color.a : 1f;
                 main.startColor = new ParticleSystem.MinMaxGradient(new Color(Ink.r, Ink.g, Ink.b, Mathf.Min(0.92f, a * 4f)));
                 var emission = ps.emission;
@@ -43,7 +49,7 @@ namespace KingLastPiece
                 rise.enabled = true;
                 rise.space = ParticleSystemSimulationSpace.Local;
                 rise.x = new ParticleSystem.MinMaxCurve(0f, 0f);   // all three axes must use the same curve mode
-                rise.y = new ParticleSystem.MinMaxCurve(0.35f, 0.9f);
+                rise.y = new ParticleSystem.MinMaxCurve(0.35f * size, 0.9f * size);
                 rise.z = new ParticleSystem.MinMaxCurve(0f, 0f);
                 var col = ps.colorOverLifetime;
                 if (col.enabled)

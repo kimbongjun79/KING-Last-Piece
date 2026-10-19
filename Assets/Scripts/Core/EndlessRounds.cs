@@ -11,8 +11,8 @@ namespace KingLastPiece
     /// <item>Empowered ("dark") pieces from round 11: one tier-1 pawn first, then a growing share — about half the army
     /// by round 29 — with higher tiers and bigger pieces joining over time. Past round 30 the spare budget empowers
     /// pieces further.</item>
-    /// <item>Every 10th round is a boss round with queens only: 10 a queen, 20 a dark I queen, 30 dark II, 40 dark III,
-    /// 50 two queens, 60 two dark I queens… Her summons at half health grow with the boss count.</item>
+    /// <item>Every 10th round is a boss round with queens only: 10 a queen, 20 a dark I queen, 30 dark II, 40 two queens,
+    /// 50 two dark I queens… Her summons at half health grow with the boss count.</item>
     /// <item>Every 40 rounds all pieces gain health; every 20 rounds the board grows a ring of squares.</item>
     /// </list>
     /// </summary>
@@ -42,7 +42,7 @@ namespace KingLastPiece
         {
             if (IsBossRound(round))
             {
-                int b = round / 10, count = (b - 1) / 4 + 1, tier = (b - 1) % 4;
+                int b = round / 10, count = (b - 1) / 3 + 1, tier = (b - 1) % 3;
                 string who = tier == 0 ? "흑색 여왕" : $"다크 {new string('I', tier)} 여왕";
                 return count == 1 ? $"{round} 라운드 — {who}" : $"{round} 라운드 — {who} {count}명";
             }
@@ -54,7 +54,7 @@ namespace KingLastPiece
             var list = new List<Spawn>();
             if (IsBossRound(round))
             {
-                int b = round / 10, count = (b - 1) / 4 + 1, tier = (b - 1) % 4;
+                int b = round / 10, count = (b - 1) / 3 + 1, tier = (b - 1) % 3;
                 for (int i = 0; i < count; i++) list.Add(new Spawn { type = PieceType.Queen, tier = tier });
                 return list;
             }
@@ -95,7 +95,7 @@ namespace KingLastPiece
                 {
                     int k = Random.Range(0, list.Count);
                     var s = list[k];
-                    if (s.tier >= 3) continue;
+                    if (s.tier >= EnemyBase.MaxEliteTier) continue;
                     s.tier++;
                     steps--;
                     budget -= Cost(s.type) * 0.8f;
@@ -139,14 +139,11 @@ namespace KingLastPiece
             return options.Count > 0 ? options[Random.Range(0, options.Count)] : -1;
         }
 
-        /// <summary>Tier I at first; tier II joins from round 18, tier III from round 30, both growing more common.</summary>
+        /// <summary>Tier I at first; tier II joins from round 20 and grows more common (as likely as tier I by round 32).</summary>
         static int RollTier(int round)
         {
-            float w1 = 1f, w2 = Mathf.Max(0f, (round - 18) / 12f), w3 = Mathf.Max(0f, (round - 30) / 15f);
-            float r = Random.value * (w1 + w2 + w3);
-            if ((r -= w3) < 0f) return 3;
-            if ((r -= w2) < 0f) return 2;
-            return 1;
+            float w1 = 1f, w2 = Mathf.Max(0f, (round - 20) / 12f);
+            return Random.value * (w1 + w2) < w2 ? 2 : 1;
         }
 
         /// <summary>
@@ -165,7 +162,7 @@ namespace KingLastPiece
                 if (b >= 4 && r < 0.25f) type = PieceType.Rook;
                 else if (b >= 3 && r < 0.5f) type = PieceType.Bishop;
                 else if (b >= 2 && r < 0.75f) type = PieceType.Knight;
-                int tier = b >= 3 ? Mathf.Clamp(Random.Range(0, b - 1), 0, 3) : 0;
+                int tier = b >= 3 ? Mathf.Clamp(Random.Range(0, b - 1), 0, EnemyBase.MaxEliteTier) : 0;
                 list.Add(new Spawn { type = type, tier = tier });
             }
             return list;

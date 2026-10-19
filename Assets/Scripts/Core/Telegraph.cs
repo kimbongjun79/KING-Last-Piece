@@ -27,9 +27,15 @@ namespace KingLastPiece
         {
             public Vector2Int square;
             public Vector2Int grow;   // zero: fill grows from the centre; else it grows from the edge facing -grow toward grow
+            public float delay, span = 1f;   // the share of the wind-up before this square starts filling, and how long it fills
             public Transform fill;
             public Transform[] edges;
         }
+
+        /// <summary>Big square sets (the whole board) drop the outlines of their squares: one red field, safe squares outlined.</summary>
+        const int OutlineLimit = 40;
+        static readonly Color Safe = new Color(0.85f, 1f, 0.9f);
+        static Material SafeMat => MaterialLib.Emissive(Safe, 3.2f);
 
         Kind kind;
         float windup, progress;
@@ -142,18 +148,78 @@ namespace KingLastPiece
             return t;
         }
 
-        /// <summary>The knight's leap: the cross it strikes lit, dotted L route, and a ghost on the landing square.</summary>
-        public static Telegraph Leap(Vector3 from, Vector3 target, float windup, Transform ghostModel)
+        /// <summary>
+        /// The knight's leap: the squares it strikes lit (the cross, or the block of a Dark knight), dotted L route, and a
+        /// ghost on the landing square.
+        /// </summary>
+        public static Telegraph Leap(Vector3 from, Vector3 target, float windup, Transform ghostModel, IList<Vector2Int> strikes = null)
         {
             var t = Create("Telegraph_Leap", Kind.Leap, windup);
             t.start = Flat(from);
             t.center = Flat(target);
-            // The cross only (not the knight's own square): the centre fills first, then each arm grows outward from it.
+            // Not the knight's own square: the centre fills first, then each arm grows outward from it (corners last).
             var landing = BoardSlots.ToSquare(t.center);
-            t.RebuildCells(CrossSquares(landing, t.scratch));
-            foreach (var c in t.cells) c.grow = c.square - landing;
+            if (strikes != null)
+            {
+                t.scratch.Clear();
+                t.scratch.AddRange(strikes);
+                t.RebuildCells(t.scratch);
+            }
+            else t.RebuildCells(CrossSquares(landing, t.scratch));
+            foreach (var c in t.cells)
+            {
+                Vector2Int d = c.square - landing;
+                bool arm = (d.x == 0) != (d.y == 0) && Mathf.Abs(d.x) + Mathf.Abs(d.y) == 1;
+                c.grow = arm ? d : Vector2Int.zero;
+                if (d == Vector2Int.zero) c.span = 0.5f;
+                else if (arm) { c.delay = 0.5f; c.span = 0.5f; }
+                else { c.delay = 0.65f; c.span = 0.35f; }
+            }
             t.BuildKnightRoute();
             if (ghostModel != null) t.BuildGhost(ghostModel);
+            return t;
+        }
+
+        /// <summary>
+        /// Any set of squares struck at once (lines, blocks, a rain of squares): they fill outward from
+        /// <paramref name="focus"/>, the nearest first, all of them full at the moment of the strike.
+        /// </summary>
+        public static Telegraph Squares(IList<Vector2Int> strikes, float windup, Vector2Int focus)
+        {
+            var t = Create("Telegraph_Squares", Kind.Area, windup);
+            t.scratch.Clear();
+            t.scratch.AddRange(strikes);
+            t.RebuildCells(t.scratch);
+            float far = 1f;
+            foreach (var c in t.cells) far = Mathf.Max(far, BoardSlots.Chebyshev(c.square, focus));
+            foreach (var c in t.cells)
+            {
+                c.delay = 0.45f * BoardSlots.Chebyshev(c.square, focus) / far;
+                c.span = 1f - c.delay;
+            }
+            return t;
+        }
+
+        /// <summary>
+        /// The whole board at once (the queen's attack from outside the board): one red field over every struck square,
+        /// and the safe squares outlined in pale white so they read at a glance.
+        /// </summary>
+        public static Telegraph Purge(IList<Vector2Int> strikes, IList<Vector2Int> safe, float windup)
+        {
+            var t = Squares(strikes, windup, safe.Count > 0 ? safe[0] : Vector2Int.zero);
+            foreach (var c in t.cells) { c.delay *= 0.5f; c.span = 1f - c.delay; }
+            float size = Tile * 0.92f, h = size * 0.5f, w = 0.1f;
+            foreach (var s in safe)
+            {
+                var root = new GameObject("Safe " + BoardSlots.Name(s)).transform;
+                root.SetParent(t.routeRoot, false);
+                Vector3 c = BoardSlots.Center(s) + Vector3.up * 0.04f;
+                PieceFactory.Part(PrimitiveType.Cube, root, c + new Vector3(0f, 0f, h), new Vector3(size + w, 0.014f, w), SafeMat);
+                PieceFactory.Part(PrimitiveType.Cube, root, c - new Vector3(0f, 0f, h), new Vector3(size + w, 0.014f, w), SafeMat);
+                PieceFactory.Part(PrimitiveType.Cube, root, c + new Vector3(h, 0f, 0f), new Vector3(w, 0.014f, size + w), SafeMat);
+                PieceFactory.Part(PrimitiveType.Cube, root, c - new Vector3(h, 0f, 0f), new Vector3(w, 0.014f, size + w), SafeMat);
+                foreach (var r in root.GetComponentsInChildren<Renderer>()) r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            }
             return t;
         }
 
@@ -278,10 +344,11 @@ namespace KingLastPiece
             squares.AddRange(wanted);
             foreach (Transform c in cellRoot) Destroy(c.gameObject);
             cells.Clear();
-            foreach (var s in squares) cells.Add(BuildCell(s));
+            bool outlines = squares.Count <= OutlineLimit;
+            foreach (var s in squares) cells.Add(BuildCell(s, outlines));
         }
 
-        Cell BuildCell(Vector2Int s)
+        Cell BuildCell(Vector2Int s, bool outlines = true)
         {
             // The cell root stays at the origin: its parts are placed in world coordinates.
             var root = new GameObject(BoardSlots.Name(s)).transform;
@@ -293,8 +360,9 @@ namespace KingLastPiece
             {
                 square = s,
                 fill = PieceFactory.Part(PrimitiveType.Cube, root, c0 + Vector3.up * 0.028f, new Vector3(0.001f, 0.01f, 0.001f), fillMat),
-                edges = new Transform[4],
+                edges = new Transform[outlines ? 4 : 0],
             };
+            if (!outlines) return cell;
             float h = size * 0.5f, w = 0.06f;
             Vector3 c = c0 + Vector3.up * 0.036f;
             cell.edges[0] = PieceFactory.Part(PrimitiveType.Cube, root, c + new Vector3(0f, 0f, h), new Vector3(size + w, 0.012f, w), EdgeMat);
@@ -384,9 +452,7 @@ namespace KingLastPiece
                 var c = cells[i];
                 // Centre-out fill. A charge fills its squares one after another, from the attacker to the end; a knight's
                 // cross fills its centre first, then the arms outward.
-                float f = kind == Kind.Line ? Mathf.Clamp01(p * n - i)
-                        : kind == Kind.Leap ? (c.grow == Vector2Int.zero ? Mathf.Clamp01(p * 2f) : Mathf.Clamp01(p * 2f - 1f))
-                        : p;
+                float f = kind == Kind.Line ? Mathf.Clamp01(p * n - i) : Mathf.Clamp01((p - c.delay) / Mathf.Max(0.01f, c.span));
                 float s = Mathf.Max(0.001f, size * PoseTrack.Curve(Ease.Out, f));
                 Vector3 sc = BoardSlots.Center(c.square) + Vector3.up * 0.028f;
                 if (c.grow == Vector2Int.zero)

@@ -191,13 +191,20 @@ namespace KingLastPiece
             i >= count - 1 ? StaggerLightFinish : i == count - 2 && count >= 3 ? StaggerLightMid : StaggerLightEarly;
 
         /// <summary>Critical hits stagger twice as much; attack power above 100% adds a little (+15% per +100%).</summary>
-        float StaggerScale(bool crit) => (1f + 0.15f * Mathf.Max(0f, Stats.attackPower - 1f)) * (crit ? 2f : 1f);
+        float StaggerScale(bool crit) => (1f + 0.15f * Mathf.Max(0f, Stats.attackPower - 1f)) * Stats.staggerPower * (crit ? 2f : 1f);
 
         bool RollCrit(out float mult)
         {
             bool crit = Random.value < Stats.critChance;
             mult = crit ? Stats.critDamage : 1f;
             return crit;
+        }
+
+        /// <summary>Regains health (life steal, healing on a capture), up to the maximum.</summary>
+        public void Restore(float hp)
+        {
+            if (IsDead || hp <= 0f) return;
+            Health = Mathf.Min(MaxHealth, Health + hp);
         }
 
         /// <summary>A permanent round-end upgrade: the gain applies right away (more health heals, a new flask is full).</summary>
@@ -389,7 +396,7 @@ namespace KingLastPiece
         {
             if (state == State.Attack || state == State.Dodge) return;
             if (staminaDelay > 0f) { staminaDelay -= dt; return; }
-            float rate = state == State.Heal ? StaminaRegen * 0.5f : StaminaRegen;
+            float rate = (state == State.Heal ? StaminaRegen * 0.5f : StaminaRegen) * Stats.staminaRegen;
             Stamina = Mathf.Min(MaxStamina, Stamina + rate * dt);
         }
 
@@ -466,7 +473,7 @@ namespace KingLastPiece
                 if (Stamina <= 0f) sprintExhausted = true;
             }
 
-            float speed = IsSprinting ? SprintSpeed : LockTarget != null ? LockedMoveSpeed : MoveSpeed;
+            float speed = (IsSprinting ? SprintSpeed : LockTarget != null ? LockedMoveSpeed : MoveSpeed) * Stats.moveSpeed;
             transform.position += dir * (speed * dt);
 
             // Sprinting breaks the lock-on facing, like souls games.

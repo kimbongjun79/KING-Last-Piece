@@ -29,6 +29,14 @@ namespace KingLastPiece
         public float lightCostCut, heavyCostCut;
         /// <summary>Chance a hit is critical, and the damage multiplier of a critical hit.</summary>
         public float critChance = 0.05f, critDamage = 1.5f;
+        /// <summary>Walk / sprint speed multiplier, and stamina refill speed multiplier.</summary>
+        public float moveSpeed = 1f, staminaRegen = 1f;
+        /// <summary>Share of the damage dealt that heals the King (0.05 = 5%).</summary>
+        public float lifeSteal;
+        /// <summary>Multiplier on the stagger every blow deals.</summary>
+        public float staggerPower = 1f;
+        /// <summary>Health regained for every piece captured.</summary>
+        public float killHeal;
         /// <summary>The King's attack motion follows his power, speed and range (endless mode); classic keeps it fixed.</summary>
         public bool scalesMotion;
 
@@ -74,25 +82,30 @@ namespace KingLastPiece
     public enum UpgradeKind
     {
         Flask, HealAmount, AttackPower, Defense, MaxHealth, AttackRange, AttackSpeed, DodgeRecharge, MaxDodges, MaxStamina,
-        LightCost, HeavyCost, CritChance, CritDamage,
+        LightCost, HeavyCost, CritChance, CritDamage, MoveSpeed, StaminaRegen, LifeSteal, StaggerPower, KillHeal,
     }
 
-    /// <summary>One offered upgrade: a stat and the (rolled) amount it grows by.</summary>
+    /// <summary>How big an offered upgrade is: the rarer the grade, the more the stat grows.</summary>
+    public enum UpgradeGrade { Common, Rare, Epic, Legendary }
+
+    /// <summary>One offered upgrade: a stat, its grade and the (rolled) amount it grows by.</summary>
     public struct Upgrade
     {
         public UpgradeKind kind;
+        public UpgradeGrade grade;
         public float amount;
 
         public string Title => Upgrades.Def(kind).title;
+        public string GradeName => Upgrades.GradeName(grade);
 
         /// <summary>"+12%" / "+1" / "+8" style label of the gain.</summary>
         public string AmountText => Upgrades.Def(kind).percent ? $"+{Mathf.RoundToInt(amount * 100f)}%" : $"+{Mathf.RoundToInt(amount)}";
     }
 
     /// <summary>
-    /// Round-end upgrades: five different stats are offered, the player keeps two. Each stat grows by a random amount
-    /// within its own range; capped stats (attack speed, range, flasks, roll charges, roll recharge) stop being offered
-    /// once they reach their cap.
+    /// Round-end upgrades: five different stats are offered, the player keeps two. Each offer rolls a grade — common,
+    /// rare, epic or legendary, the rarer ones more likely as the rounds go on — that multiplies how much the stat grows
+    /// (a random amount within its own range). Capped stats stop being offered once they reach their cap.
     /// </summary>
     public static class Upgrades
     {
@@ -123,9 +136,35 @@ namespace KingLastPiece
             { UpgradeKind.HeavyCost,     new UpgradeDef { title = "강공격 기력 소모 감소", min = 0.06f, max = 0.12f, cap = 0.5f,  percent = true } },
             { UpgradeKind.CritChance,    new UpgradeDef { title = "치명타 확률",     min = 0.03f, max = 0.06f, cap = 0.6f,  percent = true } },
             { UpgradeKind.CritDamage,    new UpgradeDef { title = "치명타 피해",     min = 0.1f,  max = 0.25f, cap = 3f,    percent = true } },
+            { UpgradeKind.MoveSpeed,     new UpgradeDef { title = "이동 속도",       min = 0.03f, max = 0.06f, cap = 1.3f,  percent = true } },
+            { UpgradeKind.StaminaRegen,  new UpgradeDef { title = "기력 회복 속도",  min = 0.08f, max = 0.15f, cap = 2f,    percent = true } },
+            { UpgradeKind.LifeSteal,     new UpgradeDef { title = "흡혈 (가한 피해만큼 회복)", min = 0.01f, max = 0.02f, cap = 0.15f, percent = true } },
+            { UpgradeKind.StaggerPower,  new UpgradeDef { title = "경직 피해",       min = 0.06f, max = 0.12f, cap = 2f,    percent = true } },
+            { UpgradeKind.KillHeal,      new UpgradeDef { title = "처치 시 체력 회복", min = 2f,  max = 4f,    cap = 20f } },
         };
 
         public static UpgradeDef Def(UpgradeKind k) => defs[k];
+
+        static readonly string[] GradeNames = { "일반", "희귀", "영웅", "전설" };
+        /// <summary>How much more a grade grows the stat than a common one.</summary>
+        static readonly float[] GradeMult = { 1f, 1.5f, 2.1f, 3f };
+
+        public static string GradeName(UpgradeGrade g) => GradeNames[(int)g];
+
+        /// <summary>
+        /// Rolls a grade. Round 1: about 70% common, 22% rare, 7% epic, 1% legendary; the rarer grades grow more likely
+        /// every round (by round 40 about 54 / 29 / 14 / 4).
+        /// </summary>
+        public static UpgradeGrade RollGrade(int round)
+        {
+            float r1 = Mathf.Max(0, round - 1);
+            float common = 70f, rare = 22f + 0.4f * r1, epic = 7f + 0.28f * r1, legendary = 1f + 0.1f * r1;
+            float r = Random.value * (common + rare + epic + legendary);
+            if ((r -= legendary) < 0f) return UpgradeGrade.Legendary;
+            if ((r -= epic) < 0f) return UpgradeGrade.Epic;
+            if ((r -= rare) < 0f) return UpgradeGrade.Rare;
+            return UpgradeGrade.Common;
+        }
 
         public static float Current(PlayerStats s, UpgradeKind k) => k switch
         {
@@ -142,13 +181,21 @@ namespace KingLastPiece
             UpgradeKind.HeavyCost => s.heavyCostCut,
             UpgradeKind.CritChance => s.critChance,
             UpgradeKind.CritDamage => s.critDamage,
+            UpgradeKind.MoveSpeed => s.moveSpeed,
+            UpgradeKind.StaminaRegen => s.staminaRegen,
+            UpgradeKind.LifeSteal => s.lifeSteal,
+            UpgradeKind.StaggerPower => s.staggerPower,
+            UpgradeKind.KillHeal => s.killHeal,
             _ => s.maxStamina,
         };
 
         public static bool AtCap(PlayerStats s, UpgradeKind k) => Current(s, k) >= Def(k).cap - 0.0001f;
 
-        /// <summary>Five different stats (fewer if too many are capped), each with a rolled amount that respects its cap.</summary>
-        public static List<Upgrade> Roll(PlayerStats s)
+        /// <summary>
+        /// Five different stats (fewer if too many are capped), each with a rolled grade and an amount that respects its
+        /// cap. Whole-step stats (flasks, roll charges) grow by 2 at epic and legendary.
+        /// </summary>
+        public static List<Upgrade> Roll(PlayerStats s, int round = 1)
         {
             var pool = new List<UpgradeKind>();
             foreach (UpgradeKind k in System.Enum.GetValues(typeof(UpgradeKind)))
@@ -160,11 +207,12 @@ namespace KingLastPiece
                 var k = pool[i];
                 pool.RemoveAt(i);
                 var d = Def(k);
-                float amount = d.whole ? d.min : Random.Range(d.min, d.max);
-                if (d.percent) amount = Mathf.Round(amount * 100f) / 100f;
+                var grade = RollGrade(round);
+                float amount = d.whole ? (grade >= UpgradeGrade.Epic ? 2f : 1f) : Random.Range(d.min, d.max) * GradeMult[(int)grade];
+                if (d.percent) amount = Mathf.Max(0.01f, Mathf.Round(amount * 100f) / 100f);
                 else if (!d.whole) amount = Mathf.Round(amount);
                 amount = Mathf.Min(amount, d.cap - Current(s, k));
-                offer.Add(new Upgrade { kind = k, amount = amount });
+                offer.Add(new Upgrade { kind = k, grade = grade, amount = amount });
             }
             return offer;
         }
@@ -188,6 +236,11 @@ namespace KingLastPiece
                 case UpgradeKind.HeavyCost: s.heavyCostCut = Mathf.Min(cap, s.heavyCostCut + u.amount); break;
                 case UpgradeKind.CritChance: s.critChance = Mathf.Min(cap, s.critChance + u.amount); break;
                 case UpgradeKind.CritDamage: s.critDamage = Mathf.Min(cap, s.critDamage + u.amount); break;
+                case UpgradeKind.MoveSpeed: s.moveSpeed = Mathf.Min(cap, s.moveSpeed + u.amount); break;
+                case UpgradeKind.StaminaRegen: s.staminaRegen = Mathf.Min(cap, s.staminaRegen + u.amount); break;
+                case UpgradeKind.LifeSteal: s.lifeSteal = Mathf.Min(cap, s.lifeSteal + u.amount); break;
+                case UpgradeKind.StaggerPower: s.staggerPower = Mathf.Min(cap, s.staggerPower + u.amount); break;
+                case UpgradeKind.KillHeal: s.killHeal = Mathf.Min(cap, s.killHeal + u.amount); break;
             }
         }
 

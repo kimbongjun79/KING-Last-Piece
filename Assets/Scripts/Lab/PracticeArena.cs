@@ -98,7 +98,7 @@ namespace KingLastPiece
             game.SpawnEmpowered(type, SpawnTier, GameManager.SquareToWorld(file + rank));
         }
 
-        /// <summary>E: empowered tier of the pieces spawned with 1–5 (0 normal, 1–3 dark).</summary>
+        /// <summary>E: empowered tier of the pieces spawned with 1–5 (0 normal, 1–2 dark).</summary>
         public int SpawnTier { get; private set; }
 
         /// <summary>Removes every hostile piece but keeps the training dummies.</summary>
@@ -129,7 +129,7 @@ namespace KingLastPiece
                 if (kb.gKey.wasPressedThisFrame) game.Player.GodMode = Invincible = !Invincible;
                 if (kb.iKey.wasPressedThisFrame) game.Player.InfiniteStamina = InfiniteStamina = !InfiniteStamina;
                 if (kb.vKey.wasPressedThisFrame) ToggleSlotView();
-                if (kb.eKey.wasPressedThisFrame) { SpawnTier = (SpawnTier + 1) % 4; Sfx.Play("UI_Confirm"); }
+                if (kb.eKey.wasPressedThisFrame) { SpawnTier = (SpawnTier + 1) % (EnemyBase.MaxEliteTier + 1); Sfx.Play("UI_Confirm"); }
                 if (kb.xKey.wasPressedThisFrame || kb.cKey.wasPressedThisFrame || kb.hKey.wasPressedThisFrame ||
                     kb.gKey.wasPressedThisFrame || kb.iKey.wasPressedThisFrame) Sfx.Play("UI_Confirm");
             }

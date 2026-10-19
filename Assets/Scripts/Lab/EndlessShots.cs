@@ -41,6 +41,7 @@ namespace KingLastPiece
             yield return ClassroomShots();
             yield return EliteTiers();
             yield return DarkWindup();
+            yield return DarkPatterns();
             yield return DizzyShot();
             yield return RoundShot(11, "21_Round11_First_Dark_Pawn.png", closeOnElite: true);
             yield return RoundShot(29, "22_Round29_Half_Dark.png", closeOnElite: false);
@@ -80,14 +81,14 @@ namespace KingLastPiece
             File.WriteAllText(Path.Combine(dir, "endless_rounds.tsv"), sb.ToString());
         }
 
-        /// <summary>A pawn and a rook at each tier, side by side (normal, Dark I, II, III), plus their stats.</summary>
+        /// <summary>A pawn and a rook at each tier, side by side (normal, Dark I, II), plus their stats.</summary>
         IEnumerator EliteTiers()
         {
             game.ClearEnemies();
             var spawned = new List<EnemyBase>();
-            for (int t = 0; t <= 3; t++)
+            for (int t = 0; t <= EnemyBase.MaxEliteTier; t++)
             {
-                float x = (t - 1.5f) * 2.6f;
+                float x = (t - 1f) * 3f;
                 spawned.Add(game.SpawnEmpowered(PieceType.Pawn, t, new Vector3(x, 0f, 4f)));
                 spawned.Add(game.SpawnEmpowered(PieceType.Rook, t, new Vector3(x, 0f, 6.5f)));
             }
@@ -208,13 +209,97 @@ namespace KingLastPiece
             game.ClearEnemies();
         }
 
-        /// <summary>A Dark III rook winding up next to the King: the aura should step back so the red glow shows.</summary>
+        /// <summary>
+        /// The Dark attacks: each piece at Dark I / II fights the (invincible) King for a while; the attacks it starts are
+        /// logged in order with their start times (a charge that comes back shows as two dashes in a row), and a top view
+        /// is taken during a square attack's wind-up. Then the Dark II queen's four attacks, one by one.
+        /// </summary>
+        IEnumerator DarkPatterns()
+        {
+            var hud = game.GetComponent<Hud>();
+            (PieceType type, int tier, string want, string file)[] runs =
+            {
+                (PieceType.Pawn, 2, "Lunge", null),
+                (PieceType.Knight, 1, "Leap", "40_Dark1_Knight_Block.png"),
+                (PieceType.Bishop, 1, "Dash", null),
+                (PieceType.Bishop, 2, "Zone", "41_Dark2_Bishop_Diagonals.png"),
+                (PieceType.Rook, 2, "Zone", "42_Dark2_Rook_Lines.png"),
+                (PieceType.Knight, 2, "Leap", null),
+            };
+            foreach (var run in runs)
+            {
+                game.ClearEnemies();
+                game.Player.ReturnToStart(GameManager.SquareToWorld("d4"), 0f);
+                var e = game.SpawnEmpowered(run.type, run.tier, GameManager.SquareToWorld("e7"));
+                var log = new StringBuilder();
+                bool shot = false;
+                int seen = 0;
+                float t0 = Time.time;
+                for (int f = 0; f < 60 * 22; f++)
+                {
+                    float wp = e.WindupProgress;
+                    if (e.AttacksStarted != seen) { seen = e.AttacksStarted; log.Append($"{Time.time - t0:0.0}s:{e.AttackLabel} "); }
+                    if (!shot && run.file != null && e.IsAttacking && wp > 0.65f && e.AttackLabel.StartsWith(run.want))
+                    {
+                        shot = true;
+                        game.Rig.UseOverride = true;
+                        game.Rig.OverridePosition = new Vector3(0f, 21f, -9f);
+                        game.Rig.OverrideLookAt = Vector3.zero;
+                        if (hud != null) hud.enabled = false;
+                        yield return Frames(1);
+                        yield return Shot(run.file);
+                        if (hud != null) hud.enabled = true;
+                        game.Rig.UseOverride = false;
+                    }
+                    yield return null;
+                }
+                stats.Append($"DarkPattern\t{run.type}\tT{run.tier}\tshot={shot}\t{log}\n");
+            }
+
+            // The Dark II queen: Royal Star, Checkmate, the rain of squares, the Purge from off the board.
+            string[] names = { "Star", "Checkmate", "Rain", "Purge" };
+            for (int k = 0; k < 4; k++)
+            {
+                game.ClearEnemies();
+                game.Player.ReturnToStart(GameManager.SquareToWorld("d3"), 0f);
+                var q = (QueenEnemy)game.SpawnEmpowered(PieceType.Queen, 2, GameManager.SquareToWorld("f6"));
+                yield return Frames(70);   // dropped in
+                q.DebugSpecial(k);
+                var log = new StringBuilder();
+                int seen = 0;
+                float t0 = Time.time;
+                bool shot = false, everOff = false;
+                for (int f = 0; f < 60 * 8; f++)
+                {
+                    float wp = q.WindupProgress;
+                    if (q.AttacksStarted != seen) { seen = q.AttacksStarted; log.Append($"{Time.time - t0:0.0}s:{q.AttackLabel} "); }
+                    everOff |= q.IsOffBoard;
+                    if (!shot && q.IsAttacking && wp > 0.7f)
+                    {
+                        shot = true;
+                        game.Rig.UseOverride = true;
+                        game.Rig.OverridePosition = new Vector3(0f, 22f, -10f);
+                        game.Rig.OverrideLookAt = Vector3.zero;
+                        if (hud != null) hud.enabled = false;
+                        yield return Frames(1);
+                        yield return Shot($"{43 + k}_Dark2_Queen_{names[k]}.png");
+                        if (hud != null) hud.enabled = true;
+                        game.Rig.UseOverride = false;
+                    }
+                    yield return null;
+                }
+                stats.Append($"QueenDark\t{names[k]}\twentOff={everOff}\tbackOn={!q.IsOffBoard}\tpos={q.FlatPos}\tplayerHits={game.Record.damageTaken:0}\t{log}\n");
+            }
+            game.ClearEnemies();
+        }
+
+        /// <summary>A Dark II rook winding up next to the King: the aura steps back so the red glow shows; its slam strikes 5×5.</summary>
         IEnumerator DarkWindup()
         {
             game.ClearEnemies();
             var at = GameManager.SquareToWorld("e4");
             game.Player.ReturnToStart(at, 0f);
-            var rook = game.SpawnEmpowered(PieceType.Rook, 3, at + new Vector3(0f, 0f, 2f));
+            var rook = game.SpawnEmpowered(PieceType.Rook, 2, at + new Vector3(0f, 0f, 2f));
             for (int f = 0; f < 600 && !(rook.IsAttacking && rook.WindupProgress > 0.7f); f++) yield return null;
             game.Rig.UseOverride = true;
             game.Rig.OverridePosition = rook.FlatPos + new Vector3(2.6f, 2.4f, -2.6f);
@@ -348,7 +433,7 @@ namespace KingLastPiece
             yield return Frames(30);
             yield return Shot("25_Upgrade_Cards.png");
             var offered = new StringBuilder();
-            foreach (var o in game.Offers) offered.Append($"{o.Title} {o.AmountText}; ");
+            foreach (var o in game.Offers) offered.Append($"[{o.GradeName}] {o.Title} {o.AmountText}; ");
             stats.Append($"Offers\t{offered}\n");
             // Choose 1, choose 4 then cancel it, choose 3: two chosen, nothing applied until the confirm button.
             game.PickUpgrade(0);

@@ -4,7 +4,9 @@ namespace KingLastPiece
 {
     /// <summary>
     /// Knight: bounds over to an L-square of the King in quick free leaps (straight at it, not square by square),
-    /// then makes its real move — the leap onto the King's square.
+    /// then makes its real move — the leap onto the King's square, striking it and the four squares beside it.
+    /// Dark I: the landing strikes the whole block of nine squares (the diagonals too). Dark II: right after landing
+    /// it leaps again onto wherever the King has gone.
     /// </summary>
     public class KnightEnemy : EnemyBase
     {
@@ -13,6 +15,7 @@ namespace KingLastPiece
         bool hopping;
         Vector3 hopFrom, hopTo;
         float hopT;
+        int leapsLeft;
 
         protected override void Configure()
         {
@@ -47,13 +50,9 @@ namespace KingLastPiece
             {
                 if (CanAttackNow)
                 {
-                    // The knight's capture: jump from the L-square onto the King's square, striking it and the
-                    // four squares beside it (a cross).
-                    BeginAttack(new AttackPlan
-                    {
-                        kind = AtkKind.Leap, target = BoardSlots.Center(KingSquare), windup = 1.05f, active = 0.55f, recover = 0.9f,
-                        damage = 20f, poise = 35f, radius = 1.5f
-                    });
+                    // The knight's capture: jump from the L-square onto the King's square.
+                    leapsLeft = EliteTier >= 2 ? 1 : 0;
+                    Leap(1.05f, leapsLeft > 0 ? 0.3f : 0.9f);
                     cooldown = Random.Range(3.4f, 4.6f);
                 }
                 return;
@@ -75,6 +74,27 @@ namespace KingLastPiece
             hopT = 0f;
             hopping = true;
             Sfx.Play("KNIGHT_Hop", transform.position);
+        }
+
+        /// <summary>Leap onto the King's square: a cross of squares, or (Dark) the block of nine.</summary>
+        void Leap(float windup, float recover)
+        {
+            var land = KingSquare;
+            bool block = EliteTier >= 1;
+            BeginAttack(new AttackPlan
+            {
+                kind = AtkKind.Leap, target = BoardSlots.Center(land), windup = windup, active = 0.55f, recover = recover,
+                damage = 20f, poise = 35f, radius = block ? 2.4f : 1.5f, squares = block ? BlockOf(land, 1) : CrossOf(land),
+            });
+        }
+
+        protected override bool ContinueCombo()
+        {
+            if (leapsLeft <= 0) return false;
+            leapsLeft--;
+            Leap(0.62f, 1.0f);
+            cooldown = Mathf.Max(cooldown, Random.Range(3f, 4f));   // a breather after the double leap
+            return true;
         }
     }
 }

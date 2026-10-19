@@ -672,7 +672,7 @@ namespace KingLastPiece
         /// <summary>A gold-ruled panel of name/value rows.</summary>
         void DrawTable(Rect area, (string name, string value)[] rows, float nameWidth)
         {
-            float line = 40 * scale;
+            float line = (rows.Length > 12 ? 35 : 40) * scale;
             var r = new Rect(area.x, area.y, area.width, rows.Length * line + 28 * scale);
             Fill(r, new Color(0f, 0f, 0f, 0.55f));
             Fill(new Rect(r.x, r.y, r.width, 2 * scale), new Color(Gold.r, Gold.g, Gold.b, 0.7f));
@@ -706,6 +706,9 @@ namespace KingLastPiece
                 ("공격당 기력 소모", $"일반공격 {p.LightAttackCost:0.#} (−{Mathf.RoundToInt(s.lightCostCut * 100f)}%)   ·   강공격 {p.HeavyAttackCost:0.#} (−{Mathf.RoundToInt(s.heavyCostCut * 100f)}%)"),
                 ("회복약", $"{p.MaxFlasks}개 (최대 5)   ·   회복량 {Mathf.RoundToInt(s.healAmount)}"),
                 ("회피 충전", $"{p.MaxDodges}회 (최대 3)   ·   1회 충전 {p.DodgeRechargeTime:0.00}초"),
+                ("이동 · 기력 회복", $"이동 속도 {Mathf.RoundToInt(s.moveSpeed * 100f)}% (최대 130%)   ·   기력 회복 {Mathf.RoundToInt(s.staminaRegen * 100f)}% (최대 200%)"),
+                ("경직 피해", $"{Mathf.RoundToInt(s.staggerPower * 100f)}%   (최대 200%)"),
+                ("흡혈 · 처치 회복", $"가한 피해의 {Mathf.RoundToInt(s.lifeSteal * 100f)}% (최대 15%)   ·   처치마다 {Mathf.RoundToInt(s.killHeal)} (최대 20)"),
             }, area.width * 0.4f);
         }
 
@@ -739,6 +742,15 @@ namespace KingLastPiece
         /// Five cards: click (or 1–5, or ←/→ and Enter) to choose — again to cancel; with two chosen, the confirm button
         /// makes them permanent and starts the next round.
         /// </summary>
+        /// <summary>Upgrade grade colours: common grey, rare blue, epic violet, legendary orange-gold.</summary>
+        static Color GradeColor(UpgradeGrade g) => g switch
+        {
+            UpgradeGrade.Rare => new Color(0.36f, 0.62f, 1f),
+            UpgradeGrade.Epic => new Color(0.74f, 0.42f, 1f),
+            UpgradeGrade.Legendary => new Color(1f, 0.62f, 0.12f),
+            _ => new Color(0.7f, 0.68f, 0.64f),
+        };
+
         void DrawUpgrades(GameManager g)
         {
             var p = g.Player;
@@ -768,15 +780,20 @@ namespace KingLastPiece
                 bool hot = g.OfferCursor == i;
                 r.y -= picked ? 18 * scale : hot ? 8 * scale : 0f;
 
-                Fill(new Rect(r.x - 3 * scale, r.y - 3 * scale, r.width + 6 * scale, r.height + 6 * scale),
-                    picked ? new Color(Gold.r, Gold.g, Gold.b, a) : hot ? new Color(0.95f, 0.92f, 0.85f, a) : new Color(Gold.r * 0.5f, Gold.g * 0.5f, Gold.b * 0.5f, a));
-                Fill(r, picked ? new Color(0.22f, 0.17f, 0.08f, 0.97f * a) : new Color(0.06f, 0.055f, 0.06f, 0.97f * a));
-                // Chess-tile header strip.
-                for (int k = 0; k < 8; k++)
-                    Fill(new Rect(r.x + k * r.width / 8f, r.y, r.width / 8f, 10 * scale), (k % 2 == 0 ? new Color(0.9f, 0.87f, 0.78f, a) : new Color(0.12f, 0.1f, 0.1f, a)));
-
                 var u = g.Offers[i];
+                Color gc = GradeColor(u.grade);
+                // The frame wears the grade's colour (brighter when hovered, gold-white when chosen).
+                Fill(new Rect(r.x - 3 * scale, r.y - 3 * scale, r.width + 6 * scale, r.height + 6 * scale),
+                    picked ? new Color(Gold.r, Gold.g, Gold.b, a) : hot ? new Color(Mathf.Lerp(gc.r, 1f, 0.45f), Mathf.Lerp(gc.g, 1f, 0.45f), Mathf.Lerp(gc.b, 1f, 0.45f), a)
+                        : new Color(gc.r * 0.75f, gc.g * 0.75f, gc.b * 0.75f, a));
+                Fill(r, picked ? new Color(0.22f, 0.17f, 0.08f, 0.97f * a) : new Color(0.06f + gc.r * 0.05f, 0.055f + gc.g * 0.05f, 0.06f + gc.b * 0.05f, 0.97f * a));
+                // Chess-tile header strip in the grade's colour.
+                for (int k = 0; k < 8; k++)
+                    Fill(new Rect(r.x + k * r.width / 8f, r.y, r.width / 8f, 10 * scale), k % 2 == 0 ? new Color(gc.r, gc.g, gc.b, a) : new Color(0.12f, 0.1f, 0.1f, a));
+
                 Text(new Rect(r.x, r.y + 14 * scale, 34 * scale, 34 * scale), (i + 1).ToString(), info, new Color(1f, 1f, 1f, 0.5f * a));
+                Text(new Rect(r.x, r.y + 14 * scale, r.width - 12 * scale, 30 * scale), u.GradeName,
+                    new GUIStyle(info) { alignment = TextAnchor.MiddleRight, fontStyle = FontStyle.Bold }, new Color(gc.r, gc.g, gc.b, a));
                 Text(new Rect(r.x + 12 * scale, r.y + 40 * scale, r.width - 24 * scale, 64 * scale), u.Title, title, new Color(Gold.r, Gold.g, Gold.b, a));
                 Text(new Rect(r.x, r.y + 110 * scale, r.width, 80 * scale), u.AmountText, amount, new Color(0.96f, 0.94f, 0.88f, a));
                 Text(new Rect(r.x, r.y + 200 * scale, r.width, 34 * scale), Upgrades.Preview(p.Stats, u), info, new Color(0.75f, 0.73f, 0.68f, a));

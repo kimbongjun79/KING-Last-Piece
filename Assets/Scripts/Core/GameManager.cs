@@ -315,7 +315,7 @@ namespace KingLastPiece
         void EnterUpgrade()
         {
             Offers.Clear();
-            Offers.AddRange(Upgrades.Roll(Player.Stats));
+            Offers.AddRange(Upgrades.Roll(Player.Stats, Round));
             Picked.Clear();
             OfferCursor = -1;
             upgradeDoneAt = Offers.Count == 0 ? 0f : -1f;
@@ -418,6 +418,7 @@ namespace KingLastPiece
         {
             Record.kills++;
             if (e.EliteTier > 0) Record.darkKills++;
+            if (Player != null) Player.Restore(Player.Stats.killHeal);
         }
 
         public void ReportPlayerDamage(float amount) => Record.damageTaken += amount;
@@ -429,6 +430,7 @@ namespace KingLastPiece
             Record.damageDealt += amount;
             Record.biggestHit = Mathf.Max(Record.biggestHit, amount);
             if (crit) Record.crits++;
+            if (Player != null) Player.Restore(amount * Player.Stats.lifeSteal);   // every damage report is the King's doing
             Sfx.Play("UI_DamagePopup");
             Popups.Add(new DamagePopup
             {

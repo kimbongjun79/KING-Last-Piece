@@ -9,7 +9,8 @@ namespace KingLastPiece
     public abstract class EnemyBase : Actor
     {
         protected enum EState { Spawning, Move, Windup, Attack, Recover, Stagger, Airborne, Getup, Grabbed, Launched, Dead }
-        protected enum AtkKind { Lunge, Dash, Leap, Slam }
+        /// <summary>Zone: a set of board squares struck all at once at the end of the active phase (lines, rains, the board).</summary>
+        protected enum AtkKind { Lunge, Dash, Leap, Slam, Zone }
 
         protected struct AttackPlan
         {
@@ -18,6 +19,12 @@ namespace KingLastPiece
             public float windup, active, recover;
             public float length, speed, damage, poise, radius;
             public float trackUntil;
+            /// <summary>Squares a leap, slam or zone strikes (null: a leap/slam strikes the circle of <see cref="radius"/>).</summary>
+            public Vector2Int[] squares;
+            /// <summary>Zone only: squares left safe (shown outlined in white; the whole-board attack).</summary>
+            public Vector2Int[] safe;
+            /// <summary>Leap only: height the piece starts from (leaping back in from the air).</summary>
+            public float startLift;
         }
 
         public PieceType Type { get; private set; }
@@ -26,7 +33,13 @@ namespace KingLastPiece
         public string DisplayName { get; protected set; } = "Pawn";
         public bool IsBoss { get; protected set; }
         public float LastHitTime { get; private set; } = -100f;
-        public bool Targetable => state != EState.Spawning && !IsDead;
+        public bool Targetable => state != EState.Spawning && !IsDead && !OffBoard;
+        /// <summary>Gone off the board (the queen's whole-board attack): out of reach, not kept on the board.</summary>
+        protected bool OffBoard { get; set; }
+        public bool IsOffBoard => OffBoard;
+        /// <summary>Kind of the current (or last) attack and how many squares it strikes, for lab logs.</summary>
+        public int AttacksStarted { get; private set; }
+        public string AttackLabel => plan.squares != null ? $"{plan.kind}[{plan.squares.Length}]" : plan.kind.ToString();
         public bool IsAttacking => state == EState.Windup || state == EState.Attack;
         public float WindupProgress => state == EState.Windup ? Mathf.Clamp01(stateTime / Mathf.Max(0.01f, plan.windup)) : 0f;
 
@@ -35,7 +48,7 @@ namespace KingLastPiece
         {
             get
             {
-                bool delayed = plan.kind == AtkKind.Leap || plan.kind == AtkKind.Slam;  // hit at the end of the active phase
+                bool delayed = plan.kind == AtkKind.Leap || plan.kind == AtkKind.Slam || plan.kind == AtkKind.Zone;  // hit at the end of the active phase
                 float travel = 0f;
                 if (!delayed && Player != null)
                 {
@@ -80,9 +93,17 @@ namespace KingLastPiece
                 return true;
             }
 
+            if (plan.squares != null)
+            {
+                // Square strikes: out toward the nearest square the attack leaves alone.
+                if (SquaresGap(plan.squares, playerPos) > playerRadius + Margin) return false;
+                escape = SafeDirection(plan.squares, playerPos);
+                return true;
+            }
+
             Vector3 center = plan.kind == AtkKind.Leap ? plan.target : atkStart;
             Vector3 radial = playerPos - new Vector3(center.x, 0f, center.z);
-            float edge = StrikesCross ? CrossGap(radial) : radial.magnitude - plan.radius;
+            float edge = radial.magnitude - plan.radius;
             if (edge > playerRadius + Margin) return false;
             escape = radial.sqrMagnitude > 0.01f ? radial.normalized : (playerPos - FlatPos).normalized;
             if (escape.sqrMagnitude < 0.01f) escape = -transform.forward;
@@ -90,7 +111,7 @@ namespace KingLastPiece
         }
 
         public bool IgnoresCollision =>
-            IsDead || state == EState.Spawning || state == EState.Grabbed || state == EState.Launched || state == EState.Airborne ||
+            IsDead || OffBoard || state == EState.Spawning || state == EState.Grabbed || state == EState.Launched || state == EState.Airborne ||
             (state == EState.Attack && (plan.kind == AtkKind.Leap || plan.kind == AtkKind.Dash));
 
         protected EState state;
@@ -184,15 +205,19 @@ namespace KingLastPiece
 
         // ---------------------------------------------------------------- empowered ("dark") pieces
 
-        /// <summary>0 = a normal piece; 1–3 = an empowered piece wrapped in a black aura, stronger at every tier.</summary>
+        /// <summary>
+        /// 0 = a normal piece; 1–2 = an empowered piece wrapped in a black aura. Dark I strikes in a stronger form (longer
+        /// thrusts, wider landings, charges that come back); Dark II also gains a new attack of its own.
+        /// </summary>
         public int EliteTier { get; private set; }
+        public const int MaxEliteTier = 2;
 
         // Per tier (index 0 = normal): health, damage, stagger resistance and attack tempo (wind-up/recovery time — barely
         // faster: attack speed grows very little). Size and move speed follow the total health boost (see Empower).
-        static readonly float[] EliteHealth = { 1f, 1.6f, 2.3f, 3.2f };
-        static readonly float[] EliteDamage = { 1f, 1.25f, 1.5f, 1.8f };
-        static readonly float[] EliteStagger = { 1f, 1.5f, 2f, 2.6f };
-        static readonly float[] EliteTempo = { 1f, 0.97f, 0.94f, 0.91f };
+        static readonly float[] EliteHealth = { 1f, 1.7f, 2.8f };
+        static readonly float[] EliteDamage = { 1f, 1.3f, 1.65f };
+        static readonly float[] EliteStagger = { 1f, 1.7f, 2.6f };
+        static readonly float[] EliteTempo = { 1f, 0.96f, 0.92f };
 
         float damageMult = 1f, tempo = 1f;
         GameObject aura;
@@ -204,14 +229,14 @@ namespace KingLastPiece
         /// </summary>
         public void Empower(int tier, float healthMult = 1f, float staggerMult = 1f)
         {
-            int t = Mathf.Clamp(tier, 0, 3);
+            int t = Mathf.Clamp(tier, 0, MaxEliteTier);
             EliteTier = t;
             MaxHealth *= EliteHealth[t] * healthMult;
             Health = MaxHealth;
             damageMult = EliteDamage[t];
             tempo = EliteTempo[t];
             // Tougher pieces are bigger and faster: both grow with the whole health boost (tier × the endless mode's
-            // every-40-rounds bonus), e.g. Dark III ≈ 26% bigger and 15% faster.
+            // every-40-rounds bonus), e.g. Dark II ≈ 22% bigger and 13% faster.
             float boost = EliteHealth[t] * healthMult - 1f;
             moveSpeed *= Mathf.Min(1.4f, 1f + 0.07f * boost);
             Grow(Mathf.Min(1.4f, 1f + 0.12f * boost));
@@ -329,7 +354,7 @@ namespace KingLastPiece
             model.localRotation = modelTilt * vulnWobble;
             model.localScale = new Vector3(modelBaseScale.x / Mathf.Sqrt(squash), modelBaseScale.y * squash, modelBaseScale.z / Mathf.Sqrt(squash));
             UpdateDizzy();
-            ClampToBoard();
+            if (!OffBoard) ClampToBoard();
         }
 
         protected void Enter(EState s)
@@ -547,6 +572,7 @@ namespace KingLastPiece
 
         protected void BeginAttack(AttackPlan p)
         {
+            AttacksStarted++;
             shoved.Clear();
             readyFrame = -10;
             ClearTelegraph();
@@ -577,17 +603,104 @@ namespace KingLastPiece
                     plan.target = ClampPoint(plan.target);
                     // Knights show their L route and a ghost on the landing square; the queen just the landing area.
                     telegraph = Type == PieceType.Knight
-                        ? Telegraph.Leap(atkStart, plan.target, plan.windup, model)
+                        ? Telegraph.Leap(atkStart, plan.target, plan.windup, model, plan.squares)
+                        : plan.squares != null ? Telegraph.Squares(plan.squares, plan.windup, BoardSlots.ToSquare(plan.target))
                         : Telegraph.Area(plan.target, plan.radius, plan.windup);
                     break;
                 case AtkKind.Slam:
-                    telegraph = Telegraph.Area(atkStart, plan.radius, plan.windup, atkStart);
+                    telegraph = plan.squares != null
+                        ? Telegraph.Squares(plan.squares, plan.windup, MySquare)
+                        : Telegraph.Area(atkStart, plan.radius, plan.windup, atkStart);
+                    break;
+                case AtkKind.Zone:
+                    // Lines fill outward from the attacker; the whole-board attack shows its safe squares outlined.
+                    telegraph = plan.safe != null
+                        ? Telegraph.Purge(plan.squares, plan.safe, plan.windup)
+                        : Telegraph.Squares(plan.squares, plan.windup, plan.target.sqrMagnitude > 0f ? BoardSlots.ToSquare(plan.target) : MySquare);
                     break;
             }
             Enter(EState.Windup);
             Sfx.Play("EN_Windup", transform.position);
             Sfx.Play("EN_Telegraph", plan.kind == AtkKind.Leap ? plan.target : atkStart);
-            if (Type == PieceType.Queen && plan.kind == AtkKind.Slam) Sfx.Play("QUEEN_Check_Windup", transform.position);
+            if (Type == PieceType.Queen && (plan.kind == AtkKind.Slam || plan.kind == AtkKind.Zone)) Sfx.Play("QUEEN_Check_Windup", transform.position);
+        }
+
+        /// <summary>Called every wind-up frame with its progress (0–1): lets a piece move while it winds up.</summary>
+        protected virtual void OnWindup(float p) { }
+
+        /// <summary>Where the current attack started (a charge that comes back heads here).</summary>
+        protected Vector3 AttackOrigin => atkStart;
+
+        // ---------------------------------------------------------------- square sets for the square attacks
+
+        static readonly Vector2Int[] Orthogonal = { Vector2Int.up, Vector2Int.down, Vector2Int.left, Vector2Int.right };
+        static readonly Vector2Int[] Diagonal = { new Vector2Int(1, 1), new Vector2Int(1, -1), new Vector2Int(-1, 1), new Vector2Int(-1, -1) };
+
+        /// <summary>A square and its four straight neighbours (the knight's landing).</summary>
+        protected static Vector2Int[] CrossOf(Vector2Int c)
+        {
+            var list = new System.Collections.Generic.List<Vector2Int> { c };
+            foreach (var o in Orthogonal) if (BoardSlots.OnBoard(c + o)) list.Add(c + o);
+            return list.ToArray();
+        }
+
+        /// <summary>The squares up to <paramref name="r"/> away from <paramref name="c"/> (a block), its corners cut if asked.</summary>
+        protected static Vector2Int[] BlockOf(Vector2Int c, int r, bool cutCorners = false)
+        {
+            var list = new System.Collections.Generic.List<Vector2Int> { c };
+            for (int x = -r; x <= r; x++)
+            for (int y = -r; y <= r; y++)
+            {
+                if ((x == 0 && y == 0) || (cutCorners && r > 1 && Mathf.Abs(x) == r && Mathf.Abs(y) == r)) continue;
+                var s = c + new Vector2Int(x, y);
+                if (BoardSlots.OnBoard(s)) list.Add(s);
+            }
+            return list.ToArray();
+        }
+
+        /// <summary>Every square on the rank and file (<paramref name="straight"/>) and/or the diagonals through <paramref name="c"/>.</summary>
+        protected static Vector2Int[] LinesOf(Vector2Int c, bool straight, bool diagonal)
+        {
+            var list = new System.Collections.Generic.List<Vector2Int> { c };
+            void Walk(Vector2Int[] dirs)
+            {
+                foreach (var d in dirs)
+                    for (var s = c + d; BoardSlots.OnBoard(s); s += d) list.Add(s);
+            }
+            if (straight) Walk(Orthogonal);
+            if (diagonal) Walk(Diagonal);
+            return list.ToArray();
+        }
+
+        /// <summary>Distance from a point to the nearest of the squares (0 inside one).</summary>
+        static float SquaresGap(Vector2Int[] squares, Vector3 p)
+        {
+            float h = GameManager.TileSize * 0.5f, best = float.MaxValue;
+            foreach (var s in squares)
+            {
+                Vector3 c = BoardSlots.Center(s);
+                float dx = Mathf.Max(0f, Mathf.Abs(p.x - c.x) - h), dz = Mathf.Max(0f, Mathf.Abs(p.z - c.z) - h);
+                best = Mathf.Min(best, dx * dx + dz * dz);
+            }
+            return Mathf.Sqrt(best);
+        }
+
+        /// <summary>Direction from a point to the nearest square not in the set.</summary>
+        static Vector3 SafeDirection(Vector2Int[] squares, Vector3 p)
+        {
+            var hit = new System.Collections.Generic.HashSet<Vector2Int>(squares);
+            Vector3 best = Vector3.zero;
+            float bestD = float.MaxValue;
+            for (int x = 0; x < BoardSlots.Size; x++)
+            for (int y = 0; y < BoardSlots.Size; y++)
+            {
+                var s = new Vector2Int(x, y);
+                if (hit.Contains(s)) continue;
+                Vector3 d = BoardSlots.Center(s) - p;
+                d.y = 0f;
+                if (d.sqrMagnitude < bestD) { bestD = d.sqrMagnitude; best = d; }
+            }
+            return best.sqrMagnitude > 0.0001f ? best.normalized : Vector3.forward;
         }
 
         // Sound ids (Docs/Sound/sounds.json) for this piece's attack release and landing.
@@ -608,6 +721,8 @@ namespace KingLastPiece
             (PieceType.Queen, AtkKind.Leap) => "QUEEN_Land",
             (PieceType.Rook, AtkKind.Slam) => "ROOK_Slam",
             (PieceType.Queen, AtkKind.Slam) => "QUEEN_Check_Slam",
+            (PieceType.Queen, AtkKind.Zone) => "QUEEN_Check_Slam",
+            (_, AtkKind.Zone) => "ROOK_Slam",
             _ => null,
         };
 
@@ -623,7 +738,7 @@ namespace KingLastPiece
             }
 
             Vector3 faceDir = plan.kind == AtkKind.Leap ? plan.target - FlatPos : plan.dir;
-            if (plan.kind != AtkKind.Slam) FaceTowards(faceDir, 720f);
+            if (plan.kind != AtkKind.Slam && plan.kind != AtkKind.Zone) FaceTowards(faceDir, 720f);
             else FaceTowards(ToPlayer, 200f);
 
             if (telegraph != null) telegraph.SetProgress(p);
@@ -634,7 +749,11 @@ namespace KingLastPiece
             switch (plan.kind)
             {
                 case AtkKind.Slam:
+                case AtkKind.Zone:
                     modelY = Mathf.Sin(p * Mathf.PI * 0.5f) * 1.2f;
+                    break;
+                case AtkKind.Leap when plan.startLift > 0f:
+                    modelY = plan.startLift;
                     break;
                 case AtkKind.Leap:
                     squash = 1f - 0.18f * p;
@@ -644,13 +763,14 @@ namespace KingLastPiece
                     squash = 1f - 0.08f * p;
                     break;
             }
+            OnWindup(p);
 
             if (p >= 1f)
             {
                 ClearTelegraph();
                 Enter(EState.Attack);
-                // The piece leaves its square (a slam stays put): free the slot for the others.
-                if (plan.kind != AtkKind.Slam) BoardSlots.Release(this);
+                // The piece leaves its square (a slam or square strike stays put): free the slot for the others.
+                if (plan.kind != AtkKind.Slam && plan.kind != AtkKind.Zone) BoardSlots.Release(this);
                 Sfx.Play(ReleaseSfx, transform.position);
             }
         }
@@ -679,7 +799,7 @@ namespace KingLastPiece
                     if (t < plan.active)
                     {
                         transform.position = Vector3.Lerp(atkStart, plan.target, p);
-                        modelY = Mathf.Sin(p * Mathf.PI) * 2.8f;
+                        modelY = Mathf.Lerp(plan.startLift, 0f, p) + Mathf.Sin(p * Mathf.PI) * 2.8f;
                         modelTilt = Quaternion.Euler(Mathf.Lerp(-25f, 25f, p), 0f, 0f);
                     }
                     else
@@ -687,9 +807,11 @@ namespace KingLastPiece
                         if (!landed)
                         {
                             landed = true;
+                            OffBoard = false;   // back on the board
                             transform.position = plan.target;
                             Sfx.Play(LandSfx, plan.target);
                             Vfx.GroundImpact(plan.target, plan.radius, 0.9f, hostile: true);
+                            if (plan.squares != null) SquareImpacts(plan.squares, 0.6f);
                             Game.Rig.Shake(0.25f);
                         }
                         squash = 0.8f;
@@ -698,15 +820,17 @@ namespace KingLastPiece
                     }
                     break;
                 case AtkKind.Slam:
+                case AtkKind.Zone:
                     modelY = Mathf.Lerp(1.2f, 0f, p * p);
                     if (p >= 1f)
                     {
                         if (!landed)
                         {
                             landed = true;
-                            Vfx.GroundImpact(atkStart, plan.radius, 1.1f, hostile: true);
+                            if (plan.kind == AtkKind.Slam) Vfx.GroundImpact(atkStart, plan.radius, 1.1f, hostile: true);
+                            if (plan.squares != null) SquareImpacts(plan.squares, plan.kind == AtkKind.Zone ? 1f : 0.6f);
                             Sfx.Play(LandSfx, atkStart);
-                            Game.Rig.Shake(0.4f);
+                            Game.Rig.Shake(plan.safe != null ? 0.8f : 0.4f);
                         }
                         squash = 0.75f;
                         TryHitPlayer(atkStart, plan.radius);
@@ -714,6 +838,20 @@ namespace KingLastPiece
                     }
                     break;
             }
+        }
+
+        /// <summary>Each struck square flares (a square ring and embers); a big set gets one shared crack sound.</summary>
+        void SquareImpacts(Vector2Int[] squares, float strength)
+        {
+            float tile = GameManager.TileSize;
+            foreach (var s in squares)
+            {
+                Vector3 c = BoardSlots.Center(s);
+                SquareRingFx.Spawn(c, tile * 0.55f, Vfx.Ember, 0.35f, 0f);
+                if (squares.Length <= 24 || Random.value < 24f / squares.Length)
+                    Effects.Sparks(c + Vector3.up * 0.15f, new Color(0.7f, 0.12f, 0.05f), Mathf.RoundToInt(4 * strength) + 1, 3f);
+            }
+            if (Player != null && plan.kind == AtkKind.Zone) Vfx.GroundImpact(Player.FlatPos, tile * 0.6f, 0.5f * strength, hostile: true);
         }
 
         void FinishAttack()
@@ -725,23 +863,13 @@ namespace KingLastPiece
             Enter(EState.Recover);
         }
 
-        /// <summary>The knight lands on the King's square and strikes it and the four squares beside it (a cross).</summary>
-        bool StrikesCross => Type == PieceType.Knight && plan.kind == AtkKind.Leap;
-
-        /// <summary>Distance from an offset (from the landing square's centre) to the cross of five squares (0 inside).</summary>
-        static float CrossGap(Vector3 d)
-        {
-            float t = GameManager.TileSize;
-            float Box(float hx, float hz) => new Vector2(Mathf.Max(Mathf.Abs(d.x) - hx, 0f), Mathf.Max(Mathf.Abs(d.z) - hz, 0f)).magnitude;
-            return Mathf.Min(Box(1.5f * t, 0.5f * t), Box(0.5f * t, 1.5f * t));
-        }
-
         void TryHitPlayer(Vector3 center, float radius)
         {
             if (atkHit || Player == null || Player.IsDead) return;
             Vector3 d = Player.FlatPos - new Vector3(center.x, 0f, center.z);
-            // Gap between the King's centre and the strike's edge (the knight's landing strikes a cross of squares).
-            float gap = StrikesCross ? CrossGap(d) : d.magnitude - radius;
+            // Gap between the King's centre and the strike's edge (a knight's landing, a zone: the squares it strikes).
+            bool bySquares = plan.squares != null && plan.kind != AtkKind.Lunge && plan.kind != AtkKind.Dash;
+            float gap = bySquares ? SquaresGap(plan.squares, Player.FlatPos) : d.magnitude - radius;
             if (gap <= Player.Radius) atkHit = Player.TakeHitFrom(this, plan.damage, plan.poise);
             // A near miss still counts for a perfect dodge (rolling out of the hit at the last moment).
             else if (gap <= Player.Radius + PlayerController.NearMissMargin) Player.NotifyNearMiss(this);
@@ -762,7 +890,7 @@ namespace KingLastPiece
         bool wallHit;
         readonly System.Collections.Generic.HashSet<EnemyBase> launchHits = new System.Collections.Generic.HashSet<EnemyBase>();
 
-        public bool CanBeGrabbed => !IsDead && state != EState.Spawning && state != EState.Launched;
+        public bool CanBeGrabbed => !IsDead && !OffBoard && state != EState.Spawning && state != EState.Launched;
 
         public void BeginGrab()
         {
@@ -856,7 +984,7 @@ namespace KingLastPiece
 
         public override bool TakeHit(float damage, float poiseDamage, Vector3 source)
         {
-            if (IsDead || state == EState.Spawning) return false;
+            if (IsDead || OffBoard || state == EState.Spawning) return false;
 
             hitFrame = Time.frameCount;
             Health -= damage;
