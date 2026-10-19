@@ -257,7 +257,8 @@ namespace KingLastPiece
 
             if (stagger != null)
             {
-                stagger.Tick(dt, state == EState.Airborne || state == EState.Getup);
+                // The broken guard's timer runs while the piece stands dazed or lies on the board, not while it flies.
+                stagger.Tick(dt, state == EState.Airborne);
                 if (stagger.Vulnerable && state != EState.Airborne) AnimateVulnerable(dt);
             }
             else if (poiseRegenTimer > 0f) poiseRegenTimer -= dt;
@@ -265,7 +266,8 @@ namespace KingLastPiece
 
             switch (state)
             {
-                case EState.Move: Think(dt); break;
+                // Guard broken: no attacks, no moving — it stands there dazed until the gauge recovers.
+                case EState.Move: if (!IsVulnerable) Think(dt); break;
                 case EState.Windup: UpdateWindup(); break;
                 case EState.Attack: UpdateAttack(); break;
                 case EState.Recover:
@@ -880,7 +882,7 @@ namespace KingLastPiece
                 // Super armor from wind-up through the end of the hit; recovery is unarmored (punish window).
                 bool superArmor = state == EState.Windup || state == EState.Attack;
                 var reaction = stagger.OnHit(poiseDamage, superArmor, state == EState.Airborne);
-                if (stagger.JustBecameVulnerable) VulnerableBurst();
+                if (stagger.JustBecameVulnerable) BreakGuard();
                 else if (superArmor && reaction == StaggerController.Reaction.None) Sfx.Play("HIT_Armor", transform.position + Vector3.up);
                 if (reaction == StaggerController.Reaction.Launch) LaunchUp(source);
                 else if (reaction == StaggerController.Reaction.Flinch) Flinch(source, stagger.Profile.flinchDuration);
@@ -1103,8 +1105,10 @@ namespace KingLastPiece
         /// </summary>
         void UpdateGetup()
         {
-            float t = stateTime;
             float lieTime = GetupLie + bonusLie;
+            // Knocked down with the guard broken: it stays down until the gauge recovers, then gets up.
+            if (IsVulnerable && stateTime > lieTime) stateTime = lieTime;
+            float t = stateTime;
             if (t >= lieTime && t - Time.deltaTime < lieTime) Sfx.Play("STG_Getup", transform.position);
             if (t < lieTime)
             {
@@ -1126,6 +1130,17 @@ namespace KingLastPiece
                 Enter(EState.Move);
                 cooldown = Mathf.Max(cooldown, 0.6f);
             }
+        }
+
+        /// <summary>The guard just broke: whatever it was doing (even mid-attack) stops, and the burst shows it.</summary>
+        void BreakGuard()
+        {
+            if (state == EState.Windup || state == EState.Attack || state == EState.Recover)
+            {
+                CancelAction();
+                Enter(EState.Move);
+            }
+            VulnerableBurst();
         }
 
         /// <summary>The gauge just filled: hidden gauge, so make Vulnerable obvious with a burst.</summary>
@@ -1157,7 +1172,7 @@ namespace KingLastPiece
             if (IsDead || amount <= 0f) return;
             if (stagger != null)
             {
-                if (stagger.Add(amount)) VulnerableBurst();
+                if (stagger.Add(amount)) BreakGuard();
                 return;
             }
             poise -= amount;

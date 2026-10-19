@@ -59,7 +59,7 @@ namespace KingLastPiece
             decayTimer = 0f;
         }
 
-        /// <summary>Advance timers. <paramref name="frozen"/> while airborne / getting up.</summary>
+        /// <summary>Advance timers. <paramref name="frozen"/> while airborne.</summary>
         public void Tick(float dt, bool frozen)
         {
             if (frozen) return;
