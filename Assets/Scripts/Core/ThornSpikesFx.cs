@@ -3,32 +3,58 @@ using UnityEngine;
 namespace KingLastPiece
 {
     /// <summary>
-    /// Thorn Armor's burst: a ring of steel cone spikes shoots out of the King in every direction (a long outer ring and
-    /// a shorter one between them, tilted a little up), holds a beat, then draws back in.
+    /// Thorn Armor's burst, riding along with the King (a knockback carries it with him): a ring of steel cone spikes
+    /// shoots out in every direction (a long outer ring and a shorter one between them, tilted a little up), holds a
+    /// beat and draws back in; a thin white ring spreads out to the burst's reach and fades, and white sparks fly.
     /// </summary>
     public class ThornSpikesFx : MonoBehaviour
     {
-        const float Out = 0.07f, Hold = 0.1f, Back = 0.16f;
-        static Mesh cone;
-        static Material steel;
+        const float Out = 0.07f, Hold = 0.1f, Back = 0.16f, RingTime = 0.32f, RingWidth = 0.14f;
+        static Mesh cone, ring;
+        static Material steel, ringBase;
 
+        Transform follow, ringT;
+        Material ringMat;
         Transform[] spikes;
         float[] lengths;
-        float t;
+        float t, radius;
 
-        /// <param name="radius">How far the long spikes reach.</param>
-        public static void Spawn(Vector3 center, float radius)
+        /// <param name="radius">How far the long spikes and the ring reach.</param>
+        public static void Spawn(Transform follow, float radius)
         {
             var go = new GameObject("Thorn Spikes");
-            go.transform.position = new Vector3(center.x, 0.9f, center.z);
             var fx = go.AddComponent<ThornSpikesFx>();
+            fx.follow = follow;
+            fx.radius = radius;
+            fx.Place();
             fx.Build(radius);
+            for (int k = 0; k < 16; k++)
+            {
+                Vector3 d = Quaternion.Euler(0f, k * 22.5f, 0f) * Vector3.forward;
+                Effects.Sparks(go.transform.position + d * 0.6f, Vfx.Accent, 1, 9f);
+            }
+        }
+
+        void Place()
+        {
+            if (follow != null) transform.position = new Vector3(follow.position.x, 0.9f, follow.position.z);
         }
 
         void Build(float radius)
         {
             cone ??= BuildCone(10);
+            ring ??= BuildRing(64);
             steel ??= MaterialLib.Get(new Color(0.78f, 0.79f, 0.82f), 0.85f, 0.9f, new Color(0.35f, 0.35f, 0.38f));
+            ringBase ??= MaterialLib.Transparent(new Color(1f, 0.98f, 0.94f, 0.9f), new Color(1.6f, 1.55f, 1.45f));
+            // The ring: an outline (not a filled disc) lying on the board under the King.
+            ringT = new GameObject("Ring").transform;
+            ringT.SetParent(transform, false);
+            ringT.localPosition = Vector3.down * 0.86f;
+            ringT.gameObject.AddComponent<MeshFilter>().sharedMesh = ring;
+            var rr = ringT.gameObject.AddComponent<MeshRenderer>();
+            ringMat = new Material(ringBase);
+            rr.sharedMaterial = ringMat;
+            rr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             const int count = 24;
             spikes = new Transform[count];
             lengths = new float[count];
@@ -52,9 +78,17 @@ namespace KingLastPiece
             }
         }
 
-        void Update()
+        void LateUpdate()
         {
             t += Time.deltaTime;
+            Place();
+            // The ring spreads out to the reach and fades.
+            float rp = Mathf.Clamp01(t / RingTime);
+            float rr = Mathf.Lerp(0.6f, radius, PoseTrack.Curve(Ease.Out, rp));
+            ringT.localScale = new Vector3(rr, 1f, rr);
+            var rc = ringMat.GetColor("_BaseColor");
+            rc.a = 0.9f * (1f - rp);
+            ringMat.SetColor("_BaseColor", rc);
             float k = t < Out ? PoseTrack.Curve(Ease.Out, t / Out)
                     : t < Out + Hold ? 1f
                     : 1f - PoseTrack.Curve(Ease.In, Mathf.Clamp01((t - Out - Hold) / Back));
@@ -63,7 +97,34 @@ namespace KingLastPiece
                 float len = lengths[i] * k, w = Mathf.Lerp(0.12f, 0.26f, lengths[i] / 4f) * Mathf.Clamp01(k * 3f);
                 spikes[i].localScale = new Vector3(w, len, w);
             }
-            if (t >= Out + Hold + Back) Destroy(gameObject);
+            if (t >= Mathf.Max(Out + Hold + Back, RingTime)) Destroy(gameObject);
+        }
+
+        void OnDestroy()
+        {
+            if (ringMat != null) Destroy(ringMat);
+        }
+
+        /// <summary>A flat ring (annulus) of outer radius 1 and width <see cref="RingWidth"/>, facing up.</summary>
+        static Mesh BuildRing(int segments)
+        {
+            var verts = new Vector3[segments * 2];
+            var tris = new int[segments * 6];
+            for (int i = 0; i < segments; i++)
+            {
+                float a = i * Mathf.PI * 2f / segments;
+                var dir = new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a));
+                verts[i * 2] = dir;
+                verts[i * 2 + 1] = dir * (1f - RingWidth);
+                int n = (i + 1) % segments;
+                // Seen from above (clockwise = front).
+                tris[i * 6 + 0] = i * 2; tris[i * 6 + 1] = i * 2 + 1; tris[i * 6 + 2] = n * 2;
+                tris[i * 6 + 3] = n * 2; tris[i * 6 + 4] = i * 2 + 1; tris[i * 6 + 5] = n * 2 + 1;
+            }
+            var m = new Mesh { name = "Thorn Ring", vertices = verts, triangles = tris };
+            m.RecalculateNormals();
+            m.RecalculateBounds();
+            return m;
         }
 
         /// <summary>A cone along +Y: base circle of radius 0.5 at y = 0, tip at y = 1.</summary>

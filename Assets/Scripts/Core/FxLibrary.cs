@@ -20,7 +20,8 @@ namespace KingLastPiece
 
         [Header("Tazo FX")]
         public GameObject recoverHold;   // the King's healing aura (looping)
-        public GameObject auraField;     // Black Aurora (special item): the swirling circle under the King (Tazo L_Bughole_circle)
+        /// <summary>Black Aurora (special item): Tazo FX images the ground field is built from — pool, smoke, rays, spreading wave.</summary>
+        public Texture2D[] auroraTextures;
 
         [Header("AC Little Enchant Mesh VFX (empowered pieces)")]
         public GameObject[] eliteAura;          // Dark Lvl 1–3

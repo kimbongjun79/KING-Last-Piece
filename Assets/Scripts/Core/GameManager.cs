@@ -430,16 +430,14 @@ namespace KingLastPiece
         public void ReportPlayerDamage(float amount) => Record.damageTaken += amount;
         public void ReportFlask() => Record.flasksUsed++;
 
-        /// <summary>Damage over time (Black Aurora): counted in the run record, but no popup (it ticks too often).</summary>
-        public void ReportDotDamage(float amount) => Record.damageDealt += amount;
-
-        public void ReportDamage(EnemyBase e, float amount, bool crit = false)
+        /// <param name="quiet">No popup sound (damage that ticks often, like the Black Aurora).</param>
+        public void ReportDamage(EnemyBase e, float amount, bool crit = false, bool quiet = false)
         {
             DamageEvents++;
             Record.damageDealt += amount;
             Record.biggestHit = Mathf.Max(Record.biggestHit, amount);
             if (crit) Record.crits++;
-            Sfx.Play("UI_DamagePopup");
+            if (!quiet) Sfx.Play("UI_DamagePopup");
             Popups.Add(new DamagePopup
             {
                 position = e.transform.position + Vector3.up * (e.IsBoss ? 3.3f : 2.3f) + Random.insideUnitSphere * 0.3f,

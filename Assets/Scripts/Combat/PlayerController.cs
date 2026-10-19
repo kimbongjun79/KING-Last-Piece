@@ -311,7 +311,7 @@ namespace KingLastPiece
         // A wide field around the King: pieces in it walk 40% slower and keep taking a little damage — (max health × 4%)
         // per second × the damage bonus. No crits, no stagger, no knockback.
         const float AuroraRadius = 6f, AuroraTick = 0.5f, AuroraSlow = 0.6f, AuroraHealthShare = 0.04f;
-        GameObject aurora;
+        AuroraFieldFx aurora;
         float auroraTimer;
 
         void UpdateAurora(float dt)
@@ -319,10 +319,10 @@ namespace KingLastPiece
             bool on = Has(Special.BlackAurora);
             if (!on)
             {
-                if (aurora != null) Destroy(aurora);
+                if (aurora != null) Destroy(aurora.gameObject);
                 return;
             }
-            if (aurora == null) aurora = BuildAurora();
+            if (aurora == null) aurora = AuroraFieldFx.Spawn(transform, AuroraRadius);
 
             auroraTimer -= dt;
             if (auroraTimer > 0f) return;
@@ -333,48 +333,10 @@ namespace KingLastPiece
                 if (e == null || e.IsDead || !e.Targetable) continue;
                 if ((e.FlatPos - FlatPos).magnitude > AuroraRadius + e.Radius) continue;
                 e.Slow(AuroraSlow, AuroraTick + 0.15f);
+                // Tick damage shows its number (quietly: no popup sound every tick).
                 e.TakeAuraDamage(damage, transform.position);
-                Game.ReportDotDamage(damage);
+                Game.ReportDamage(e, damage, false, quiet: true);
             }
-        }
-
-        /// <summary>
-        /// The field's look: Tazo FX's swirling "Bughole" circle laid under the King, scaled to the field and turned into a
-        /// black aurora (its additive materials swapped for alpha-blended copies, its colours made ink-black).
-        /// </summary>
-        GameObject BuildAurora()
-        {
-            var lib = FxLibrary.Instance;
-            if (lib == null || lib.auraField == null) return new GameObject("Black Aurora (no fx)");
-            var fx = Instantiate(lib.auraField, transform);
-            fx.name = "Black Aurora";
-            fx.transform.localPosition = Vector3.up * 0.05f;
-            fx.transform.localRotation = Quaternion.identity;
-            fx.transform.localScale = Vector3.one * (AuroraRadius / 2.5f);
-            foreach (var ps in fx.GetComponentsInChildren<ParticleSystem>(true))
-            {
-                var main = ps.main;
-                main.scalingMode = ParticleSystemScalingMode.Hierarchy;
-                main.simulationSpace = ParticleSystemSimulationSpace.Local;   // the field follows the King
-            }
-            foreach (var a in fx.GetComponentsInChildren<AudioSource>(true)) a.enabled = false;
-            // Alpha-blended black copies of its materials (black would vanish in additive), built from the Dark aura's.
-            var sources = new System.Collections.Generic.List<Material>();
-            foreach (var r in fx.GetComponentsInChildren<ParticleSystemRenderer>(true))
-                foreach (var m in r.sharedMaterials)
-                    if (m != null && !sources.Contains(m)) sources.Add(m);
-            var template = lib.eliteAuraBlack != null && lib.eliteAuraBlack.Length > 0 ? lib.eliteAuraBlack[0] : null;
-            if (template != null)
-            {
-                var blacks = new Material[sources.Count];
-                for (int i = 0; i < sources.Count; i++)
-                {
-                    blacks[i] = new Material(template) { name = "Aurora " + sources[i].name };
-                    if (sources[i].HasProperty("_MainTex")) blacks[i].SetTexture("_BaseMap", sources[i].GetTexture("_MainTex"));
-                }
-                EliteAura.Blacken(fx, sources.ToArray(), blacks, 1.6f);
-            }
-            return fx;
         }
 
         // ---------------------------------------------------------------- Thorn Armor (special item)
@@ -389,7 +351,7 @@ namespace KingLastPiece
         {
             float damage = (ThornBase + Mathf.Max(0f, Stats.defense)) * (1f + Stats.damage);
             if (damage <= 0f) return;
-            ThornSpikesFx.Spawn(FlatPos, ThornRadius);
+            ThornSpikesFx.Spawn(transform, ThornRadius);
             Sfx.Play("HIT_Armor", transform.position + Vector3.up);
             foreach (var e in Game.Enemies)
             {
