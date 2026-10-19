@@ -165,7 +165,7 @@ namespace KingLastPiece
             crumbled = false;
             InitActor(Stats.maxHealth);
             Stamina = MaxStamina;
-            stalemateUsed = false;
+            stalemateUsed = gambitUsed = false;
             stalemateTimer = 0f;
             Flasks = MaxFlasks;
             Enter(State.Normal);
@@ -264,7 +264,7 @@ namespace KingLastPiece
 
         // Stalemate (special item): once a round a lethal blow leaves the King at 1 health, invincible for a moment.
         const float StalemateGuard = 2f, StalemateRadius = 4f;
-        bool stalemateUsed;
+        bool stalemateUsed, gambitUsed;   // Gambit (special item): the first blow of each round is ignored
         float stalemateTimer;
 
         /// <summary>
@@ -291,7 +291,7 @@ namespace KingLastPiece
         /// </summary>
         public void Rest()
         {
-            stalemateUsed = false;   // Stalemate is ready again for the next round
+            stalemateUsed = gambitUsed = false;   // Stalemate and Gambit are ready again for the next round
             if (Flasks >= MaxFlasks && Health < MaxHealth)
             {
                 Restore(HealAmount);
@@ -1302,6 +1302,17 @@ namespace KingLastPiece
             float taken = Stats.DamageTaken(damage);
             // Martyr's Crown: at 30% health or less, blows hurt 20% less.
             if (Has(Special.MartyrCrown) && Health <= MaxHealth * 0.3f) taken *= 0.8f;
+            if (Has(Special.Gambit) && !gambitUsed)
+            {
+                // Gambit: the round's first blow is given up to a pawn — no damage.
+                gambitUsed = true;
+                Flash(new Color(1.4f, 1.4f, 1.3f), 0.25f);
+                Sfx.Play("HIT_Armor", transform.position + Vector3.up);
+                Effects.Shockwave(FlatPos, 1.6f, Vfx.Accent, 0.35f);
+                Effects.Sparks(transform.position + Vector3.up, Vfx.Accent, 14, 5f);
+                Game.ShowBanner("갬빗");
+                return true;
+            }
             taken = Mathf.Min(Health, taken);
             if (taken >= Health && Has(Special.Stalemate) && !stalemateUsed)
             {

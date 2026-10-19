@@ -102,7 +102,7 @@ namespace KingLastPiece
 
     /// <summary>A round-end item: a fixed set of stat steps and a grade set by how much they are worth.</summary>
     /// <summary>What a special item does (none: a stat item).</summary>
-    public enum Special { None, Stalemate, KingsDance, MartyrCrown, Execution }
+    public enum Special { None, Stalemate, KingsDance, MartyrCrown, Execution, Gambit }
 
     public class Item
     {
@@ -258,6 +258,7 @@ namespace KingLastPiece
             S("kings_dance",    "왕의 연무",      L, Special.KingsDance, "강공격 버튼이 사라지고, 일반공격 4타 뒤에 5타로 강공격(띄우기 포함)이 이어집니다. 이 5타 강공격의 기력 소모는 50% 줄어듭니다."),
             S("martyr_crown",   "순교자의 왕관",  H, Special.MartyrCrown, "체력이 낮을수록 주는 피해가 커집니다 (체력이 바닥에 가까울수록 최대 +50%). 체력 30% 이하에서는 받는 피해가 20% 줄어듭니다."),
             S("execution",      "처형",           H, Special.Execution, "기절한 적을 강공격으로 치면 피해가 100% 추가됩니다."),
+            S("gambit",         "갬빗",           R, Special.Gambit, "라운드마다 처음 받는 피해 1번을 무시합니다. 폰 하나를 내주고 왕을 지킵니다."),
             I("fountain_of_life","생명의 샘",     L, E(Fl, 1), E(Heal, 2), E(Hp, 2)),
         };
 
