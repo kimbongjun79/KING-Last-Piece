@@ -362,10 +362,102 @@ namespace KingLastPiece
             }
         }
 
+        /// <summary>
+        /// Practice ▸ T: every item as an icon (grouped by grade), click to give it to the King right away; the King's
+        /// stats beside it. Hover an icon for what it does. Reset forgets every item; the base switches between the
+        /// classic King and the endless mode's weak starting King.
+        /// </summary>
+        void DrawItemTestPanel(PracticeArena arena, PlayerController p)
+        {
+            var e = Event.current;
+            Vector2 mouse = e.mousePosition;
+            float pw = 1560 * scale, ph = 820 * scale;
+            var panel = new Rect((Screen.width - pw) / 2f, (Screen.height - ph) / 2f, pw, ph);
+            Fill(new Rect(0, 0, Screen.width, Screen.height), new Color(0f, 0f, 0f, 0.45f));
+            Fill(new Rect(panel.x - 2 * scale, panel.y - 2 * scale, panel.width + 4 * scale, panel.height + 4 * scale), new Color(Gold.r, Gold.g, Gold.b, 0.8f));
+            Fill(panel, new Color(0.05f, 0.045f, 0.05f, 0.97f));
+            Text(new Rect(panel.x + 20 * scale, panel.y + 12 * scale, 600 * scale, 40 * scale), "아이템 테스트  —  클릭하면 바로 적용", label, Gold);
+
+            // Buttons: reset, base, close.
+            bool Button(Rect r, string text)
+            {
+                bool hot = r.Contains(mouse);
+                Fill(r, hot ? new Color(Gold.r, Gold.g, Gold.b, 0.9f) : new Color(1f, 1f, 1f, 0.1f));
+                Text(r, text, new GUIStyle(small) { alignment = TextAnchor.MiddleCenter, fontSize = Mathf.RoundToInt(17 * scale) },
+                    hot ? new Color(0.08f, 0.06f, 0.05f) : new Color(0.9f, 0.88f, 0.8f));
+                if (e.type == EventType.MouseDown && hot) { e.Use(); return true; }
+                return false;
+            }
+            float bw = 200 * scale, bh = 40 * scale, by = panel.y + 12 * scale;
+            if (Button(new Rect(panel.xMax - 3 * (bw + 12 * scale), by, bw, bh), "아이템 초기화")) arena.ResetItems();
+            if (Button(new Rect(panel.xMax - 2 * (bw + 12 * scale), by, bw, bh), arena.EndlessBase ? "기본: 무한 모드 시작" : "기본: 일반 모드")) arena.ToggleBase();
+            if (Button(new Rect(panel.xMax - (bw + 12 * scale), by, bw, bh), "닫기  (T)")) arena.ToggleItemPanel();
+
+            // The items, a row per grade (wrapping), with how many the King holds.
+            float cell = 66 * scale, icon = 54 * scale, gx = panel.x + 20 * scale, gw = 860 * scale;
+            float y = panel.y + 66 * scale;
+            int cols = Mathf.FloorToInt(gw / cell);
+            Item hover = null;
+            var counts = new System.Collections.Generic.Dictionary<Item, int>();
+            foreach (var it in p.Items) counts[it] = counts.TryGetValue(it, out int c) ? c + 1 : 1;
+            var countStyle = new GUIStyle(small) { fontSize = Mathf.RoundToInt(14 * scale), alignment = TextAnchor.LowerRight, fontStyle = FontStyle.Bold };
+            for (int g = 0; g < 4; g++)
+            {
+                var grade = (UpgradeGrade)g;
+                Color gc = GradeColor(grade);
+                Text(new Rect(gx, y, 200 * scale, 24 * scale), Upgrades.GradeName(grade), new GUIStyle(small) { fontSize = Mathf.RoundToInt(16 * scale), fontStyle = FontStyle.Bold },
+                    gc);
+                y += 26 * scale;
+                int i = 0;
+                foreach (var it in Upgrades.All)
+                {
+                    if (it.grade != grade) continue;
+                    var r = new Rect(gx + (i % cols) * cell, y + (i / cols) * cell, icon, icon);
+                    bool usable = !it.IsSpecial || Upgrades.Useful(p.Stats, it, p.Items);
+                    bool hot = r.Contains(mouse);
+                    if (hot) hover = it;
+                    Fill(new Rect(r.x - 2 * scale, r.y - 2 * scale, r.width + 4 * scale, r.height + 4 * scale),
+                        hot ? Color.white : it.IsSpecial ? Gold : new Color(gc.r * 0.8f, gc.g * 0.8f, gc.b * 0.8f));
+                    Fill(r, new Color(0.02f, 0.02f, 0.025f));
+                    var old = GUI.color;
+                    GUI.color = usable ? Color.white : new Color(1f, 1f, 1f, 0.3f);
+                    if (it.Icon != null) GUI.DrawTexture(r, it.Icon, ScaleMode.ScaleToFit);
+                    GUI.color = old;
+                    if (counts.TryGetValue(it, out int n))
+                        Text(new Rect(r.x, r.y, r.width - 3 * scale, r.height - 1 * scale), it.IsSpecial ? "보유" : $"×{n}", countStyle, new Color(1f, 0.95f, 0.6f));
+                    if (hot && e.type == EventType.MouseDown) { arena.GiveItem(it); e.Use(); }
+                    i++;
+                }
+                y += Mathf.CeilToInt(i / (float)cols) * cell + 6 * scale;
+            }
+
+            // The King's stats on the right.
+            DrawStats(p, new Rect(panel.x + gw + 50 * scale, panel.y + 66 * scale, panel.xMax - (panel.x + gw + 70 * scale), 0f));
+
+            if (hover != null) DrawTooltip(ItemSummary(hover, p), mouse);
+        }
+
+        /// <summary>An item's name, grade and what it does (effects with before → after, or a special's description).</summary>
+        static string ItemSummary(Item it, PlayerController p)
+        {
+            var sb = new System.Text.StringBuilder();
+            sb.Append($"[{it.GradeName}{(it.IsSpecial ? " · 특수" : "")}] {it.name}\n");
+            if (it.IsSpecial) sb.Append(it.desc);
+            else
+                foreach (var fx in it.effects)
+                    sb.Append($"{Upgrades.Def(fx.kind).title} {Upgrades.Arrows(fx)}   {Upgrades.Preview(p.Stats, fx)}\n");
+            return sb.ToString().TrimEnd();
+        }
+
         void DrawPracticePanel()
         {
             var arena = PracticeArena.Instance;
             if (arena == null) return;
+            if (arena.ItemPanelOpen)
+            {
+                DrawItemTestPanel(arena, GameManager.Instance.Player);
+                return;
+            }
             var g = GameManager.Instance;
             float w = 430 * scale, x = Screen.width - w - 24 * scale, y = 24 * scale, line = 26 * scale;
             string[] rows =
@@ -377,6 +469,7 @@ namespace KingLastPiece
                 $"H     히트스톱: {(g.HitStopEnabled ? "켜짐" : "꺼짐")}",
                 $"V     체스판 슬롯 표시: {(arena.SlotViewOn ? "켜짐" : "꺼짐")}",
                 $"E     소환 단계: {(arena.SpawnTier == 0 ? "일반" : "다크 " + new string('I', arena.SpawnTier))}",
+                "T     아이템 테스트 창 (클릭해서 적용)",
             };
             Fill(new Rect(x, y, w, (rows.Length + 1.6f) * line + 16 * scale), new Color(0f, 0f, 0f, 0.6f));
             x += 14 * scale;

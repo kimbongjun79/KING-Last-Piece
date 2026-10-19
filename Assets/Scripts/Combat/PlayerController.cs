@@ -411,6 +411,18 @@ namespace KingLastPiece
             Effects.Sparks(transform.position + Vector3.up, gold, 14, 3f);
         }
 
+        /// <summary>Lab: start over from <paramref name="s"/> (items forgotten), full health, stamina, flasks and rolls.</summary>
+        public void ResetStatsForLab(PlayerStats s)
+        {
+            Stats = s;
+            InitActor(s.maxHealth);
+            Stamina = MaxStamina;
+            Flasks = MaxFlasks;
+            DodgeCharges = MaxDodges;
+            stalemateUsed = gambitUsed = false;
+            stalemateTimer = 0f;
+        }
+
         public void RefillForLab()
         {
             Health = MaxHealth;

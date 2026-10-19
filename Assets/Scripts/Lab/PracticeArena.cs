@@ -75,6 +75,43 @@ namespace KingLastPiece
         /// <summary>V: show the board slots (attack squares red, waiting squares grey, the King's square gold).</summary>
         public bool SlotViewOn { get { var v = GetComponent<SlotDebugView>(); return v != null && v.enabled; } }
 
+        // ---------------------------------------------------------------- item test window (T)
+
+        /// <summary>The item test window is open: the cursor is free to click items.</summary>
+        public bool ItemPanelOpen { get; private set; }
+        /// <summary>The base the item tests start from: the endless mode's weak King (true) or the classic one.</summary>
+        public bool EndlessBase { get; private set; }
+
+        public void ToggleItemPanel()
+        {
+            ItemPanelOpen = !ItemPanelOpen;
+            Cursor.lockState = ItemPanelOpen ? CursorLockMode.None : CursorLockMode.Locked;
+            Cursor.visible = ItemPanelOpen;
+            Sfx.Play(ItemPanelOpen ? "UI_Confirm" : "UI_Back");
+        }
+
+        /// <summary>Gives the King an item now (a held special item, or one it excludes, is refused).</summary>
+        public void GiveItem(Item item)
+        {
+            var p = game.Player;
+            if (item.IsSpecial && !Upgrades.Useful(p.Stats, item, p.Items)) { Sfx.Play("UI_Back"); return; }
+            p.ApplyItem(item);
+            Sfx.Play("UI_Confirm");
+        }
+
+        /// <summary>Forgets every item: back to the chosen base stats.</summary>
+        public void ResetItems()
+        {
+            game.Player.ResetStatsForLab(EndlessBase ? PlayerStats.EndlessStart() : PlayerStats.Classic());
+            Sfx.Play("UI_Back");
+        }
+
+        public void ToggleBase()
+        {
+            EndlessBase = !EndlessBase;
+            ResetItems();
+        }
+
         void ToggleSlotView()
         {
             var view = GetComponent<SlotDebugView>();
@@ -129,12 +166,14 @@ namespace KingLastPiece
                 if (kb.gKey.wasPressedThisFrame) game.Player.GodMode = Invincible = !Invincible;
                 if (kb.iKey.wasPressedThisFrame) game.Player.InfiniteStamina = InfiniteStamina = !InfiniteStamina;
                 if (kb.vKey.wasPressedThisFrame) ToggleSlotView();
+                if (kb.tKey.wasPressedThisFrame) ToggleItemPanel();
                 if (kb.eKey.wasPressedThisFrame) { SpawnTier = (SpawnTier + 1) % (EnemyBase.MaxEliteTier + 1); Sfx.Play("UI_Confirm"); }
                 if (kb.xKey.wasPressedThisFrame || kb.cKey.wasPressedThisFrame || kb.hKey.wasPressedThisFrame ||
                     kb.gKey.wasPressedThisFrame || kb.iKey.wasPressedThisFrame) Sfx.Play("UI_Confirm");
             }
 
-            if (game.Player.Health < game.Player.MaxHealth * 0.3f) game.Player.RefillForLab();
+            // Kept topped up — except while testing items (low-health items like Martyr's Crown need the King hurt).
+            if (game.Player.Items.Count == 0 && game.Player.Health < game.Player.MaxHealth * 0.3f) game.Player.RefillForLab();
 
             for (int i = 0; i < dummies.Length; i++)
             {
