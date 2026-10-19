@@ -765,14 +765,14 @@ namespace KingLastPiece
             DrawTable(area, new (string, string, string)[]
             {
                 ("공격력", $"{Mathf.RoundToInt(s.attackPower * 100f)}%", D(UpgradeKind.AttackPower)),
-                ("데미지", $"+{Mathf.RoundToInt(s.damage * 100f)}%   (최종 피해 ×{s.DamageMultiplier:0.00})", D(UpgradeKind.Damage)),
+                ("데미지", $"{(s.damage >= 0f ? "+" : "−")}{Mathf.RoundToInt(Mathf.Abs(s.damage) * 100f)}%   (최종 피해 ×{s.DamageMultiplier:0.00})", D(UpgradeKind.Damage)),
                 ("공격 속도", $"{Mathf.RoundToInt(s.attackSpeed * 100f)}%   (최대 135%)", D(UpgradeKind.AttackSpeed)),
                 ("공격 범위", $"{Mathf.RoundToInt(s.attackRange * 100f)}%   (최대 130%)", D(UpgradeKind.AttackRange)),
                 ("치명타", $"확률 {Mathf.RoundToInt(s.critChance * 100f)}% (최대 60%)   ·   피해 {Mathf.RoundToInt(s.critDamage * 100f)}% (최대 300%)",
                     D(UpgradeKind.CritChance) + "\n" + D(UpgradeKind.CritDamage)),
                 ("경직 피해", $"{Mathf.RoundToInt(s.staggerPower * 100f)}%   (최대 200%)", D(UpgradeKind.StaggerPower)),
                 ("최대 체력", $"{Mathf.RoundToInt(p.MaxHealth)}", D(UpgradeKind.MaxHealth)),
-                ("방어력", $"{Mathf.RoundToInt(s.defense)}   (받는 피해 −{Mathf.RoundToInt(dmgCut * 100f)}%)", D(UpgradeKind.Defense)),
+                ("방어력", $"{Mathf.RoundToInt(s.defense)}   (받는 피해 {(dmgCut >= 0f ? "−" : "+")}{Mathf.RoundToInt(Mathf.Abs(dmgCut) * 100f)}%)", D(UpgradeKind.Defense)),
                 ("회복약", $"{p.MaxFlasks}개 (최대 5)   ·   회복량 {Mathf.RoundToInt(s.healAmount)}", D(UpgradeKind.Flask) + "\n" + D(UpgradeKind.HealAmount)),
                 ("흡혈 · 처치 회복", $"{Upgrades.Format(UpgradeKind.LifeSteal, s.lifeSteal)}  ·  처치마다 {Mathf.RoundToInt(s.killHeal)}   (지금 효율 ×{sustain:0.00})",
                     D(UpgradeKind.LifeSteal) + "\n" + D(UpgradeKind.KillHeal) + $"\n효율: 1라운드 ×0.34 · 20라운드 ×1.0 · 40라운드 ×1.7 (상한 없음)"),

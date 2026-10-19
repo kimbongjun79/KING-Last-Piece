@@ -78,7 +78,8 @@ namespace KingLastPiece
 
         public PlayerStats Clone() => (PlayerStats)MemberwiseClone();
 
-        public float DamageTaken(float damage) => damage * 100f / (100f + Mathf.Max(0f, defense));
+        /// <summary>Defense below zero (an item's drawback) makes hits hurt more: −30 → ×1.43, never past ×2.5.</summary>
+        public float DamageTaken(float damage) => damage * 100f / Mathf.Max(40f, 100f + defense);
 
         /// <summary>What every blow is multiplied by: attack power × (1 + damage bonus).</summary>
         public float DamageMultiplier => attackPower * (1f + damage);
@@ -147,14 +148,14 @@ namespace KingLastPiece
         static readonly Dictionary<UpgradeKind, UpgradeDef> defs = new Dictionary<UpgradeKind, UpgradeDef>
         {
             { UpgradeKind.AttackPower,   new UpgradeDef { title = "공격력",        step = 0.05f, cap = Inf,   floor = 0.3f, percent = true, desc = "모든 공격의 기본 피해 배율. 1단계 +5% (더하기)." } },
-            { UpgradeKind.Damage,        new UpgradeDef { title = "데미지",        step = 0.05f, cap = Inf,   floor = 0f,   percent = true, desc = "공격력과 따로 곱해지는 최종 피해 증가. 1단계 +5%. 공격력이 높아도 효율이 줄지 않습니다." } },
+            { UpgradeKind.Damage,        new UpgradeDef { title = "데미지",        step = 0.05f, cap = Inf,   floor = -0.5f, percent = true, desc = "공격력과 따로 곱해지는 최종 피해 증가. 1단계 +5%. 공격력이 높아도 효율이 줄지 않습니다. 단점으로 음수가 되면 피해가 줄어듭니다." } },
             { UpgradeKind.AttackSpeed,   new UpgradeDef { title = "공격 속도",     step = 0.04f, cap = 1.35f, floor = 0.6f, percent = true, desc = "공격 동작(준비·휘두르기·회복) 속도. 1단계 +4%. 빠를수록 빈틈도 짧아집니다." } },
             { UpgradeKind.AttackRange,   new UpgradeDef { title = "공격 범위",     step = 0.07f, cap = 1.3f,  floor = 0.5f, percent = true, desc = "공격이 닿는 거리와 돌진 거리. 1단계 +7%." } },
             { UpgradeKind.CritChance,    new UpgradeDef { title = "치명타 확률",   step = 0.06f, cap = 0.6f,  floor = 0f,   percent = true, desc = "공격이 치명타가 될 확률. 1단계 +6%. 치명타는 경직 피해도 2배." } },
             { UpgradeKind.CritDamage,    new UpgradeDef { title = "치명타 피해",   step = 0.25f, cap = 3f,    floor = 1.2f, percent = true, desc = "치명타의 피해 배율. 1단계 +25%." } },
             { UpgradeKind.StaggerPower,  new UpgradeDef { title = "경직 피해",     step = 0.1f,  cap = 2f,    floor = 0.5f, percent = true, desc = "공격이 적의 경직도를 깎는 양. 1단계 +10%. 경직도가 다 깎인 적은 기절해 움직이지 못합니다." } },
             { UpgradeKind.MaxHealth,     new UpgradeDef { title = "최대 체력",     step = 8f,    cap = Inf,   floor = 30f,  desc = "최대 체력. 1단계 +8. 늘어난 만큼 바로 회복됩니다." } },
-            { UpgradeKind.Defense,       new UpgradeDef { title = "방어력",        step = 6f,    cap = Inf,   floor = 0f,   desc = "받는 피해 = 피해 × 100 / (100 + 방어력). 1단계 +6." } },
+            { UpgradeKind.Defense,       new UpgradeDef { title = "방어력",        step = 6f,    cap = Inf,   floor = -60f, desc = "받는 피해 = 피해 × 100 / (100 + 방어력). 1단계 +6. 단점으로 음수가 되면 받는 피해가 늘어납니다 (−30이면 약 1.4배)." } },
             { UpgradeKind.HealAmount,    new UpgradeDef { title = "회복약 회복량", step = 4f,    cap = Inf,   floor = 5f,   desc = "회복약 하나가 회복하는 체력. 1단계 +4." } },
             { UpgradeKind.Flask,         new UpgradeDef { title = "회복약 개수",   step = 1f,    cap = 5f,    floor = 1f,   whole = true, desc = "가질 수 있는 회복약 수 (최대 5). 라운드를 마칠 때마다 1개 채워지고, 다 차 있으면 그만큼 체력이 회복됩니다." } },
             { UpgradeKind.LifeSteal,     new UpgradeDef { title = "흡혈",          step = 0.005f, cap = 0.15f, floor = 0f,  percent = true, desc = "가한 피해의 일부만큼 체력 회복. 1단계 +0.5%. 라운드가 진행될수록 효율이 올라갑니다 (초반 약함, 후반 강함)." } },
