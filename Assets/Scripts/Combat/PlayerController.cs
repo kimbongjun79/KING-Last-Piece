@@ -424,7 +424,7 @@ namespace KingLastPiece
 
         /// <summary>
         /// A storm over the whole reach, in the NamuFX prefabs' own colours: a huge area slash layered twice (mirrored)
-        /// and a ring of big slashes all around, with dust, a ground impact and a heavier shake.
+        /// and three big slashes around it, with dust, a ground impact and a heavier shake.
         /// </summary>
         void WhirlFx(HitWindow w, float reach)
         {
@@ -434,9 +434,9 @@ namespace KingLastPiece
             Vfx.Slash(SlashFxKind.AoeA, c + Vector3.up * 0.9f, face, 1.05f * reach);
             Vfx.Slash(SlashFxKind.AoeA, c + Vector3.up * 1.3f, face * Quaternion.Euler(0f, 90f, 0f), 0.9f * reach, null, true);
             float spin = Random.value * 360f;
-            for (int k = 0; k < 6; k++)
+            for (int k = 0; k < 3; k++)
             {
-                Quaternion rot = Quaternion.Euler(0f, spin + k * 60f, 0f);
+                Quaternion rot = Quaternion.Euler(0f, spin + k * 120f, 0f);
                 Vfx.Slash(k % 2 == 0 ? SlashFxKind.SlashB : SlashFxKind.SlashA, c + rot * Vector3.forward * (r * 0.45f) + Vector3.up * 0.9f,
                     rot, 1.4f * reach, null, k % 2 == 1);
             }
@@ -1115,8 +1115,8 @@ namespace KingLastPiece
                     }
                     // Sword Wave (special item): each attack's last window sends the blade light flying.
                     if (atkSwordWave && i == atk.hits.Length - 1) LaunchSwordWave();
-                    // Tempest (special item): the 3rd hit's windows open with a storm of NamuFX slashes over the whole reach.
-                    if (atkWhirl) WhirlFx(w, reach);
+                    // Tempest (special item): the 3rd hit's first window opens with a storm of NamuFX slashes over the whole reach.
+                    if (atkWhirl && i == 0) WhirlFx(w, reach);
                 }
                 if (w.sparkTrail)
                 {
