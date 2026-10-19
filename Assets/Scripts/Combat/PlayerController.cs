@@ -13,8 +13,9 @@ namespace KingLastPiece
         enum State { Normal, Attack, Dodge, Heal, Stagger, Counter, Dead }
         public enum Buffered { None, Light, Heavy, Dodge, Heal }
 
-        /// <summary>The King's stats (classic defaults; the endless mode starts weaker and upgrades them).</summary>
-        public PlayerStats Stats { get; set; } = PlayerStats.Classic();
+        PlayerStats stats = PlayerStats.Classic();
+        /// <summary>The King's stats; setting a fresh set (a new run) also forgets the items picked.</summary>
+        public PlayerStats Stats { get => stats; set { stats = value; Items.Clear(); } }
         public float MaxStamina => Stats.maxStamina;
         public int MaxFlasks => Stats.maxFlasks;
         public float HealAmount => Stats.healAmount;
@@ -26,6 +27,8 @@ namespace KingLastPiece
         const float AssistMinRange = 2.5f, AssistMaxRange = 4.5f;
         // Gap closer: a target within this angle of the aim, and where to stop in front of it.
         const float GapAngle = 100f, GapInputAngle = 35f, GapStopDistance = 0.5f;
+        // The dash aims past the contact point (a piece in the way stops it there anyway), so one stepping back is still caught.
+        const float GapOvershoot = 1.3f;
         const float DodgeDuration = 0.5f, IFrameStart = 0.03f, IFrameEnd = 0.36f, DodgeCancelAt = 0.4f;
 
         // Dodge charges replace stamina for rolling: a short burst of rolls, refilled quickly.
@@ -207,16 +210,25 @@ namespace KingLastPiece
             Health = Mathf.Min(MaxHealth, Health + hp);
         }
 
-        /// <summary>A permanent round-end upgrade: the gain applies right away (more health heals, a new flask is full).</summary>
-        public void ApplyUpgrade(Upgrade u)
+        /// <summary>Items picked this run, in order.</summary>
+        public readonly List<Item> Items = new List<Item>();
+
+        /// <summary>
+        /// A round-end item, kept for good: its gains apply right away (more health heals, a new flask or roll is
+        /// ready, more stamina fills up); a drawback that lowers the maximum health cuts the health down with it.
+        /// </summary>
+        public void ApplyItem(Item item)
         {
-            Upgrades.Apply(Stats, u);
+            int flasksBefore = MaxFlasks, dodgesBefore = MaxDodges;
+            float staminaBefore = MaxStamina;
+            Upgrades.Apply(Stats, item);
+            Items.Add(item);
             float hpGain = Stats.maxHealth - MaxHealth;
             MaxHealth = Stats.maxHealth;
-            if (hpGain > 0f) Health = Mathf.Min(MaxHealth, Health + hpGain);
-            Flasks = Mathf.Min(MaxFlasks, Flasks + (u.kind == UpgradeKind.Flask ? 1 : 0));
-            DodgeCharges = Mathf.Min(MaxDodges, DodgeCharges + (u.kind == UpgradeKind.MaxDodges ? 1 : 0));
-            if (u.kind == UpgradeKind.MaxStamina) Stamina = MaxStamina;
+            Health = hpGain > 0f ? Mathf.Min(MaxHealth, Health + hpGain) : Mathf.Min(MaxHealth, Health);
+            Flasks = Mathf.Min(MaxFlasks, Flasks + Mathf.Max(0, MaxFlasks - flasksBefore));
+            DodgeCharges = Mathf.Min(MaxDodges, DodgeCharges + Mathf.Max(0, MaxDodges - dodgesBefore));
+            Stamina = MaxStamina > staminaBefore ? MaxStamina : Mathf.Min(Stamina, MaxStamina);
         }
 
         /// <summary>
@@ -519,7 +531,7 @@ namespace KingLastPiece
             {
                 // Mid range: dash in first; the combo continues with hit 1 (index -1 + 1 = 0).
                 comboIndex = -1;
-                atk = style.gapCloser(gap);
+                atk = style.gapCloser(gap + GapOvershoot);
                 atkIsGapCloser = true;
             }
             else
@@ -771,7 +783,7 @@ namespace KingLastPiece
             bool landed = false;
             int hitCount = 0;
             // Attack range scales the reach (and how far ahead the hit is centred); attack power the damage.
-            float range = w.range * Stats.attackRange, damage = w.damage * Stats.attackPower;
+            float range = w.range * Stats.attackRange, damage = w.damage * Stats.DamageMultiplier;
             Vector3 center = FlatPos + transform.forward * (w.forward * Stats.attackRange);
             scratch.Clear();
             scratch.AddRange(Game.Enemies);
@@ -983,11 +995,30 @@ namespace KingLastPiece
 
         // ---------------------------------------------------------------- royal throw (counter)
 
+        // Against the queen (the boss) there is no throw: a short leap at her and one strong blow. Invincible throughout,
+        // like every counter.
+        const float LeapCounterRise = 0.3f, LeapCounterEnd = 0.62f, LeapCounterDamage = 55f, StaggerLeapCounter = 60f;
+        bool leapCounter, leapStruck;
+
         void StartCounter()
         {
             buffer = Buffered.None;
             counterTarget = justTarget;
             justTarget = null;
+            leapCounter = counterTarget.IsBoss;
+            if (leapCounter)
+            {
+                leapStruck = false;
+                LockTarget = counterTarget;
+                Vector3 toQ = counterTarget.FlatPos - FlatPos;
+                if (toQ.sqrMagnitude < 0.01f) toQ = transform.forward;
+                counterFrom = FlatPos;
+                counterTo = counterTarget.FlatPos - toQ.normalized * (counterTarget.Radius + Radius + 0.35f);
+                transform.rotation = Quaternion.LookRotation(toQ);
+                Sfx.Play("PL_Dodge", FlatPos);
+                Enter(State.Counter);
+                return;
+            }
             counterTarget.BeginGrab();
             counterReleased = false;
             counterHits.Clear();
@@ -1007,9 +1038,58 @@ namespace KingLastPiece
             Enter(State.Counter);
         }
 
+        /// <summary>The leap at the queen: rise and come down just in front of her, strike on landing, recover.</summary>
+        void UpdateLeapCounter()
+        {
+            float t = stateTime;
+            if (t < LeapCounterRise)
+            {
+                float p = t / LeapCounterRise;
+                transform.position = Vector3.Lerp(counterFrom, counterTo, PoseTrack.Curve(Ease.Out, p));
+                if (counterTarget != null) FaceTowards(counterTarget.FlatPos - FlatPos, 900f);
+                ApplyPose(BodyPose.P(tilt: Mathf.Lerp(-10f, 24f, p), lift: Mathf.Sin(p * Mathf.PI) * 1.3f, squash: -0.08f * (1f - p)));
+                crownTrail.emitting = true;
+                return;
+            }
+            if (!leapStruck)
+            {
+                leapStruck = true;
+                Game.EndSlowMo();
+                if (counterTarget != null && !counterTarget.IsDead)
+                {
+                    bool crit = RollCrit(out float mult);
+                    float damage = LeapCounterDamage * Stats.DamageMultiplier * mult;
+                    Vector3 toQ = (counterTarget.FlatPos - FlatPos).normalized;
+                    if (counterTarget.TakeHit(damage, StaggerLeapCounter * StaggerScale(crit), transform.position))
+                    {
+                        Game.ReportDamage(counterTarget, damage, crit);
+                        Vfx.Hit(counterTarget.Visual.position + Vector3.up * 1.4f - toQ * (counterTarget.Radius * 0.3f), toQ, true, counterTarget.Visual);
+                        Vfx.Slash(SlashFxKind.Ink, FlatPos + Vector3.up * 1.2f, Quaternion.LookRotation(toQ), 1.3f, null);
+                        Sfx.Play("HIT_Boss", counterTarget.transform.position + Vector3.up);
+                    }
+                }
+                Vfx.GroundImpact(FlatPos, 1.6f, 0.8f);
+                Game.HitStop(0.1f);
+                Game.Rig.Kick(0.8f);
+                Game.Rig.Shake(0.4f);
+                LockTarget = null;
+            }
+            float r = Mathf.Clamp01((t - LeapCounterRise) / (LeapCounterEnd - LeapCounterRise));
+            ApplyPose(BodyPose.Lerp(BodyPose.P(tilt: 30f, squash: -0.15f), default, PoseTrack.Curve(Ease.OutBack, r)));
+            crownTrail.emitting = false;
+            if (t >= LeapCounterEnd)
+            {
+                counterTarget = null;
+                leapCounter = false;
+                ApplyPose(default);
+                Enter(State.Normal);
+            }
+        }
+
         void UpdateCounter(float dt)
         {
             float t = stateTime;
+            if (leapCounter) { UpdateLeapCounter(); return; }
             if (counterTarget == null || (counterTarget.IsDead && !counterReleased))
             {
                 Game.EndSlowMo();
@@ -1060,7 +1140,7 @@ namespace KingLastPiece
                     if ((e.FlatPos - piecePos).magnitude > counterTarget.Radius + e.Radius + 0.5f) continue;
                     counterHits.Add(e);
                     bool crit = RollCrit(out float mult);
-                    float swingDamage = SwingHitDamage * Stats.attackPower * mult;
+                    float swingDamage = SwingHitDamage * Stats.DamageMultiplier * mult;
                     if (e.TakeHit(swingDamage, StaggerCounterSwing * StaggerScale(crit), piecePos))
                     {
                         Game.ReportDamage(e, swingDamage, crit);
@@ -1083,7 +1163,7 @@ namespace KingLastPiece
                     Game.EndSlowMo();
                     // The landing damage can crit too (rolled now, shown when it lands).
                     bool crit = RollCrit(out float mult);
-                    counterTarget.Launch(dir, 17f, 7f, ThrowLandingDamage * Stats.attackPower * mult, crit, StaggerCounterThrow * StaggerScale(crit));
+                    counterTarget.Launch(dir, 17f, 7f, ThrowLandingDamage * Stats.DamageMultiplier * mult, crit, StaggerCounterThrow * StaggerScale(crit));
                     Game.HitStop(0.12f);
                     Game.Rig.Kick(1f);
                     Game.Rig.Shake(0.5f);

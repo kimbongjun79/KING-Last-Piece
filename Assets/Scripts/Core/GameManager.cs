@@ -42,10 +42,10 @@ namespace KingLastPiece
         /// <summary>Endless mode: the round number (1-based).</summary>
         public int Round => WaveIndex + 1;
         public bool IsEndless => CurrentMode == Mode.Endless;
-        /// <summary>Round-end upgrades on offer, and the ones already taken this time (endless mode).</summary>
-        public readonly List<Upgrade> Offers = new List<Upgrade>();
+        /// <summary>Round-end items on offer, and the one chosen this time (endless mode).</summary>
+        public readonly List<Item> Offers = new List<Item>();
         public readonly List<int> Picked = new List<int>();
-        /// <summary>Upgrade card under the cursor / selected with the keys or pad (−1: none).</summary>
+        /// <summary>Item card under the cursor / selected with the keys or pad (−1: none).</summary>
         public int OfferCursor { get; set; } = -1;
         ArenaBoard board;
 
@@ -284,27 +284,27 @@ namespace KingLastPiece
                 SpawnEmpowered(summons[i].type, summons[i].tier, BoardSlots.Center(free[i]));
         }
 
-        /// <summary>How many cards must be chosen before the confirm button unlocks (two, or fewer if fewer are offered).</summary>
+        /// <summary>How many cards must be chosen before the confirm button unlocks (one item).</summary>
         public int PicksNeeded => Mathf.Min(Upgrades.Picks, Offers.Count);
         public bool CanConfirmUpgrades => State == GameState.Upgrade && upgradeDoneAt < 0f && Picked.Count == PicksNeeded;
         /// <summary>The cursor index of the confirm button (after the cards).</summary>
         public int ConfirmSlot => Offers.Count;
 
-        /// <summary>Selects upgrade card <paramref name="i"/>, or unselects it if it was selected. Two can be held.</summary>
+        /// <summary>Selects item card <paramref name="i"/> (another card switches to it), or unselects it if it was selected.</summary>
         public void PickUpgrade(int i)
         {
             if (State != GameState.Upgrade || upgradeDoneAt >= 0f || i < 0 || i >= Offers.Count) return;
             if (Picked.Remove(i)) { Sfx.Play("UI_Back"); return; }
-            if (Picked.Count >= PicksNeeded) { Sfx.Play("UI_Back"); return; }   // already holding two: unselect one first
+            if (Picked.Count >= PicksNeeded) Picked.RemoveAt(0);   // one item: choosing another card switches to it
             Picked.Add(i);
             Sfx.Play("UI_Confirm");
         }
 
-        /// <summary>Confirm button: the chosen upgrades become permanent and the next round starts.</summary>
+        /// <summary>Confirm button: the chosen item is kept for good and the next round starts.</summary>
         public void ConfirmUpgrades()
         {
             if (!CanConfirmUpgrades) return;
-            foreach (int i in Picked) Player.ApplyUpgrade(Offers[i]);
+            foreach (int i in Picked) Player.ApplyItem(Offers[i]);
             Record.upgrades += Picked.Count;
             Sfx.Play("UI_Title_Start");
             upgradeDoneAt = StateTime;
@@ -315,7 +315,7 @@ namespace KingLastPiece
         void EnterUpgrade()
         {
             Offers.Clear();
-            Offers.AddRange(Upgrades.Roll(Player.Stats, Round));
+            Offers.AddRange(Upgrades.Roll(Player.Stats, Round, EndlessRounds.IsBossRound(Round)));
             Picked.Clear();
             OfferCursor = -1;
             upgradeDoneAt = Offers.Count == 0 ? 0f : -1f;
@@ -414,11 +414,17 @@ namespace KingLastPiece
 
         public RunRecord Record { get; private set; } = new RunRecord();
 
+        /// <summary>
+        /// How well life steal and healing on a capture work right now: weak early, strong late, no ceiling
+        /// (endless mode: ×0.34 at round 1, ×1 at round 20, ×1.7 at 40, ×2.4 at 60; elsewhere ×1).
+        /// </summary>
+        public float SustainScale => IsEndless ? EndlessRounds.SustainScale(Round) : 1f;
+
         public void ReportKill(EnemyBase e)
         {
             Record.kills++;
             if (e.EliteTier > 0) Record.darkKills++;
-            if (Player != null) Player.Restore(Player.Stats.killHeal);
+            if (Player != null) Player.Restore(Player.Stats.killHeal * SustainScale);
         }
 
         public void ReportPlayerDamage(float amount) => Record.damageTaken += amount;
@@ -430,7 +436,7 @@ namespace KingLastPiece
             Record.damageDealt += amount;
             Record.biggestHit = Mathf.Max(Record.biggestHit, amount);
             if (crit) Record.crits++;
-            if (Player != null) Player.Restore(amount * Player.Stats.lifeSteal);   // every damage report is the King's doing
+            if (Player != null) Player.Restore(amount * Player.Stats.lifeSteal * SustainScale);   // every damage report is the King's doing
             Sfx.Play("UI_DamagePopup");
             Popups.Add(new DamagePopup
             {

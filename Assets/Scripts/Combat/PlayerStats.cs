@@ -5,15 +5,17 @@ namespace KingLastPiece
 {
     /// <summary>
     /// The King's stats. The classic 10-round game uses the defaults (the values the game was tuned with); the endless
-    /// mode starts far weaker and grows through the upgrades picked after every round (<see cref="Upgrades"/>).
+    /// mode starts far weaker and grows through the items picked after every round (<see cref="Upgrades"/>).
     /// </summary>
     [System.Serializable]
     public class PlayerStats
     {
         public float maxHealth = 100f;
         public float maxStamina = 100f;
-        /// <summary>Damage multiplier on every attack.</summary>
+        /// <summary>Damage multiplier on every attack (items add to it).</summary>
         public float attackPower = 1f;
+        /// <summary>Final damage bonus, multiplied on top of the attack power (0.1 = +10%).</summary>
+        public float damage;
         /// <summary>Attack animation speed (wind-up, swing and recovery all play faster).</summary>
         public float attackSpeed = 1f;
         /// <summary>Hit reach multiplier.</summary>
@@ -77,79 +79,153 @@ namespace KingLastPiece
         public PlayerStats Clone() => (PlayerStats)MemberwiseClone();
 
         public float DamageTaken(float damage) => damage * 100f / (100f + Mathf.Max(0f, defense));
+
+        /// <summary>What every blow is multiplied by: attack power × (1 + damage bonus).</summary>
+        public float DamageMultiplier => attackPower * (1f + damage);
     }
 
     public enum UpgradeKind
     {
         Flask, HealAmount, AttackPower, Defense, MaxHealth, AttackRange, AttackSpeed, DodgeRecharge, MaxDodges, MaxStamina,
-        LightCost, HeavyCost, CritChance, CritDamage, MoveSpeed, StaminaRegen, LifeSteal, StaggerPower, KillHeal,
+        LightCost, HeavyCost, CritChance, CritDamage, MoveSpeed, StaminaRegen, LifeSteal, StaggerPower, KillHeal, Damage,
     }
 
-    /// <summary>How big an offered upgrade is: the rarer the grade, the more the stat grows.</summary>
+    /// <summary>How strong an item is (its total worth in steps): the rarer the grade, the stronger the item.</summary>
     public enum UpgradeGrade { Common, Rare, Epic, Legendary }
 
-    /// <summary>One offered upgrade: a stat, its grade and the (rolled) amount it grows by.</summary>
-    public struct Upgrade
+    /// <summary>One stat an item changes, in steps (negative: the item's drawback).</summary>
+    public struct ItemEffect
     {
         public UpgradeKind kind;
+        public int steps;
+        public ItemEffect(UpgradeKind kind, int steps) { this.kind = kind; this.steps = steps; }
+    }
+
+    /// <summary>A round-end item: a fixed set of stat steps and a grade set by how much they are worth.</summary>
+    public class Item
+    {
+        public string id, name;
         public UpgradeGrade grade;
-        public float amount;
-
-        public string Title => Upgrades.Def(kind).title;
+        public ItemEffect[] effects;
         public string GradeName => Upgrades.GradeName(grade);
-
-        /// <summary>"+12%" / "+1" / "+8" style label of the gain.</summary>
-        public string AmountText => Upgrades.Def(kind).percent ? $"+{Mathf.RoundToInt(amount * 100f)}%" : $"+{Mathf.RoundToInt(amount)}";
+        Texture2D icon;
+        bool iconLoaded;
+        /// <summary>The item's picture (Resources/ItemIcons/&lt;id&gt;), null if there is none.</summary>
+        public Texture2D Icon
+        {
+            get
+            {
+                if (!iconLoaded) { iconLoaded = true; icon = Resources.Load<Texture2D>("ItemIcons/" + id); }
+                return icon;
+            }
+        }
     }
 
     /// <summary>
-    /// Round-end upgrades: five different stats are offered, the player keeps two. Each offer rolls a grade — common,
-    /// rare, epic or legendary, the rarer ones more likely as the rounds go on — that multiplies how much the stat grows
-    /// (a random amount within its own range). Capped stats stop being offered once they reach their cap.
+    /// Round-end items (endless mode): three items are offered, the player keeps one. Every item is a fixed set of stat
+    /// steps — one step is worth about 5% of damage or survival (see Docs) — with drawbacks on some; its grade follows
+    /// its total worth (common ≈ 2 steps, rare ≈ 3, epic ≈ 4–5, legendary ≈ 6–7). Rarer grades turn up more as the
+    /// rounds go on; after a boss round one of the three is epic or better. Stats stop at their caps (and floors).
     /// </summary>
     public static class Upgrades
     {
-        public const int Offered = 5, Picks = 2;
+        public const int Offered = 3, Picks = 1;
 
         public struct UpgradeDef
         {
             public string title;
-            public float min, max;
+            public float step;     // one step
             public float cap;      // ∞ when uncapped
+            public float floor;    // lowest a drawback can take it
             public bool percent;   // shown as a percentage (multiplier stats)
             public bool whole;     // whole steps (flasks, charges)
+            public string desc;    // what it does (the pause menu's stats tab)
         }
+
+        static readonly float Inf = float.PositiveInfinity;
 
         static readonly Dictionary<UpgradeKind, UpgradeDef> defs = new Dictionary<UpgradeKind, UpgradeDef>
         {
-            { UpgradeKind.Flask,         new UpgradeDef { title = "회복약 개수",     min = 1f,    max = 1f,    cap = 5f,    whole = true } },
-            { UpgradeKind.HealAmount,    new UpgradeDef { title = "회복약 회복량",   min = 6f,    max = 12f,   cap = float.PositiveInfinity } },
-            { UpgradeKind.AttackPower,   new UpgradeDef { title = "공격력",          min = 0.06f, max = 0.12f, cap = float.PositiveInfinity, percent = true } },
-            { UpgradeKind.Defense,       new UpgradeDef { title = "방어력",          min = 5f,    max = 12f,   cap = float.PositiveInfinity } },
-            { UpgradeKind.MaxHealth,     new UpgradeDef { title = "최대 체력",       min = 10f,   max = 20f,   cap = float.PositiveInfinity } },
-            { UpgradeKind.AttackRange,   new UpgradeDef { title = "공격 범위",       min = 0.04f, max = 0.08f, cap = 1.3f,  percent = true } },
-            { UpgradeKind.AttackSpeed,   new UpgradeDef { title = "공격 속도",       min = 0.03f, max = 0.06f, cap = 1.35f, percent = true } },
-            { UpgradeKind.DodgeRecharge, new UpgradeDef { title = "회피 충전 속도",  min = 0.1f,  max = 0.2f,  cap = 1.6f,  percent = true } },
-            { UpgradeKind.MaxDodges,     new UpgradeDef { title = "회피 충전 횟수",  min = 1f,    max = 1f,    cap = 3f,    whole = true } },
-            { UpgradeKind.MaxStamina,    new UpgradeDef { title = "최대 기력",       min = 8f,    max = 15f,   cap = float.PositiveInfinity } },
-            { UpgradeKind.LightCost,     new UpgradeDef { title = "일반공격 기력 소모 감소", min = 0.06f, max = 0.12f, cap = 0.6f,  percent = true } },
-            { UpgradeKind.HeavyCost,     new UpgradeDef { title = "강공격 기력 소모 감소", min = 0.06f, max = 0.12f, cap = 0.5f,  percent = true } },
-            { UpgradeKind.CritChance,    new UpgradeDef { title = "치명타 확률",     min = 0.03f, max = 0.06f, cap = 0.6f,  percent = true } },
-            { UpgradeKind.CritDamage,    new UpgradeDef { title = "치명타 피해",     min = 0.1f,  max = 0.25f, cap = 3f,    percent = true } },
-            { UpgradeKind.MoveSpeed,     new UpgradeDef { title = "이동 속도",       min = 0.03f, max = 0.06f, cap = 1.3f,  percent = true } },
-            { UpgradeKind.StaminaRegen,  new UpgradeDef { title = "기력 회복 속도",  min = 0.08f, max = 0.15f, cap = 2f,    percent = true } },
-            { UpgradeKind.LifeSteal,     new UpgradeDef { title = "흡혈 (가한 피해만큼 회복)", min = 0.01f, max = 0.02f, cap = 0.15f, percent = true } },
-            { UpgradeKind.StaggerPower,  new UpgradeDef { title = "경직 피해",       min = 0.06f, max = 0.12f, cap = 2f,    percent = true } },
-            { UpgradeKind.KillHeal,      new UpgradeDef { title = "처치 시 체력 회복", min = 2f,  max = 4f,    cap = 20f } },
+            { UpgradeKind.AttackPower,   new UpgradeDef { title = "공격력",        step = 0.05f, cap = Inf,   floor = 0.3f, percent = true, desc = "모든 공격의 기본 피해 배율. 1단계 +5% (더하기)." } },
+            { UpgradeKind.Damage,        new UpgradeDef { title = "데미지",        step = 0.05f, cap = Inf,   floor = 0f,   percent = true, desc = "공격력과 따로 곱해지는 최종 피해 증가. 1단계 +5%. 공격력이 높아도 효율이 줄지 않습니다." } },
+            { UpgradeKind.AttackSpeed,   new UpgradeDef { title = "공격 속도",     step = 0.04f, cap = 1.35f, floor = 0.6f, percent = true, desc = "공격 동작(준비·휘두르기·회복) 속도. 1단계 +4%. 빠를수록 빈틈도 짧아집니다." } },
+            { UpgradeKind.AttackRange,   new UpgradeDef { title = "공격 범위",     step = 0.07f, cap = 1.3f,  floor = 0.5f, percent = true, desc = "공격이 닿는 거리와 돌진 거리. 1단계 +7%." } },
+            { UpgradeKind.CritChance,    new UpgradeDef { title = "치명타 확률",   step = 0.06f, cap = 0.6f,  floor = 0f,   percent = true, desc = "공격이 치명타가 될 확률. 1단계 +6%. 치명타는 경직 피해도 2배." } },
+            { UpgradeKind.CritDamage,    new UpgradeDef { title = "치명타 피해",   step = 0.25f, cap = 3f,    floor = 1.2f, percent = true, desc = "치명타의 피해 배율. 1단계 +25%." } },
+            { UpgradeKind.StaggerPower,  new UpgradeDef { title = "경직 피해",     step = 0.1f,  cap = 2f,    floor = 0.5f, percent = true, desc = "공격이 적의 경직도를 깎는 양. 1단계 +10%. 경직도가 다 깎인 적은 기절해 움직이지 못합니다." } },
+            { UpgradeKind.MaxHealth,     new UpgradeDef { title = "최대 체력",     step = 8f,    cap = Inf,   floor = 30f,  desc = "최대 체력. 1단계 +8. 늘어난 만큼 바로 회복됩니다." } },
+            { UpgradeKind.Defense,       new UpgradeDef { title = "방어력",        step = 6f,    cap = Inf,   floor = 0f,   desc = "받는 피해 = 피해 × 100 / (100 + 방어력). 1단계 +6." } },
+            { UpgradeKind.HealAmount,    new UpgradeDef { title = "회복약 회복량", step = 4f,    cap = Inf,   floor = 5f,   desc = "회복약 하나가 회복하는 체력. 1단계 +4." } },
+            { UpgradeKind.Flask,         new UpgradeDef { title = "회복약 개수",   step = 1f,    cap = 5f,    floor = 1f,   whole = true, desc = "가질 수 있는 회복약 수 (최대 5). 라운드를 마칠 때마다 1개 채워지고, 다 차 있으면 그만큼 체력이 회복됩니다." } },
+            { UpgradeKind.LifeSteal,     new UpgradeDef { title = "흡혈",          step = 0.005f, cap = 0.15f, floor = 0f,  percent = true, desc = "가한 피해의 일부만큼 체력 회복. 1단계 +0.5%. 라운드가 진행될수록 효율이 올라갑니다 (초반 약함, 후반 강함)." } },
+            { UpgradeKind.KillHeal,      new UpgradeDef { title = "처치 시 회복",  step = 1f,    cap = 20f,   floor = 0f,   desc = "기물을 잡을 때마다 체력 회복. 1단계 +1. 라운드가 진행될수록 효율이 올라갑니다 (초반 약함, 후반 강함)." } },
+            { UpgradeKind.MoveSpeed,     new UpgradeDef { title = "이동 속도",     step = 0.06f, cap = 1.3f,  floor = 0.7f, percent = true, desc = "걷기·달리기 속도. 1단계 +6%." } },
+            { UpgradeKind.DodgeRecharge, new UpgradeDef { title = "회피 충전 속도", step = 0.15f, cap = 1.6f, floor = 0.3f, percent = true, desc = "회피 횟수가 다시 차는 속도. 1단계 +15%." } },
+            { UpgradeKind.MaxDodges,     new UpgradeDef { title = "회피 횟수",     step = 1f,    cap = 3f,    floor = 1f,   whole = true, desc = "연달아 쓸 수 있는 회피(무적 구르기) 수 (최대 3)." } },
+            { UpgradeKind.MaxStamina,    new UpgradeDef { title = "최대 기력",     step = 15f,   cap = Inf,   floor = 30f,  desc = "최대 기력. 공격·강공격·달리기에 쓰입니다. 1단계 +15." } },
+            { UpgradeKind.StaminaRegen,  new UpgradeDef { title = "기력 회복 속도", step = 0.2f, cap = 2f,    floor = 0.5f, percent = true, desc = "기력이 다시 차는 속도. 1단계 +20%." } },
+            { UpgradeKind.LightCost,     new UpgradeDef { title = "일반공격 기력 절약", step = 0.08f, cap = 0.6f, floor = 0f, percent = true, desc = "일반공격의 기력 소모 감소. 1단계 8%." } },
+            { UpgradeKind.HeavyCost,     new UpgradeDef { title = "강공격 기력 절약", step = 0.08f, cap = 0.5f, floor = 0f, percent = true, desc = "강공격의 기력 소모 감소. 1단계 8%. 강공격은 필요한 기력이 다 있어야 나갑니다." } },
         };
 
         public static UpgradeDef Def(UpgradeKind k) => defs[k];
 
         static readonly string[] GradeNames = { "일반", "희귀", "영웅", "전설" };
-        /// <summary>How much more a grade grows the stat than a common one.</summary>
-        static readonly float[] GradeMult = { 1f, 1.5f, 2.1f, 3f };
-
         public static string GradeName(UpgradeGrade g) => GradeNames[(int)g];
+
+        static Item I(string id, string name, UpgradeGrade grade, params ItemEffect[] fx) => new Item { id = id, name = name, grade = grade, effects = fx };
+        static ItemEffect E(UpgradeKind k, int steps) => new ItemEffect(k, steps);
+
+        const UpgradeGrade C = UpgradeGrade.Common, R = UpgradeGrade.Rare, H = UpgradeGrade.Epic, L = UpgradeGrade.Legendary;
+        const UpgradeKind Pow = UpgradeKind.AttackPower, Dmg = UpgradeKind.Damage, Spd = UpgradeKind.AttackSpeed, Rng = UpgradeKind.AttackRange,
+            CrC = UpgradeKind.CritChance, CrD = UpgradeKind.CritDamage, Stg = UpgradeKind.StaggerPower, Hp = UpgradeKind.MaxHealth,
+            Def_ = UpgradeKind.Defense, Heal = UpgradeKind.HealAmount, Fl = UpgradeKind.Flask, Ls = UpgradeKind.LifeSteal, Kh = UpgradeKind.KillHeal,
+            Mv = UpgradeKind.MoveSpeed, DRc = UpgradeKind.DodgeRecharge, Dg = UpgradeKind.MaxDodges, St = UpgradeKind.MaxStamina,
+            StR = UpgradeKind.StaminaRegen, LC = UpgradeKind.LightCost, HC = UpgradeKind.HeavyCost;
+
+        /// <summary>Every item (stat items only for now; items that change how the King fights come later).</summary>
+        public static readonly Item[] All =
+        {
+            // Common (≈ 2 steps)
+            I("whetstone",      "숫돌",           C, E(Pow, 2)),
+            I("light_gloves",   "가벼운 장갑",    C, E(Spd, 2)),
+            I("leather_boots",  "가죽 장화",      C, E(Mv, 2), E(DRc, 1)),
+            I("thick_cloak",    "두꺼운 망토",    C, E(Def_, 2)),
+            I("training",       "체력 단련",      C, E(Hp, 2)),
+            I("breathing",      "호흡법 교본",    C, E(StR, 1), E(St, 1)),
+            I("big_flask",      "큰 약병",        C, E(Heal, 2)),
+            I("sword_manual",   "검술 교본",      C, E(LC, 2), E(St, 1)),
+            I("heavy_manual",   "강타 교본",      C, E(HC, 2), E(Stg, 1)),
+            I("sharp_edge",     "날 선 칼날",     C, E(Dmg, 2)),
+            I("vampire_fang",   "흡혈귀의 송곳니", C, E(Ls, 2)),
+            I("loot_pouch",     "전리품 주머니",  C, E(Kh, 2)),
+            // Rare (≈ 3 steps)
+            I("knight_sword",   "기사의 검",      R, E(Pow, 2), E(CrC, 2)),
+            I("herald_wings",   "전령의 날개",    R, E(Mv, 2), E(DRc, 2)),
+            I("hawk_eye",       "매의 눈",        R, E(CrC, 2), E(CrD, 2)),
+            I("rampart_stone",  "성벽의 돌",      R, E(Def_, 2), E(Hp, 1)),
+            I("crafted_grip",   "장인의 손잡이",  R, E(Rng, 2), E(Stg, 1)),
+            I("heavy_crown",    "무거운 왕관",    R, E(Pow, 4), E(Spd, -1)),
+            I("feather_crown",  "깃털 왕관",      R, E(Spd, 4), E(Pow, -1)),
+            I("long_spear",     "장창",           R, E(Rng, 4), E(Spd, -1)),
+            I("dagger",         "단검",           R, E(Spd, 4), E(Rng, -1)),
+            I("iron_armor",     "철갑옷",         R, E(Def_, 4), E(Mv, -1)),
+            I("headsman_blade", "처형인의 칼날",  R, E(Dmg, 3)),
+            I("mad_seal",       "광기의 인장",    R, E(Dmg, 4), E(Def_, -1)),
+            I("blood_cup",      "피의 잔",        R, E(Ls, 2), E(Kh, 1)),
+            // Epic (≈ 4–5 steps)
+            I("apothecary_bag", "약제사의 가방",  H, E(Fl, 1), E(Heal, 1)),
+            I("guard_insignia", "근위대 휘장",    H, E(Pow, 2), E(Def_, 2), E(Hp, 1)),
+            I("spare_boots",    "여분의 신발",    H, E(Dg, 1), E(DRc, 2)),
+            I("glass_cannon",   "유리 대포",      H, E(Pow, 5), E(CrD, 3), E(Hp, -2)),
+            I("berserker_blood","광전사의 피",    H, E(Ls, 3), E(Pow, 3), E(Def_, -2)),
+            I("running_king",   "질주하는 왕",    H, E(Mv, 4), E(StR, 3), E(St, 1), E(Def_, -2)),
+            I("black_oath",     "검은 서약",      H, E(Dmg, 3), E(CrC, 1), E(CrD, 2)),
+            // Legendary (≈ 6–7 steps)
+            I("kings_seal",     "왕의 인장",      L, E(Pow, 1), E(Spd, 1), E(Rng, 1), E(Hp, 1), E(Def_, 1), E(Heal, 1), E(Stg, 1)),
+            I("sacrifice",      "희생",           L, E(Pow, 9), E(CrC, 1), E(Hp, -3)),
+            I("crown_wrath",    "왕관의 분노",    L, E(Dmg, 4), E(Pow, 2), E(Rng, 1)),
+        };
 
         /// <summary>
         /// Rolls a grade. Round 1: about 70% common, 22% rare, 7% epic, 1% legendary; the rarer grades grow more likely
@@ -186,70 +262,101 @@ namespace KingLastPiece
             UpgradeKind.LifeSteal => s.lifeSteal,
             UpgradeKind.StaggerPower => s.staggerPower,
             UpgradeKind.KillHeal => s.killHeal,
+            UpgradeKind.Damage => s.damage,
             _ => s.maxStamina,
         };
 
-        public static bool AtCap(PlayerStats s, UpgradeKind k) => Current(s, k) >= Def(k).cap - 0.0001f;
+        static void Set(PlayerStats s, UpgradeKind k, float v)
+        {
+            switch (k)
+            {
+                case UpgradeKind.Flask: s.maxFlasks = Mathf.RoundToInt(v); break;
+                case UpgradeKind.HealAmount: s.healAmount = v; break;
+                case UpgradeKind.AttackPower: s.attackPower = v; break;
+                case UpgradeKind.Defense: s.defense = v; break;
+                case UpgradeKind.MaxHealth: s.maxHealth = v; break;
+                case UpgradeKind.AttackRange: s.attackRange = v; break;
+                case UpgradeKind.AttackSpeed: s.attackSpeed = v; break;
+                case UpgradeKind.DodgeRecharge: s.dodgeRecharge = v; break;
+                case UpgradeKind.MaxDodges: s.maxDodges = Mathf.RoundToInt(v); break;
+                case UpgradeKind.MaxStamina: s.maxStamina = v; break;
+                case UpgradeKind.LightCost: s.lightCostCut = v; break;
+                case UpgradeKind.HeavyCost: s.heavyCostCut = v; break;
+                case UpgradeKind.CritChance: s.critChance = v; break;
+                case UpgradeKind.CritDamage: s.critDamage = v; break;
+                case UpgradeKind.MoveSpeed: s.moveSpeed = v; break;
+                case UpgradeKind.StaminaRegen: s.staminaRegen = v; break;
+                case UpgradeKind.LifeSteal: s.lifeSteal = v; break;
+                case UpgradeKind.StaggerPower: s.staggerPower = v; break;
+                case UpgradeKind.KillHeal: s.killHeal = v; break;
+                case UpgradeKind.Damage: s.damage = v; break;
+            }
+        }
+
+        /// <summary>Where one effect takes the stat: steps × step, kept between the stat's floor and cap.</summary>
+        public static float After(PlayerStats s, ItemEffect fx)
+        {
+            var d = Def(fx.kind);
+            float now = Current(s, fx.kind), next = now + fx.steps * d.step;
+            // A gain never lowers a stat already past its cap; a drawback never raises one below its floor.
+            return fx.steps >= 0 ? Mathf.Max(now, Mathf.Min(d.cap, next)) : Mathf.Min(now, Mathf.Max(d.floor, next));
+        }
+
+        /// <summary>Worth offering: at least one of its gains still has room under its cap.</summary>
+        public static bool Useful(PlayerStats s, Item item)
+        {
+            foreach (var fx in item.effects)
+                if (fx.steps > 0 && Current(s, fx.kind) < Def(fx.kind).cap - 0.0001f) return true;
+            return false;
+        }
 
         /// <summary>
-        /// Five different stats (fewer if too many are capped), each with a rolled grade and an amount that respects its
-        /// cap. Whole-step stats (flasks, roll charges) grow by 2 at epic and legendary.
+        /// Three different items, each of a rolled grade (falling back to a neighbouring grade when every item of that
+        /// grade is useless now). <paramref name="bossCleared"/>: the first one is epic or better.
         /// </summary>
-        public static List<Upgrade> Roll(PlayerStats s, int round = 1)
+        public static List<Item> Roll(PlayerStats s, int round = 1, bool bossCleared = false)
         {
-            var pool = new List<UpgradeKind>();
-            foreach (UpgradeKind k in System.Enum.GetValues(typeof(UpgradeKind)))
-                if (!AtCap(s, k)) pool.Add(k);
-            var offer = new List<Upgrade>();
-            while (offer.Count < Offered && pool.Count > 0)
+            var offer = new List<Item>();
+            for (int slot = 0; slot < Offered; slot++)
             {
-                int i = Random.Range(0, pool.Count);
-                var k = pool[i];
-                pool.RemoveAt(i);
-                var d = Def(k);
                 var grade = RollGrade(round);
-                float amount = d.whole ? (grade >= UpgradeGrade.Epic ? 2f : 1f) : Random.Range(d.min, d.max) * GradeMult[(int)grade];
-                if (d.percent) amount = Mathf.Max(0.01f, Mathf.Round(amount * 100f) / 100f);
-                else if (!d.whole) amount = Mathf.Round(amount);
-                amount = Mathf.Min(amount, d.cap - Current(s, k));
-                offer.Add(new Upgrade { kind = k, grade = grade, amount = amount });
+                if (bossCleared && slot == 0 && grade < UpgradeGrade.Epic) grade = UpgradeGrade.Epic;
+                Item pick = null;
+                // The rolled grade first, then the nearest others.
+                for (int dist = 0; dist < 4 && pick == null; dist++)
+                foreach (int sign in new[] { 1, -1 })
+                {
+                    int g = (int)grade + dist * sign;
+                    if (g < 0 || g > 3 || pick != null) continue;
+                    var pool = new List<Item>();
+                    foreach (var it in All)
+                        if ((int)it.grade == g && !offer.Contains(it) && Useful(s, it)) pool.Add(it);
+                    if (pool.Count > 0) pick = pool[Random.Range(0, pool.Count)];
+                }
+                if (pick == null) break;
+                offer.Add(pick);
             }
             return offer;
         }
 
-        public static void Apply(PlayerStats s, Upgrade u)
+        public static void Apply(PlayerStats s, Item item)
         {
-            float cap = Def(u.kind).cap;
-            switch (u.kind)
-            {
-                case UpgradeKind.Flask: s.maxFlasks = Mathf.Min((int)cap, s.maxFlasks + Mathf.RoundToInt(u.amount)); break;
-                case UpgradeKind.HealAmount: s.healAmount += u.amount; break;
-                case UpgradeKind.AttackPower: s.attackPower += u.amount; break;
-                case UpgradeKind.Defense: s.defense += u.amount; break;
-                case UpgradeKind.MaxHealth: s.maxHealth += u.amount; break;
-                case UpgradeKind.AttackRange: s.attackRange = Mathf.Min(cap, s.attackRange + u.amount); break;
-                case UpgradeKind.AttackSpeed: s.attackSpeed = Mathf.Min(cap, s.attackSpeed + u.amount); break;
-                case UpgradeKind.DodgeRecharge: s.dodgeRecharge = Mathf.Min(cap, s.dodgeRecharge + u.amount); break;
-                case UpgradeKind.MaxDodges: s.maxDodges = Mathf.Min((int)cap, s.maxDodges + Mathf.RoundToInt(u.amount)); break;
-                case UpgradeKind.MaxStamina: s.maxStamina += u.amount; break;
-                case UpgradeKind.LightCost: s.lightCostCut = Mathf.Min(cap, s.lightCostCut + u.amount); break;
-                case UpgradeKind.HeavyCost: s.heavyCostCut = Mathf.Min(cap, s.heavyCostCut + u.amount); break;
-                case UpgradeKind.CritChance: s.critChance = Mathf.Min(cap, s.critChance + u.amount); break;
-                case UpgradeKind.CritDamage: s.critDamage = Mathf.Min(cap, s.critDamage + u.amount); break;
-                case UpgradeKind.MoveSpeed: s.moveSpeed = Mathf.Min(cap, s.moveSpeed + u.amount); break;
-                case UpgradeKind.StaminaRegen: s.staminaRegen = Mathf.Min(cap, s.staminaRegen + u.amount); break;
-                case UpgradeKind.LifeSteal: s.lifeSteal = Mathf.Min(cap, s.lifeSteal + u.amount); break;
-                case UpgradeKind.StaggerPower: s.staggerPower = Mathf.Min(cap, s.staggerPower + u.amount); break;
-                case UpgradeKind.KillHeal: s.killHeal = Mathf.Min(cap, s.killHeal + u.amount); break;
-            }
+            foreach (var fx in item.effects) Set(s, fx.kind, After(s, fx));
         }
 
-        /// <summary>"85% → 91%" / "1 → 2" preview of an upgrade.</summary>
-        public static string Preview(PlayerStats s, Upgrade u)
+        /// <summary>"▲▲" / "▼" for the effect's steps.</summary>
+        public static string Arrows(ItemEffect fx) => new string(fx.steps >= 0 ? '▲' : '▼', Mathf.Min(9, Mathf.Abs(fx.steps)));
+
+        /// <summary>A stat's value as shown: "85%" / "3" / "1.5%".</summary>
+        public static string Format(UpgradeKind k, float v)
         {
-            var d = Def(u.kind);
-            float a = Current(s, u.kind), b = Mathf.Min(d.cap, a + u.amount);
-            return d.percent ? $"{Mathf.RoundToInt(a * 100f)}% → {Mathf.RoundToInt(b * 100f)}%" : $"{Mathf.RoundToInt(a)} → {Mathf.RoundToInt(b)}";
+            var d = Def(k);
+            if (!d.percent) return Mathf.RoundToInt(v).ToString();
+            float pct = v * 100f;
+            return Mathf.Abs(pct - Mathf.Round(pct)) > 0.05f ? $"{pct:0.0}%" : $"{Mathf.RoundToInt(pct)}%";
         }
+
+        /// <summary>"85% → 95%" preview of one effect of an item.</summary>
+        public static string Preview(PlayerStats s, ItemEffect fx) => $"{Format(fx.kind, Current(s, fx.kind))} → {Format(fx.kind, After(s, fx))}";
     }
 }

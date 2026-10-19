@@ -410,6 +410,11 @@ namespace KingLastPiece
             var clone = Instantiate(model.gameObject, transform);
             clone.name = "Ghost";
             foreach (var b in clone.GetComponentsInChildren<MonoBehaviour>()) Destroy(b);
+            // Only the piece itself: no copy of what it wears (a Dark piece's aura, the dizzy swirl, trails).
+            foreach (var ps in clone.GetComponentsInChildren<ParticleSystem>(true))
+                if (ps != null) DestroyImmediate(ps.gameObject);
+            foreach (var tr in clone.GetComponentsInChildren<TrailRenderer>(true))
+                if (tr != null) DestroyImmediate(tr.gameObject);
             foreach (var r in clone.GetComponentsInChildren<Renderer>())
             {
                 var mats = new Material[r.sharedMaterials.Length];

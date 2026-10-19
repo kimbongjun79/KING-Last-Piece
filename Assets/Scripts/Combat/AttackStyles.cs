@@ -294,7 +294,7 @@ namespace KingLastPiece
                     name = "Royal Ensemble", koName = "왕의 연무",
                     description = "Ram in from mid range, whip R→L, whip L→R, 360° cyclone, air somersault slam; heavy is a wide flipping stomp.",
                     lights = new[] { EnsembleSwing(1f), EnsembleSwing(-1f), EnsembleCyclone(), EnsembleMeteor() }, heavy = EnsembleStomp(),
-                    gapCloser = EnsembleDash, gapCloserMaxRange = 7f,
+                    gapCloser = EnsembleDash, gapCloserMaxRange = 8f,
                 },
             };
         }
@@ -395,7 +395,7 @@ namespace KingLastPiece
                 .Key(0.34f, P(tilt: 32f), Ease.Linear)
                 .Key(0.52f, P(), Ease.OutBack),
             hits = new[] { new HitWindow { start = 0.14f, end = 0.34f, shape = HitShape.Circle, forward = 0.9f, range = 0.95f, damage = 10f, poise = 12f } },
-            moves = new[] { new MoveSeg(0.12f, 0.34f, Mathf.Clamp(distance, 1.5f, 5.5f)) },
+            moves = new[] { new MoveSeg(0.12f, 0.34f, Mathf.Clamp(distance, 1.5f, 7.5f)) },
         };
 
         /// <summary>RMB heavy: Royal Stomp's flipping meteor with a wider landing blast (costs about half the stamina bar).</summary>

@@ -433,13 +433,18 @@ namespace KingLastPiece
             yield return Frames(30);
             yield return Shot("25_Upgrade_Cards.png");
             var offered = new StringBuilder();
-            foreach (var o in game.Offers) offered.Append($"[{o.GradeName}] {o.Title} {o.AmountText}; ");
+            foreach (var o in game.Offers)
+            {
+                offered.Append($"[{o.GradeName}] {o.name} (");
+                foreach (var fx in o.effects) offered.Append($"{Upgrades.Def(fx.kind).title}{fx.steps:+0;-0} ");
+                offered.Append("); ");
+            }
             stats.Append($"Offers\t{offered}\n");
-            // Choose 1, choose 4 then cancel it, choose 3: two chosen, nothing applied until the confirm button.
+            // Choose 1, switch to 3, cancel 3, choose 2: one chosen, nothing applied until the confirm button.
             game.PickUpgrade(0);
-            game.PickUpgrade(3);
-            game.PickUpgrade(3);
             game.PickUpgrade(2);
+            game.PickUpgrade(2);
+            game.PickUpgrade(1);
             game.OfferCursor = game.ConfirmSlot;
             bool appliedEarly = game.Player.Stats.maxDodges != before.maxDodges || game.Player.Stats.maxStamina != before.maxStamina ||
                                 game.Player.Stats.defense != before.defense || game.Player.Stats.maxHealth != before.maxHealth;
@@ -449,7 +454,7 @@ namespace KingLastPiece
             game.ConfirmUpgrades();
             for (int f = 0; f < 200 && game.State != GameManager.GameState.Playing; f++) yield return null;
             var after = game.Player.Stats;
-            stats.Append($"Upgraded\tround={game.Round}\tpower {before.attackPower:0.00}->{after.attackPower:0.00}\thp {before.maxHealth}->{after.maxHealth}\t" +
+            stats.Append($"Upgraded\titem={(game.Player.Items.Count > 0 ? game.Player.Items[game.Player.Items.Count - 1].name : "-")}\tround={game.Round}\tpower {before.attackPower:0.00}->{after.attackPower:0.00}\thp {before.maxHealth}->{after.maxHealth}\t" +
                          $"def {before.defense}->{after.defense}\tflasks {before.maxFlasks}->{after.maxFlasks}\trolls {before.maxDodges}->{after.maxDodges}\n");
             yield return Frames(30);
 
@@ -475,6 +480,10 @@ namespace KingLastPiece
             if (hud != null) hud.PauseTab = 1;
             yield return Frames(3);
             yield return Shot("27_Pause_Stats.png");
+            Hud.DebugMouse = new Vector2(Screen.width * 0.42f, Screen.height * 0.47f);   // a row hovered: its description box
+            yield return Frames(3);
+            yield return Shot("27b_Pause_Stats_Hover.png");
+            Hud.DebugMouse = null;
             if (hud != null) hud.PauseTab = 2;
             yield return Frames(3);
             yield return Shot("28_Pause_Controls.png");

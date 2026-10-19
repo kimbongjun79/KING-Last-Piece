@@ -209,6 +209,64 @@ namespace KingLastPiece
             }
         }
 
+        /// <summary>
+        /// Perfect dodge against the queen, then the counter: a short leap and one blow (no throw), the King invincible
+        /// throughout. Logs the counter's length, whether he stayed invincible, and the queen's lost health.
+        /// </summary>
+        IEnumerator QueenCounterScenario(string dir, StringBuilder stats)
+        {
+            var player = game.Player;
+            game.ClearEnemies();
+            player.ResetForWave(PlayerStart, 0f);
+            var queen = game.SpawnEnemy(PieceType.Queen, PlayerStart + new Vector3(0f, 0f, 2.6f));
+            for (int f = 0; f < 60; f++) yield return null;   // dropped in
+            int throwsBefore = player.ThrowCount;
+            player.GodMode = true;   // missed attempts don't end the test
+            bool perfect = false;
+            var tries = new StringBuilder();
+            float[] leads = { 0.12f, 0.08f, 0.16f, 0.05f, 0.2f };
+            for (int k = 0; k < leads.Length && !perfect; k++)
+            {
+                for (int f = 0; f < 900 && queen != null && queen.TimeToImpact > leads[k]; f++) yield return null;
+                tries.Append($"{queen.AttackLabel}@{queen.TimeToImpact:0.00} ");
+                player.Press(PlayerController.Buffered.Dodge);
+                for (int f = 0; f < 50 && !player.CounterReady; f++) yield return null;
+                perfect = player.CounterReady;
+                if (!perfect) for (int f = 0; f < 40 && queen.IsAttacking; f++) yield return null;   // let that attack finish
+            }
+            player.GodMode = Invincible;
+            float hpBefore = queen.Health;
+            player.Press(PlayerController.Buffered.Light);
+            int counterFrames = 0, vulnerableFrames = 0;
+            var sheet = new List<Texture2D>();
+            for (int f = 0; f < 90; f++)
+            {
+                yield return null;
+                if (player.IsCountering) { counterFrames++; if (!player.IsInvulnerable) vulnerableFrames++; }
+                if (f % 6 == 3 && sheet.Count < 5)
+                {
+                    yield return new WaitForEndOfFrame();
+                    sheet.Add(ScreenCapture.CaptureScreenshotAsTexture());
+                }
+            }
+            if (sheet.Count > 0)
+            {
+                int w = sheet[0].width, h = sheet[0].height;
+                var strip = new Texture2D(w * sheet.Count, h, TextureFormat.RGB24, false);
+                for (int i = 0; i < sheet.Count; i++)
+                {
+                    if (sheet[i].width == w && sheet[i].height == h) strip.SetPixels32(i * w, 0, w, h, sheet[i].GetPixels32());
+                    Destroy(sheet[i]);
+                }
+                strip.Apply();
+                File.WriteAllBytes(Path.Combine(dir, "7b_Queen_Leap_Counter.png"), strip.EncodeToPNG());
+                Destroy(strip);
+            }
+            stats.AppendLine($"QueenCounter\ttries={tries}\tperfect={perfect}\tcounter_time={counterFrames / 60f:0.00}s\tunprotected_frames={vulnerableFrames}(should be 0)\t" +
+                             $"queen_damage={hpBefore - queen.Health:0}\tthrows={player.ThrowCount - throwsBefore}(should be 0)");
+            game.ClearEnemies();
+        }
+
         /// <summary>All piece models side by side, turned toward the King: front, side and close-up views.</summary>
         IEnumerator PieceLineup(string dir)
         {
@@ -934,6 +992,7 @@ namespace KingLastPiece
             }
 
             yield return JustDodgeScenario(dir, stats);
+            yield return QueenCounterScenario(dir, stats);
             yield return PieceLineup(dir);
             yield return StaggerScenario(dir, stats);
             yield return StaggerImmunityScenario(stats);

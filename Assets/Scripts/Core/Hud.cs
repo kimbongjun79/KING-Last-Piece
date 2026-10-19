@@ -186,9 +186,30 @@ namespace KingLastPiece
         }
 
         /// <summary>2×2 chess tile in a gold frame with a little crown.</summary>
+        // Generated icons (Resources/UiIcons): the King on the emblem, the flasks under the bars. Without them the HUD
+        // draws its own crown and vials.
+        static Texture2D kingIcon, flaskIcon;
+        static bool iconsLoaded;
+
+        static void LoadIcons()
+        {
+            if (iconsLoaded) return;
+            iconsLoaded = true;
+            kingIcon = Resources.Load<Texture2D>("UiIcons/king");
+            flaskIcon = Resources.Load<Texture2D>("UiIcons/flask");
+        }
+
         void DrawEmblem(Rect r)
         {
+            LoadIcons();
             Fill(new Rect(r.x - 3 * scale, r.y - 3 * scale, r.width + 6 * scale, r.height + 6 * scale), Gold);
+            if (kingIcon != null)
+            {
+                // The King's picture on a dark plate.
+                Fill(r, new Color(0.05f, 0.045f, 0.05f));
+                GUI.DrawTexture(r, kingIcon, ScaleMode.ScaleToFit);
+                return;
+            }
             float hw = r.width / 2f, hh = r.height / 2f;
             var ivory = new Color(0.9f, 0.87f, 0.78f);
             var onyx = new Color(0.1f, 0.09f, 0.1f);
@@ -214,6 +235,18 @@ namespace KingLastPiece
 
         void DrawVial(Rect r, bool full)
         {
+            LoadIcons();
+            if (flaskIcon != null)
+            {
+                // The flask picture (square, a little wider than the old vial); an empty slot is a dim ghost of it.
+                float s = r.height * 1.15f;
+                var sq = new Rect(r.center.x - s / 2f, r.center.y - s / 2f, s, s);
+                var old = GUI.color;
+                GUI.color = full ? Color.white : new Color(0.35f, 0.35f, 0.38f, 0.45f);
+                GUI.DrawTexture(sq, flaskIcon, ScaleMode.ScaleToFit);
+                GUI.color = old;
+                return;
+            }
             var glass = new Color(0.05f, 0.05f, 0.07f, 0.9f);
             var rim = new Color(Gold.r, Gold.g, Gold.b, 0.85f);
             float neckW = r.width * 0.45f, neckH = r.height * 0.22f;
@@ -672,44 +705,95 @@ namespace KingLastPiece
         /// <summary>A gold-ruled panel of name/value rows.</summary>
         void DrawTable(Rect area, (string name, string value)[] rows, float nameWidth)
         {
+            var full = new (string, string, string)[rows.Length];
+            for (int i = 0; i < rows.Length; i++) full[i] = (rows[i].name, rows[i].value, null);
+            DrawTable(area, full, nameWidth);
+        }
+
+        /// <summary>
+        /// A gold-ruled panel of name/value rows; a row with a description shows it in a box by the mouse while hovered.
+        /// </summary>
+        void DrawTable(Rect area, (string name, string value, string desc)[] rows, float nameWidth)
+        {
             float line = (rows.Length > 12 ? 35 : 40) * scale;
             var r = new Rect(area.x, area.y, area.width, rows.Length * line + 28 * scale);
             Fill(r, new Color(0f, 0f, 0f, 0.55f));
             Fill(new Rect(r.x, r.y, r.width, 2 * scale), new Color(Gold.r, Gold.g, Gold.b, 0.7f));
             var name = new GUIStyle(label) { fontSize = Mathf.RoundToInt(20 * scale) };
             var value = new GUIStyle(small) { fontSize = Mathf.RoundToInt(20 * scale), alignment = TextAnchor.MiddleRight };
+            Vector2 mouse = DebugMouse ?? Event.current.mousePosition;
+            string hover = null;
             float y = r.y + 14 * scale;
             for (int i = 0; i < rows.Length; i++)
             {
-                if (i % 2 == 0) Fill(new Rect(r.x + 8 * scale, y, r.width - 16 * scale, line), new Color(1f, 1f, 1f, 0.04f));
+                var row = new Rect(r.x + 8 * scale, y, r.width - 16 * scale, line);
+                bool hot = rows[i].desc != null && row.Contains(mouse);
+                if (hot) { hover = rows[i].desc; Fill(row, new Color(Gold.r, Gold.g, Gold.b, 0.16f)); }
+                else if (i % 2 == 0) Fill(row, new Color(1f, 1f, 1f, 0.04f));
                 Text(new Rect(r.x + 24 * scale, y, nameWidth, line), rows[i].name, name, Gold);
                 Text(new Rect(r.x + 24 * scale, y, r.width - 48 * scale, line), rows[i].value, value, new Color(0.93f, 0.9f, 0.83f));
                 y += line;
             }
+            if (hover != null) DrawTooltip(hover, mouse);
         }
 
-        /// <summary>The King's stats (pause ▸ 능력치).</summary>
+        /// <summary>Lab: stands in for the mouse position over the stats rows (null: the real mouse).</summary>
+        public static Vector2? DebugMouse;
+
+        /// <summary>A small dark box with a wrapped description next to the mouse (kept on screen).</summary>
+        void DrawTooltip(string text, Vector2 at)
+        {
+            var style = new GUIStyle(small) { fontSize = Mathf.RoundToInt(18 * scale), alignment = TextAnchor.UpperLeft, wordWrap = true };
+            float w = 430 * scale, pad = 14 * scale;
+            float h = style.CalcHeight(new GUIContent(text), w - 2 * pad) + 2 * pad;
+            var box = new Rect(at.x + 18 * scale, at.y + 14 * scale, w, h);
+            if (box.xMax > Screen.width - 8) box.x = at.x - w - 18 * scale;
+            if (box.yMax > Screen.height - 8) box.y = Screen.height - 8 - h;
+            Fill(new Rect(box.x - 2 * scale, box.y - 2 * scale, box.width + 4 * scale, box.height + 4 * scale), new Color(Gold.r, Gold.g, Gold.b, 0.8f));
+            Fill(box, new Color(0.04f, 0.035f, 0.04f, 0.97f));
+            Text(new Rect(box.x + pad, box.y + pad, w - 2 * pad, h - 2 * pad), text, style, new Color(0.95f, 0.92f, 0.85f));
+        }
+
+        static string D(UpgradeKind k) => Upgrades.Def(k).desc;
+
+        /// <summary>The King's stats (pause ▸ 능력치); hover a row for what it does.</summary>
         void DrawStats(PlayerController p, Rect area)
         {
             var s = p.Stats;
             float dmgCut = 1f - s.DamageTaken(100f) / 100f;
-            DrawTable(area, new[]
+            float sustain = GameManager.Instance != null ? GameManager.Instance.SustainScale : 1f;
+            DrawTable(area, new (string, string, string)[]
             {
-                ("공격력", $"{Mathf.RoundToInt(s.attackPower * 100f)}%"),
-                ("방어력", $"{Mathf.RoundToInt(s.defense)}   (받는 피해 −{Mathf.RoundToInt(dmgCut * 100f)}%)"),
-                ("최대 체력", $"{Mathf.RoundToInt(p.MaxHealth)}"),
-                ("공격 속도", $"{Mathf.RoundToInt(s.attackSpeed * 100f)}%   (최대 135%)"),
-                ("공격 범위", $"{Mathf.RoundToInt(s.attackRange * 100f)}%   (최대 130%)"),
-                ("공격 역동감", $"{Mathf.RoundToInt(s.Dynamism * 100f)}%   (공격력·속도·범위에 따라 80~140%)"),
-                ("최대 기력", $"{Mathf.RoundToInt(p.MaxStamina)}"),
-                ("치명타", $"확률 {Mathf.RoundToInt(s.critChance * 100f)}% (최대 60%)   ·   피해 {Mathf.RoundToInt(s.critDamage * 100f)}% (최대 300%)"),
-                ("공격당 기력 소모", $"일반공격 {p.LightAttackCost:0.#} (−{Mathf.RoundToInt(s.lightCostCut * 100f)}%)   ·   강공격 {p.HeavyAttackCost:0.#} (−{Mathf.RoundToInt(s.heavyCostCut * 100f)}%)"),
-                ("회복약", $"{p.MaxFlasks}개 (최대 5)   ·   회복량 {Mathf.RoundToInt(s.healAmount)}"),
-                ("회피 충전", $"{p.MaxDodges}회 (최대 3)   ·   1회 충전 {p.DodgeRechargeTime:0.00}초"),
-                ("이동 · 기력 회복", $"이동 속도 {Mathf.RoundToInt(s.moveSpeed * 100f)}% (최대 130%)   ·   기력 회복 {Mathf.RoundToInt(s.staminaRegen * 100f)}% (최대 200%)"),
-                ("경직 피해", $"{Mathf.RoundToInt(s.staggerPower * 100f)}%   (최대 200%)"),
-                ("흡혈 · 처치 회복", $"가한 피해의 {Mathf.RoundToInt(s.lifeSteal * 100f)}% (최대 15%)   ·   처치마다 {Mathf.RoundToInt(s.killHeal)} (최대 20)"),
-            }, area.width * 0.4f);
+                ("공격력", $"{Mathf.RoundToInt(s.attackPower * 100f)}%", D(UpgradeKind.AttackPower)),
+                ("데미지", $"+{Mathf.RoundToInt(s.damage * 100f)}%   (최종 피해 ×{s.DamageMultiplier:0.00})", D(UpgradeKind.Damage)),
+                ("공격 속도", $"{Mathf.RoundToInt(s.attackSpeed * 100f)}%   (최대 135%)", D(UpgradeKind.AttackSpeed)),
+                ("공격 범위", $"{Mathf.RoundToInt(s.attackRange * 100f)}%   (최대 130%)", D(UpgradeKind.AttackRange)),
+                ("치명타", $"확률 {Mathf.RoundToInt(s.critChance * 100f)}% (최대 60%)   ·   피해 {Mathf.RoundToInt(s.critDamage * 100f)}% (최대 300%)",
+                    D(UpgradeKind.CritChance) + "\n" + D(UpgradeKind.CritDamage)),
+                ("경직 피해", $"{Mathf.RoundToInt(s.staggerPower * 100f)}%   (최대 200%)", D(UpgradeKind.StaggerPower)),
+                ("최대 체력", $"{Mathf.RoundToInt(p.MaxHealth)}", D(UpgradeKind.MaxHealth)),
+                ("방어력", $"{Mathf.RoundToInt(s.defense)}   (받는 피해 −{Mathf.RoundToInt(dmgCut * 100f)}%)", D(UpgradeKind.Defense)),
+                ("회복약", $"{p.MaxFlasks}개 (최대 5)   ·   회복량 {Mathf.RoundToInt(s.healAmount)}", D(UpgradeKind.Flask) + "\n" + D(UpgradeKind.HealAmount)),
+                ("흡혈 · 처치 회복", $"{Upgrades.Format(UpgradeKind.LifeSteal, s.lifeSteal)}  ·  처치마다 {Mathf.RoundToInt(s.killHeal)}   (지금 효율 ×{sustain:0.00})",
+                    D(UpgradeKind.LifeSteal) + "\n" + D(UpgradeKind.KillHeal) + $"\n효율: 1라운드 ×0.34 · 20라운드 ×1.0 · 40라운드 ×1.7 (상한 없음)"),
+                ("기력", $"최대 {Mathf.RoundToInt(p.MaxStamina)}   ·   회복 속도 {Mathf.RoundToInt(s.staminaRegen * 100f)}% (최대 200%)",
+                    D(UpgradeKind.MaxStamina) + "\n" + D(UpgradeKind.StaminaRegen)),
+                ("공격당 기력 소모", $"일반공격 {p.LightAttackCost:0.#} (−{Mathf.RoundToInt(s.lightCostCut * 100f)}%)   ·   강공격 {p.HeavyAttackCost:0.#} (−{Mathf.RoundToInt(s.heavyCostCut * 100f)}%)",
+                    D(UpgradeKind.LightCost) + "\n" + D(UpgradeKind.HeavyCost)),
+                ("이동 속도", $"{Mathf.RoundToInt(s.moveSpeed * 100f)}%   (최대 130%)", D(UpgradeKind.MoveSpeed)),
+                ("회피", $"{p.MaxDodges}회 (최대 3)   ·   1회 충전 {p.DodgeRechargeTime:0.00}초", D(UpgradeKind.MaxDodges) + "\n" + D(UpgradeKind.DodgeRecharge)),
+                ("공격 역동감", $"{Mathf.RoundToInt(s.Dynamism * 100f)}%   (80~140%)", "공격 동작의 기울기·도약·카메라 반동의 크기. 공격력·공격 속도·공격 범위가 오를수록 커집니다."),
+                ("보유 아이템", p.Items.Count == 0 ? "없음" : $"{p.Items.Count}개", ItemList(p)),
+            }, area.width * 0.36f);
+        }
+
+        /// <summary>The items picked this run, one per line (newest last).</summary>
+        static string ItemList(PlayerController p)
+        {
+            if (p.Items.Count == 0) return "라운드를 마칠 때마다 아이템 3개 중 하나를 고릅니다.";
+            var sb = new System.Text.StringBuilder();
+            foreach (var it in p.Items) sb.Append($"[{it.GradeName}] {it.name}\n");
+            return sb.ToString().TrimEnd();
         }
 
         /// <summary>How to play (pause ▸ 조작법): keyboard and mouse, then the gamepad.</summary>
@@ -730,19 +814,15 @@ namespace KingLastPiece
             DrawTable(area, rows, area.width * 0.36f);
             float y = area.y + rows.Length * 40 * scale + 46 * scale;
             var tip = new GUIStyle(small) { fontSize = Mathf.RoundToInt(18 * scale) };
-            Text(new Rect(0, y, Screen.width, 30 * scale), "공격이 닿기 직전에 구르면  완벽한 회피  →  느려진 시간 속에서 좌클릭:  로열 스로 (잡아 돌려 던지기)",
+            Text(new Rect(0, y, Screen.width, 30 * scale), "공격이 닿기 직전에 구르면  완벽한 회피  →  느려진 시간 속에서 좌클릭:  로열 스로 (퀸에게는 도약 반격)",
                 tip, new Color(0.6f, 0.9f, 1f, 0.9f));
-            Text(new Rect(0, y + 32 * scale, Screen.width, 30 * scale), "적의 경직 게이지가 다 차면 무방비  —  강공격으로 띄워 공중 콤보",
+            Text(new Rect(0, y + 32 * scale, Screen.width, 30 * scale), "적의 경직 게이지가 다 차면 기절  —  강공격으로 띄워 공중 콤보",
                 tip, new Color(0.85f, 0.82f, 0.75f, 0.85f));
         }
 
-        // ---------------------------------------------------------------- round-end upgrades (endless)
+        // ---------------------------------------------------------------- round-end items (endless)
 
-        /// <summary>
-        /// Five cards: click (or 1–5, or ←/→ and Enter) to choose — again to cancel; with two chosen, the confirm button
-        /// makes them permanent and starts the next round.
-        /// </summary>
-        /// <summary>Upgrade grade colours: common grey, rare blue, epic violet, legendary orange-gold.</summary>
+        /// <summary>Item grade colours: common grey, rare blue, epic violet, legendary orange-gold.</summary>
         static Color GradeColor(UpgradeGrade g) => g switch
         {
             UpgradeGrade.Rare => new Color(0.36f, 0.62f, 1f),
@@ -751,22 +831,29 @@ namespace KingLastPiece
             _ => new Color(0.7f, 0.68f, 0.64f),
         };
 
+        static readonly Color Gain = new Color(0.55f, 0.95f, 0.5f), Loss = new Color(1f, 0.42f, 0.36f);
+
+        /// <summary>
+        /// Three item cards: click (or 1–3, or ←/→ and Enter) to choose one — another card switches, the same card again
+        /// cancels; the confirm button keeps it for good and starts the next round. Each card: picture, grade, name and
+        /// its stat steps (▲ gains, ▼ drawbacks) with the before → after values.
+        /// </summary>
         void DrawUpgrades(GameManager g)
         {
             var p = g.Player;
             float a = Mathf.Clamp01(g.StateTime / 0.35f);
             Fill(new Rect(0, 0, Screen.width, Screen.height), new Color(0f, 0f, 0f, 0.6f * a));
-            int need = g.PicksNeeded;
-            Text(new Rect(0, Screen.height * 0.15f, Screen.width, 50 * scale), $"{g.Round} 라운드 클리어", mid, new Color(Gold.r, Gold.g, Gold.b, a));
-            Text(new Rect(0, Screen.height * 0.15f + 52 * scale, Screen.width, 34 * scale),
-                $"영구 강화 {need}개를 고르세요  ({g.Picked.Count} / {need})   —   다시 누르면 선택 취소", small, new Color(0.9f, 0.88f, 0.8f, a));
+            Text(new Rect(0, Screen.height * 0.1f, Screen.width, 50 * scale), $"{g.Round} 라운드 클리어", mid, new Color(Gold.r, Gold.g, Gold.b, a));
+            Text(new Rect(0, Screen.height * 0.1f + 52 * scale, Screen.width, 34 * scale),
+                "아이템 하나를 고르세요   —   다른 카드를 누르면 바꾸고, 같은 카드를 다시 누르면 취소", small, new Color(0.9f, 0.88f, 0.8f, a));
 
             int n = g.Offers.Count;
-            float cw = 250 * scale, ch = 300 * scale, gap = 22 * scale;
-            float x0 = (Screen.width - (n * cw + (n - 1) * gap)) / 2f, y0 = Screen.height * 0.32f;
-            var title = new GUIStyle(label) { alignment = TextAnchor.MiddleCenter, fontSize = Mathf.RoundToInt(25 * scale), wordWrap = true };
-            var amount = new GUIStyle(big) { fontSize = Mathf.RoundToInt(56 * scale) };
+            float cw = 300 * scale, ch = 410 * scale, gap = 30 * scale;
+            float x0 = (Screen.width - (n * cw + (n - 1) * gap)) / 2f, y0 = Screen.height * 0.1f + 110 * scale;
+            var title = new GUIStyle(label) { alignment = TextAnchor.MiddleCenter, fontSize = Mathf.RoundToInt(26 * scale), wordWrap = true };
             var info = new GUIStyle(small) { fontSize = Mathf.RoundToInt(19 * scale) };
+            var fxName = new GUIStyle(small) { fontSize = Mathf.RoundToInt(18 * scale), alignment = TextAnchor.MiddleLeft };
+            var fxValue = new GUIStyle(small) { fontSize = Mathf.RoundToInt(17 * scale), alignment = TextAnchor.MiddleRight };
             var e = Event.current;
             // Hover follows the mouse only when it moves, so the keys / pad can steer the cursor too.
             bool mouseMoved = e.type == EventType.Repaint && (e.mousePosition - lastMouse).sqrMagnitude > 1f;
@@ -780,9 +867,9 @@ namespace KingLastPiece
                 bool hot = g.OfferCursor == i;
                 r.y -= picked ? 18 * scale : hot ? 8 * scale : 0f;
 
-                var u = g.Offers[i];
-                Color gc = GradeColor(u.grade);
-                // The frame wears the grade's colour (brighter when hovered, gold-white when chosen).
+                var item = g.Offers[i];
+                Color gc = GradeColor(item.grade);
+                // The frame wears the grade's colour (brighter when hovered, gold when chosen).
                 Fill(new Rect(r.x - 3 * scale, r.y - 3 * scale, r.width + 6 * scale, r.height + 6 * scale),
                     picked ? new Color(Gold.r, Gold.g, Gold.b, a) : hot ? new Color(Mathf.Lerp(gc.r, 1f, 0.45f), Mathf.Lerp(gc.g, 1f, 0.45f), Mathf.Lerp(gc.b, 1f, 0.45f), a)
                         : new Color(gc.r * 0.75f, gc.g * 0.75f, gc.b * 0.75f, a));
@@ -791,24 +878,44 @@ namespace KingLastPiece
                 for (int k = 0; k < 8; k++)
                     Fill(new Rect(r.x + k * r.width / 8f, r.y, r.width / 8f, 10 * scale), k % 2 == 0 ? new Color(gc.r, gc.g, gc.b, a) : new Color(0.12f, 0.1f, 0.1f, a));
 
-                Text(new Rect(r.x, r.y + 14 * scale, 34 * scale, 34 * scale), (i + 1).ToString(), info, new Color(1f, 1f, 1f, 0.5f * a));
-                Text(new Rect(r.x, r.y + 14 * scale, r.width - 12 * scale, 30 * scale), u.GradeName,
+                Text(new Rect(r.x + 4 * scale, r.y + 14 * scale, 34 * scale, 30 * scale), (i + 1).ToString(), info, new Color(1f, 1f, 1f, 0.5f * a));
+                Text(new Rect(r.x, r.y + 14 * scale, r.width - 12 * scale, 30 * scale), item.GradeName,
                     new GUIStyle(info) { alignment = TextAnchor.MiddleRight, fontStyle = FontStyle.Bold }, new Color(gc.r, gc.g, gc.b, a));
-                Text(new Rect(r.x + 12 * scale, r.y + 40 * scale, r.width - 24 * scale, 64 * scale), u.Title, title, new Color(Gold.r, Gold.g, Gold.b, a));
-                Text(new Rect(r.x, r.y + 110 * scale, r.width, 80 * scale), u.AmountText, amount, new Color(0.96f, 0.94f, 0.88f, a));
-                Text(new Rect(r.x, r.y + 200 * scale, r.width, 34 * scale), Upgrades.Preview(p.Stats, u), info, new Color(0.75f, 0.73f, 0.68f, a));
-                var d = Upgrades.Def(u.kind);
-                if (!float.IsInfinity(d.cap))
-                    Text(new Rect(r.x, r.y + 232 * scale, r.width, 26 * scale), d.percent ? $"최대 {Mathf.RoundToInt(d.cap * 100f)}%" : $"최대 {Mathf.RoundToInt(d.cap)}",
-                        new GUIStyle(info) { fontSize = Mathf.RoundToInt(15 * scale) }, new Color(1f, 1f, 1f, 0.35f * a));
+
+                // The item's picture on a grade-tinted plate.
+                float isz = 112 * scale;
+                var plate = new Rect(r.center.x - isz / 2f, r.y + 46 * scale, isz, isz);
+                Fill(new Rect(plate.x - 2 * scale, plate.y - 2 * scale, plate.width + 4 * scale, plate.height + 4 * scale), new Color(gc.r * 0.6f, gc.g * 0.6f, gc.b * 0.6f, a));
+                Fill(plate, new Color(0.02f, 0.02f, 0.025f, a));
+                if (item.Icon != null)
+                {
+                    var old = GUI.color;
+                    GUI.color = new Color(1f, 1f, 1f, a);
+                    GUI.DrawTexture(plate, item.Icon, ScaleMode.ScaleToFit);
+                    GUI.color = old;
+                }
+                else Diamond(plate.center, 22f * scale, new Color(gc.r, gc.g, gc.b, 0.5f * a));
+
+                Text(new Rect(r.x + 10 * scale, plate.yMax + 8 * scale, r.width - 20 * scale, 40 * scale), item.name, title, new Color(Gold.r, Gold.g, Gold.b, a));
+
+                // Stat steps: ▲ gains in green, ▼ drawbacks in red, with the value before → after.
+                float fy = plate.yMax + 58 * scale, lh = 27 * scale;
+                foreach (var fx in item.effects)
+                {
+                    var c = fx.steps >= 0 ? Gain : Loss;
+                    var row = new Rect(r.x + 16 * scale, fy, r.width - 32 * scale, lh);
+                    Text(row, $"{Upgrades.Def(fx.kind).title}  {Upgrades.Arrows(fx)}", fxName, new Color(c.r, c.g, c.b, a));
+                    Text(row, Upgrades.Preview(p.Stats, fx), fxValue, new Color(0.8f, 0.78f, 0.72f, a));
+                    fy += lh;
+                }
                 if (picked)
-                    Text(new Rect(r.x, r.yMax - 40 * scale, r.width, 32 * scale), "선택됨",
+                    Text(new Rect(r.x, r.yMax - 36 * scale, r.width, 30 * scale), "선택됨",
                         new GUIStyle(label) { alignment = TextAnchor.MiddleCenter, fontSize = Mathf.RoundToInt(19 * scale) }, new Color(Gold.r, Gold.g, Gold.b, a));
             }
 
-            // Confirm button: unlocks with two chosen.
+            // Confirm button: unlocks with an item chosen.
             bool ready = g.CanConfirmUpgrades;
-            var b = new Rect((Screen.width - 300 * scale) / 2f, y0 + ch + 44 * scale, 300 * scale, 62 * scale);
+            var b = new Rect((Screen.width - 300 * scale) / 2f, y0 + ch + 34 * scale, 300 * scale, 62 * scale);
             if (mouseMoved && b.Contains(e.mousePosition)) g.OfferCursor = g.ConfirmSlot;
             if (e.type == EventType.MouseDown && b.Contains(e.mousePosition)) { g.ConfirmUpgrades(); e.Use(); }
             bool bHot = g.OfferCursor == g.ConfirmSlot;
@@ -818,7 +925,7 @@ namespace KingLastPiece
             Fill(b, ready ? (bHot ? new Color(0.36f, 0.27f, 0.1f, a) : new Color(0.24f, 0.18f, 0.07f, a)) : new Color(0.08f, 0.08f, 0.08f, 0.9f * a));
             Text(b, "확인", new GUIStyle(mid) { fontSize = Mathf.RoundToInt(28 * scale) },
                 ready ? new Color(1f, 0.95f, 0.85f, a) : new Color(1f, 1f, 1f, 0.3f * a));
-            Text(new Rect(0, b.yMax + 10 * scale, Screen.width, 26 * scale), "클릭  ·  숫자 1–5  ·  ← → 와 Enter",
+            Text(new Rect(0, b.yMax + 10 * scale, Screen.width, 26 * scale), "클릭  ·  숫자 1–3  ·  ← → 와 Enter",
                 new GUIStyle(small) { fontSize = Mathf.RoundToInt(15 * scale) }, new Color(1f, 1f, 1f, 0.4f * a));
         }
 
@@ -827,7 +934,6 @@ namespace KingLastPiece
         // ---------------------------------------------------------------- low health
 
         static Texture2D vignette;
-        float vignetteLevel;
 
         /// <summary>Radial mask: clear in the middle, opaque at the edges (soft falloff).</summary>
         static Texture2D Vignette
@@ -852,24 +958,12 @@ namespace KingLastPiece
             }
         }
 
-        /// <summary>
-        /// Below 35% health the screen edges close in with a pulsing blood-red vignette: the lower the health, the
-        /// further it reaches toward the centre and the harder it beats.
-        /// </summary>
+        LowHealthFx lowHealth;
+
+        /// <summary>Low health is shown by URP post-processing (<see cref="LowHealthFx"/>), not drawn here: just make sure it runs.</summary>
         void DrawLowHealthVignette(PlayerController p)
         {
-            float frac = p.MaxHealth > 0f ? p.Health / p.MaxHealth : 1f;
-            float target = p.IsDead ? 0f : Mathf.Clamp01((0.35f - frac) / 0.3f);
-            vignetteLevel = Mathf.MoveTowards(vignetteLevel, target, Time.unscaledDeltaTime * 1.5f);
-            if (vignetteLevel <= 0.001f) return;
-            float beat = Mathf.Pow(Mathf.Abs(Mathf.Sin(Time.unscaledTime * Mathf.Lerp(3.2f, 5.5f, vignetteLevel))), 6f);
-            // Draw the mask oversized when mild (edges only), at screen size when critical (closing in).
-            float grow = Mathf.Lerp(0.45f, 0.02f, vignetteLevel) - 0.06f * beat * vignetteLevel;
-            var r = new Rect(-Screen.width * grow, -Screen.height * grow, Screen.width * (1f + 2f * grow), Screen.height * (1f + 2f * grow));
-            var old = GUI.color;
-            GUI.color = new Color(0.55f, 0.02f, 0.02f, Mathf.Lerp(0.55f, 0.9f, vignetteLevel) * (0.85f + 0.15f * beat));
-            GUI.DrawTexture(r, Vignette, ScaleMode.StretchToFill, true);
-            GUI.color = old;
+            if (lowHealth == null && !TryGetComponent(out lowHealth)) lowHealth = gameObject.AddComponent<LowHealthFx>();
         }
 
         static void Fill(Rect r, Color c)
