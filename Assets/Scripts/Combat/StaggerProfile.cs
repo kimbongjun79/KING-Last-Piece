@@ -21,6 +21,8 @@ namespace KingLastPiece
         public float launchForce = 7f;
         [Tooltip("Length of the flinch motion on a normal hit.")]
         public float flinchDuration = 0.35f;
+        [Tooltip("Seconds after the guard recovers during which hits fill no gauge (no back-to-back breaks).")]
+        public float recoveryImmunity = 3f;
 
         public static StaggerProfile Create(float maxGauge, float vulnerableDuration, float launchForce, float flinchDuration,
             float decayDelay = 1.2f, float decayFraction = 0.4f)

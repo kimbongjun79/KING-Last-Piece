@@ -256,6 +256,32 @@ namespace KingLastPiece
         /// (m move, w/a attack, r recover, s flinch, U airborne, g get-up, x dead; uppercase-V marks Vulnerable).
         /// Captures a 5×2 sheet of the sequence.
         /// </summary>
+        /// <summary>
+        /// Break a rook's guard, wait until it recovers, then try to break it again at once (should hold for the
+        /// immunity window) and once more after it (should break).
+        /// </summary>
+        IEnumerator StaggerImmunityScenario(StringBuilder stats)
+        {
+            game.ClearEnemies();
+            game.Player.ResetForWave(PlayerStart, 0f);
+            var rook = game.SpawnEnemy(PieceType.Rook, PlayerStart + new Vector3(0f, 0f, 6f));
+            for (int f = 0; f < 50; f++) yield return null;
+            game.Player.GodMode = true;
+            rook.AddStagger(9999f, game.Player.transform.position);
+            bool broke = rook.IsVulnerable;
+            float t0 = Time.time;
+            while (rook.IsVulnerable && Time.time - t0 < 10f) yield return null;
+            float dazed = Time.time - t0;
+            rook.AddStagger(9999f, game.Player.transform.position);
+            bool rebrokeAtOnce = rook.IsVulnerable;
+            for (float t = 0f; t < 3.2f; t += Time.deltaTime) yield return null;
+            rook.AddStagger(9999f, game.Player.transform.position);
+            bool brokeAfter = rook.IsVulnerable;
+            stats.Append($"StaggerImmunity\tbroke={broke}\tdazed={dazed:0.0}s\trebroke_at_once={rebrokeAtOnce}(should be False)\tbroke_after_3s={brokeAfter}\n");
+            game.Player.GodMode = Invincible;
+            game.ClearEnemies();
+        }
+
         IEnumerator StaggerScenario(string dir, StringBuilder stats)
         {
             var hud = game.GetComponent<Hud>();
@@ -910,6 +936,7 @@ namespace KingLastPiece
             yield return JustDodgeScenario(dir, stats);
             yield return PieceLineup(dir);
             yield return StaggerScenario(dir, stats);
+            yield return StaggerImmunityScenario(stats);
             yield return AutoAssistScenario(dir, stats);
             yield return CrumbleScenario(dir);
             yield return GapCloserScenario(dir, stats);

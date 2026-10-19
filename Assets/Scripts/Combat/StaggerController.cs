@@ -7,6 +7,8 @@ namespace KingLastPiece
     /// Normal: hits flinch and fill the gauge. Attacking (super armor): no reaction, gauge still fills.
     /// Full gauge → Vulnerable: each hit pops the enemy up a little and cancels its action. Airborne: hits juggle it
     /// with shrinking, capped boosts. The gauge is frozen while Vulnerable/airborne and resets on get-up or timeout.
+    /// When the guard recovers, hits fill no gauge for <see cref="StaggerProfile.recoveryImmunity"/> seconds, so a
+    /// piece can't be broken again right away.
     /// </summary>
     [DisallowMultipleComponent]
     public class StaggerController : MonoBehaviour
@@ -16,24 +18,18 @@ namespace KingLastPiece
         public StaggerProfile Profile;
         public float Gauge { get; private set; }
         public bool Vulnerable => vulnerableTimer > 0f;
+        /// <summary>Just recovered from a broken guard: hits fill no gauge for now.</summary>
+        public bool Immune => immuneTimer > 0f;
         /// <summary>True for the hit that filled the gauge (used to play the "vulnerable" effect once).</summary>
         public bool JustBecameVulnerable { get; private set; }
 
-        float decayTimer, vulnerableTimer;
+        float decayTimer, vulnerableTimer, immuneTimer;
 
         public Reaction OnHit(float staggerDamage, bool superArmor, bool airborne)
         {
             JustBecameVulnerable = false;
             if (Vulnerable || airborne) return Reaction.Launch;  // gauge frozen; every hit launches
-
-            Gauge += staggerDamage;
-            decayTimer = Profile.decayDelay;
-            if (Gauge >= Profile.maxGauge)
-            {
-                Gauge = Profile.maxGauge;
-                vulnerableTimer = Profile.vulnerableDuration;
-                JustBecameVulnerable = true;
-            }
+            if (!Immune && Fill(staggerDamage)) JustBecameVulnerable = true;
             return superArmor ? Reaction.None : Reaction.Flinch;
         }
 
@@ -41,13 +37,18 @@ namespace KingLastPiece
         public bool Add(float staggerDamage)
         {
             JustBecameVulnerable = false;
-            if (Vulnerable) return false;
+            if (Vulnerable || Immune) return false;
+            return JustBecameVulnerable = Fill(staggerDamage);
+        }
+
+        /// <summary>Adds to the gauge; true when that fills it (the guard breaks).</summary>
+        bool Fill(float staggerDamage)
+        {
             Gauge += staggerDamage;
             decayTimer = Profile.decayDelay;
             if (Gauge < Profile.maxGauge) return false;
             Gauge = Profile.maxGauge;
             vulnerableTimer = Profile.vulnerableDuration;
-            JustBecameVulnerable = true;
             return true;
         }
 
@@ -62,11 +63,17 @@ namespace KingLastPiece
         /// <summary>Advance timers. <paramref name="frozen"/> while airborne.</summary>
         public void Tick(float dt, bool frozen)
         {
+            if (immuneTimer > 0f) immuneTimer -= dt;
             if (frozen) return;
             if (vulnerableTimer > 0f)
             {
                 vulnerableTimer -= dt;
-                if (vulnerableTimer <= 0f) ResetGauge();
+                if (vulnerableTimer <= 0f)
+                {
+                    // Out of the daze: a few seconds before the guard can be broken again.
+                    ResetGauge();
+                    immuneTimer = Profile.recoveryImmunity;
+                }
                 return;
             }
             if (decayTimer > 0f) decayTimer -= dt;

@@ -286,8 +286,12 @@ namespace KingLastPiece
                 stagger.Tick(dt, state == EState.Airborne);
                 if (stagger.Vulnerable && state != EState.Airborne) AnimateVulnerable(dt);
             }
-            else if (poiseRegenTimer > 0f) poiseRegenTimer -= dt;
-            else poise = Mathf.Min(maxPoise, poise + maxPoise * 0.04f * dt);   // the boss's poise refills slowly
+            else
+            {
+                if (stunImmunity > 0f) stunImmunity -= dt;
+                if (poiseRegenTimer > 0f) poiseRegenTimer -= dt;
+                else poise = Mathf.Min(maxPoise, poise + maxPoise * 0.04f * dt);   // the boss's poise refills slowly
+            }
 
             switch (state)
             {
@@ -359,6 +363,12 @@ namespace KingLastPiece
 
         protected void Enter(EState s)
         {
+            // The boss comes out of a stun (however it ends): a few seconds before its poise can be broken again.
+            if (bossStunned && state == EState.Stagger && s != EState.Stagger)
+            {
+                bossStunned = false;
+                stunImmunity = BossStunImmunity;
+            }
             state = s;
             stateTime = 0f;
         }
@@ -1017,14 +1027,16 @@ namespace KingLastPiece
                 return true;
             }
 
-            // Bosses: classic poise (separate from the stagger system).
-            poise -= poiseDamage;
-            poiseRegenTimer = 3f;
+            // Bosses: classic poise (separate from the stagger system), untouched while stunned and just after.
+            if (!PoiseLocked)
+            {
+                poise -= poiseDamage;
+                poiseRegenTimer = 3f;
+            }
             bool armored = hyperArmor && (state == EState.Attack || state == EState.Windup);
             if (poise <= 0f && !armored)
             {
-                poise = maxPoise;
-                Flinch(source, staggerDuration);
+                BossStun(source);
                 Effects.Sparks(transform.position + Vector3.up * 1.5f, new Color(1f, 0.9f, 0.4f), 8, 3f);
             }
             else if (state == EState.Move)
@@ -1303,10 +1315,23 @@ namespace KingLastPiece
                 if (stagger.Add(amount)) BreakGuard();
                 return;
             }
+            if (PoiseLocked) return;
             poise -= amount;
             poiseRegenTimer = 3f;
             if (poise > 0f) return;
+            BossStun(source);
+        }
+
+        // Boss stun: while stunned and for a few seconds after, its poise can't be worn down (no stun-locking).
+        const float BossStunImmunity = 3f;
+        bool bossStunned;
+        float stunImmunity;
+        bool PoiseLocked => bossStunned || stunImmunity > 0f;
+
+        void BossStun(Vector3 source)
+        {
             poise = maxPoise;
+            bossStunned = true;
             Flinch(source, staggerDuration);
         }
 
