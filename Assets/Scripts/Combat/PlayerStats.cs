@@ -102,7 +102,7 @@ namespace KingLastPiece
 
     /// <summary>A round-end item: a fixed set of stat steps and a grade set by how much they are worth.</summary>
     /// <summary>What a special item does (none: a stat item).</summary>
-    public enum Special { None, Stalemate, KingsDance, MartyrCrown, Execution, Gambit, Momentum, BoomerangCrown, Thorns, BlackAurora }
+    public enum Special { None, Stalemate, KingsDance, MartyrCrown, Execution, Gambit, Momentum, BoomerangCrown, Thorns, BlackAurora, SwordWave, Echo, ChainLightning }
 
     public class Item
     {
@@ -213,6 +213,7 @@ namespace KingLastPiece
             I("waterskin",      "가죽 수통",      C, E(St, 2)),
             I("lucky_coin",     "행운의 동전",    C, E(CrC, 2)),
             I("long_haft",      "긴 자루",        C, E(Rng, 2)),
+            I("iron_buckle",    "쇠 버클",        C, E(Def_, 1), E(Hp, 1)),
             // Rare (≈ 3 steps)
             I("knight_sword",   "기사의 검",      R, E(Pow, 2), E(CrC, 2)),
             I("herald_wings",   "전령의 날개",    R, E(Mv, 2), E(DRc, 2)),
@@ -236,6 +237,8 @@ namespace KingLastPiece
             I("sturdy_heart",   "튼튼한 심장",    R, E(Hp, 3)),
             I("herb_pouch",     "약초 주머니",    R, E(Heal, 3)),
             I("endurance_ring", "지구력의 반지",  R, E(St, 2), E(StR, 1)),
+            I("spiked_gauntlet","가시 건틀릿",    R, E(Stg, 2), E(CrC, 1)),
+            I("royal_rations",  "왕실 식량",      R, E(Hp, 2), E(Heal, 1)),
             // Epic (≈ 4–5 steps)
             I("apothecary_bag", "약제사의 가방",  H, E(Fl, 1), E(Heal, 1)),
             I("guard_insignia", "근위대 휘장",    H, E(Pow, 2), E(Def_, 2), E(Hp, 1)),
@@ -250,10 +253,12 @@ namespace KingLastPiece
             I("sword_dance",    "검무의 두루마리", H, E(Spd, 3), E(LC, 1), E(StR, 1)),
             I("giant_arm",      "거인의 팔",      H, E(Rng, 3), E(Pow, 1), E(Stg, 1)),
             I("royal_plate",    "왕의 갑주",      H, E(Hp, 3), E(Def_, 2)),
+            I("duelist_cape",   "결투가의 망토",  H, E(CrC, 2), E(Mv, 2), E(DRc, 1)),
             // Legendary (≈ 6–7 steps)
             I("kings_seal",     "왕의 인장",      L, E(Pow, 1), E(Spd, 1), E(Rng, 1), E(Hp, 1), E(Def_, 1), E(Heal, 1), E(Stg, 1)),
             I("sacrifice",      "희생",           L, E(Pow, 9), E(CrC, 1), E(Hp, -3)),
             I("crown_wrath",    "왕관의 분노",    L, E(Dmg, 4), E(Pow, 2), E(Rng, 1)),
+            I("phoenix_feather","불사조의 깃털",  L, E(Dg, 1), E(Ls, 3), E(StR, 2)),
 
             // Special items: a new way to fight, not more of a stat. Offered like the others, never twice.
             S("stalemate",      "스테일메이트",   L, Special.Stalemate, "라운드마다 1번, 치명상을 받아도 체력 1로 버팁니다. 발동하면 2초간 무적이 되고 주변 2칸의 적이 모두 기절합니다."),
@@ -265,6 +270,9 @@ namespace KingLastPiece
             S("boomerang_crown","부메랑 왕관",    L, Special.BoomerangCrown, "왕관이 가장 가까운 적을 향해 저절로 날아갑니다. 앞으로 날아갔다가 돌아오며 오갈 때마다 닿는 모든 적에게 피해를 주고, 돌아온 뒤 4초가 지나면 다시 던집니다."),
             S("thorn_armor",    "고슴도치 갑옷",  H, Special.Thorns, "피해를 받을 때마다 주변 2칸의 적에게 가시 피해를 돌려줍니다. 피해량은 (10 + 방어력) × 데미지 배율 — 방어력과 데미지가 높을수록 아픕니다."),
             S("black_aurora",   "검은 오로라",    H, Special.BlackAurora, "킹 주변 넓은 범위(3칸)에 검은 오로라 장판이 깔립니다. 안에 든 적은 이동 속도가 40% 줄고, 최대 체력과 데미지에 비례한 약한 피해를 계속 받습니다. 치명타·경직·넉백은 없습니다."),
+            S("sword_wave",     "검기",           R, Special.SwordWave, "일반공격 4타를 휘두르면 앞으로 흰 검기가 날아갑니다 (약 3칸, 공격 범위에 비례). 닿는 모든 적을 관통하며 4타 피해의 50%를 줍니다."),
+            S("echo",           "잔향",           R, Special.Echo, "일반공격이 적에게 맞을 때마다 그 적의 뒤쪽으로 충격이 튀어, 뒤에 있는 적들에게 그 타격 피해의 30%를 줍니다."),
+            S("chain_lightning","연쇄 번개",      H, Special.ChainLightning, "치명타가 터지면 맞은 적에서 번개가 튀어 가까운 적 2마리에게 차례로 옮겨 갑니다 (각각 그 타격 기본 피해의 60%)."),
             I("fountain_of_life","생명의 샘",     L, E(Fl, 1), E(Heal, 2), E(Hp, 2)),
         };
 

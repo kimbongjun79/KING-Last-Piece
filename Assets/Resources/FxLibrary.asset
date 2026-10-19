@@ -25,6 +25,9 @@ MonoBehaviour:
   - {fileID: 2800000, guid: 661df6c1dedef2644b0d5a878a386fd3, type: 3}
   - {fileID: 2800000, guid: 0326a21581567b644bb930332711f4e5, type: 3}
   - {fileID: 2800000, guid: a80f0424c4e00df4ea2f460838c6a469, type: 3}
+  rangedTextures:
+  - {fileID: 2800000, guid: bf7097e76f9417b4497e5ef843a4d750, type: 3}
+  - {fileID: 2800000, guid: d1c5a035a033eee4a815b5870c7a111a, type: 3}
   eliteAura:
   - {fileID: 2720650084040897827, guid: de283b37bdd532540a43a9dabc14ffce, type: 3}
   - {fileID: 6397433411572311964, guid: 3ad6581d9e6a10e4987680f1483aab44, type: 3}

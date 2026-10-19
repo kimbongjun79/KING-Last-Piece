@@ -365,6 +365,104 @@ namespace KingLastPiece
             }
         }
 
+        // ---------------------------------------------------------------- Sword Wave (special item)
+
+        const float SwordWaveReach = 7f, SwordWaveShare = 0.5f, StaggerSwordWave = 12f;
+        bool atkSwordWave;   // the current attack is the 4th light hit, with the Sword Wave held
+        float swordWaveDamage;
+
+        /// <summary>The 4th light hit sends a crescent of blade light straight ahead, through every piece in its path.</summary>
+        void LaunchSwordWave()
+        {
+            float total = 0f;
+            foreach (var h in atk.hits) total += h.damage;
+            swordWaveDamage = total * SwordWaveShare * DamageMult;
+            SwordWaveFx.Spawn(this, FlatPos + transform.forward * 0.6f, transform.forward, SwordWaveReach * Stats.attackRange);
+            Sfx.Play("THR_Release", FlatPos);
+        }
+
+        /// <summary>The flying sword wave passes through a piece.</summary>
+        public void SwordWaveStrike(EnemyBase e, Vector3 at)
+        {
+            bool crit = RollCrit(out float mult);
+            float damage = swordWaveDamage * mult;
+            if (!e.TakeHit(damage, StaggerSwordWave * StaggerScale(crit), at)) return;
+            Game.ReportDamage(e, damage, crit);
+            Vector3 dir = e.FlatPos - new Vector3(at.x, 0f, at.z);
+            Vfx.Hit(e.Visual.position + Vector3.up * 1.0f, dir.sqrMagnitude > 0.01f ? dir.normalized : transform.forward, false, e.Visual);
+            RangedFx.Burst(e.Visual.position + Vector3.up * 1.0f, 1.6f, Color.white, 0.18f);
+            Sfx.Play(e.IsBoss ? "HIT_Boss" : "HIT_Light", e.transform.position + Vector3.up);
+        }
+
+        // ---------------------------------------------------------------- Echo (special item)
+
+        const float EchoShare = 0.3f, EchoRadius = 1.6f, EchoOffset = 1.2f, StaggerEcho = 4f;
+
+        /// <summary>
+        /// A light hit rings on through the struck piece: a small burst just behind it hurts whatever stands there
+        /// (<see cref="EchoShare"/> of the hit, no crit, a little stagger).
+        /// </summary>
+        void EchoBurst(EnemyBase struck, Vector3 dir, float hitDamage)
+        {
+            Vector3 at = struck.FlatPos + dir * (struck.Radius + EchoOffset);
+            Effects.Shockwave(at, EchoRadius, Vfx.Accent, 0.25f);
+            RangedFx.Burst(at + Vector3.up * 0.9f, 1.4f, new Color(1f, 0.95f, 0.85f), 0.2f);
+            float damage = hitDamage * EchoShare;
+            foreach (var e in Game.Enemies.ToArray())
+            {
+                if (e == null || e == struck || e.IsDead || !e.Targetable) continue;
+                if ((e.FlatPos - at).magnitude > EchoRadius + e.Radius) continue;
+                if (!e.TakeHit(damage, StaggerEcho * Stats.staggerPower, struck.transform.position)) continue;
+                Game.ReportDamage(e, damage, false, quiet: true);
+                Effects.Sparks(e.Visual.position + Vector3.up, Vfx.Accent, 4, 4f);
+            }
+        }
+
+        // ---------------------------------------------------------------- Chain Lightning (special item)
+
+        const float ChainRange = 5f, ChainShare = 0.6f, StaggerChain = 8f, ChainCooldown = 0.25f;
+        const int ChainJumps = 2;
+        float chainReadyAt;
+
+        /// <summary>
+        /// A critical hit sends lightning leaping from the struck piece to the nearest other piece, and on from there
+        /// (<see cref="ChainJumps"/> jumps, each <see cref="ChainShare"/> of the hit's base damage; the bolts never crit).
+        /// </summary>
+        void ChainLightning(EnemyBase from, float baseDamage)
+        {
+            if (Time.time < chainReadyAt) return;
+            chainReadyAt = Time.time + ChainCooldown;
+            var hit = new HashSet<EnemyBase> { from };
+            var current = from;
+            float damage = baseDamage * ChainShare;
+            bool any = false;
+            for (int j = 0; j < ChainJumps; j++)
+            {
+                EnemyBase next = null;
+                float best = float.MaxValue;
+                foreach (var e in Game.Enemies)
+                {
+                    if (e == null || e.IsDead || !e.Targetable || hit.Contains(e)) continue;
+                    float d = (e.FlatPos - current.FlatPos).magnitude;
+                    if (d < best && d <= ChainRange + e.Radius) { best = d; next = e; }
+                }
+                if (next == null) break;
+                hit.Add(next);
+                Vector3 a = current.Visual.position + Vector3.up * 1.1f, b = next.Visual.position + Vector3.up * 1.1f;
+                RangedFx.Bolt(a, b);
+                RangedFx.Burst(b, 1.5f, new Color(0.75f, 0.88f, 1f), 0.24f);
+                if (j == 0) RangedFx.Burst(a, 1.2f, new Color(0.75f, 0.88f, 1f), 0.2f);
+                if (next.TakeHit(damage, StaggerChain * Stats.staggerPower, current.transform.position))
+                {
+                    Game.ReportDamage(next, damage);
+                    Effects.Sparks(b, new Color(0.75f, 0.88f, 1f), 5, 5f);
+                }
+                any = true;
+                current = next;
+            }
+            if (any) Sfx.Play("HIT_Armor", from.transform.position + Vector3.up);
+        }
+
         /// <summary>Holds the special item <paramref name="s"/>.</summary>
         public bool Has(Special s)
         {
@@ -751,6 +849,7 @@ namespace KingLastPiece
             // Stagger this attack deals, spread over its hit windows.
             float stagger = heavy ? StaggerHeavy : atkIsGapCloser ? StaggerLightEarly : ComboStagger(comboIndex, style.lights.Length);
             atkStagger = stagger / Mathf.Max(1, atk.hits.Length);
+            atkSwordWave = !heavy && !atkIsGapCloser && comboIndex == style.lights.Length - 1 && Has(Special.SwordWave);
             Consume(heavy ? atk.cost * (1f - Stats.heavyCostCut) * (danceFinisher ? 0.5f : 1f) : atk.cost * LightCostScale * (1f - Stats.lightCostCut));
             atkUsesSlashFx = FxLibrary.Instance != null && System.Array.Exists(atk.hits, h => h.fx != SlashFxKind.None);
             hitStopUsed = false;
@@ -981,6 +1080,8 @@ namespace KingLastPiece
                         Vfx.GroundImpact(hitCenter, w.range * reach, atk.heavy ? 1.4f : 1f);
                         Game.Rig.Shake(w.shake * dyn);
                     }
+                    // Sword Wave (special item): the 4th light hit's last window sends the blade light flying.
+                    if (atkSwordWave && i == atk.hits.Length - 1) LaunchSwordWave();
                 }
                 if (w.sparkTrail)
                 {
@@ -1042,6 +1143,8 @@ namespace KingLastPiece
                     Sfx.Play(e.IsBoss ? "HIT_Boss" : atk.heavy ? "HIT_Heavy" : "HIT_Light", e.transform.position + Vector3.up);
                     hitCount++;
                     if (w.launch) e.ForceLaunch(transform.position);
+                    if (!atk.heavy && Has(Special.Echo)) EchoBurst(e, toE, damage * mult);
+                    if (crit && Has(Special.ChainLightning)) ChainLightning(e, damage);
                 }
             }
             if (landed)

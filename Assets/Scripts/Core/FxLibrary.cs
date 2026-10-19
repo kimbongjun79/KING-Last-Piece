@@ -22,6 +22,8 @@ namespace KingLastPiece
         public GameObject recoverHold;   // the King's healing aura (looping)
         /// <summary>Black Aurora (special item): Tazo FX images the ground field is built from — pool, smoke, rays, spreading wave.</summary>
         public Texture2D[] auroraTextures;
+        /// <summary>Ranged special items (Sword Wave, Echo, Chain Lightning): star flare, energy streak.</summary>
+        public Texture2D[] rangedTextures;
 
         [Header("AC Little Enchant Mesh VFX (empowered pieces)")]
         public GameObject[] eliteAura;          // Dark Lvl 1–3

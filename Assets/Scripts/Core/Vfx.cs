@@ -117,6 +117,14 @@ namespace KingLastPiece
         public static bool Slash(SlashFxKind kind, Vector3 pos, Quaternion rot, float scale, Color? tint = null, bool mirror = false) =>
             Slash(kind, pos, rot, scale, tint, null, mirror);
 
+        /// <summary>A slash that rides along with <paramref name="follow"/> (its particles move with it).</summary>
+        public static bool SlashFollowing(SlashFxKind kind, Vector3 pos, Quaternion rot, float scale, Color? tint, Transform follow)
+        {
+            followTarget = follow;
+            try { return Slash(kind, pos, rot, scale, tint, null); }
+            finally { followTarget = null; }
+        }
+
         /// <param name="keep">When set, only particle systems whose (lower-case) name passes keep emitting.</param>
         static bool Slash(SlashFxKind kind, Vector3 pos, Quaternion rot, float scale, Color? tint, System.Predicate<string> keep,
                           bool mirror = false, float dustLife = 1f, bool burst = false)
