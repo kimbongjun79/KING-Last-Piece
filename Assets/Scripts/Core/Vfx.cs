@@ -251,6 +251,20 @@ namespace KingLastPiece
             Effects.Sparks(center, DustColor, Mathf.RoundToInt(6 + radius * 3f), 3.5f);
         }
 
+        /// <summary>
+        /// A sprinting footstep: a small puff of the NamuFX dust kicked up behind the King (no sound — the step plays its
+        /// own), plus a few grains. Falls back to grains only.
+        /// </summary>
+        public static void StepDust(Vector3 foot, Vector3 back)
+        {
+            foot.y = 0.1f;
+            back.y = 0f;
+            if (back.sqrMagnitude < 0.01f) back = Vector3.back;
+            System.Predicate<string> dustOnly = n => n.Contains("smoke") || n.Contains("dust");
+            Slash(SlashFxKind.SlashA, foot + back.normalized * 0.25f, Quaternion.LookRotation(back), 0.55f, null, dustOnly, false, 1.4f);
+            Effects.Sparks(foot, DustColor, 4, 2.5f);
+        }
+
         static readonly Dictionary<Material, Material> vertexColored = new Dictionary<Material, Material>();
         static readonly Dictionary<Material, Material> flatColored = new Dictionary<Material, Material>();
         static readonly int GradientMapId = Shader.PropertyToID("_GradientMap");
@@ -383,9 +397,7 @@ namespace KingLastPiece
                 v.y = Mathf.Abs(v.y) + 0.6f;
                 p.velocity = (v.normalized + dir * 0.7f).normalized * speed * Random.Range(0.5f, 1.1f);
                 p.spin = Random.onUnitSphere * Random.Range(300f, 900f);
-                // Played a bit faster and gone quickly: a snappy burst rather than litter on the board.
-                p.rate = 1.35f;
-                p.life = p.maxLife = Random.Range(0.45f, 0.7f);
+                p.life = p.maxLife = Random.Range(0.8f, 1.3f);
             }
         }
     }

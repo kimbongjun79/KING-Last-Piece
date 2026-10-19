@@ -508,7 +508,12 @@ namespace KingLastPiece
             bobPhase += dt * Mathf.Lerp(10f, 15f, sprintBlend) * m;
             // A footstep each time the hop touches down; a whoosh when a sprint starts.
             int step = Mathf.FloorToInt(bobPhase / Mathf.PI);
-            if (m > 0.05f && step != lastStep) Sfx.Play(IsSprinting ? "PL_Step_Sprint" : "PL_Step", FlatPos);
+            if (m > 0.05f && step != lastStep)
+            {
+                Sfx.Play(IsSprinting ? "PL_Step_Sprint" : "PL_Step", FlatPos);
+                // Sprinting: every footstep kicks up a puff of dust behind the King.
+                if (IsSprinting) Vfx.StepDust(FlatPos, -dir);
+            }
             lastStep = step;
             if (IsSprinting && !prevSprint) Sfx.Play("PL_Sprint_Start", FlatPos);
             prevSprint = IsSprinting;
@@ -516,7 +521,8 @@ namespace KingLastPiece
             float heading = 0f;
             if (m > 0.05f) heading = Vector3.SignedAngle(transform.forward, dir, Vector3.up);
             ApplyPose(BodyPose.P(tilt: Mathf.Lerp(7f, 18f, sprintBlend) * prevMove, heading: heading, lift: hop));
-            if (IsSprinting && Random.value < 0.25f)
+            // Walking: a few grains of dust at the feet (sprinting adds the footstep puffs above).
+            if (m > 0.05f && Random.value < 0.25f)
                 Effects.Sparks(FlatPos + Vector3.up * 0.05f, new Color(0.6f, 0.55f, 0.5f), 1, 2f);
         }
 
