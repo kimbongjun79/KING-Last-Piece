@@ -92,7 +92,7 @@ namespace KingLastPiece
         bool[] windowStarted = new bool[0];
         int[] sparksEmitted = new int[0];
         /// <summary>White sparks a spark-trail window throws off its crown over the whole window (whatever the frame rate or attack speed).</summary>
-        const int SparkTrailCount = 40;
+        const int SparkTrailCount = 60;
         readonly List<EnemyBase> scratch = new List<EnemyBase>();
         Vector3 dodgeDir, knockback;
         Buffered buffer;
@@ -770,6 +770,12 @@ namespace KingLastPiece
                             w.sweepFrom, w.sweepTo, (w.end - w.start) / Mathf.Max(0.1f, Stats.attackSpeed), new Color(1f, 0.82f, 0.45f));
                     if (w.kick > 0f) Game.Rig.Kick(w.kick * dyn);
                     if (w.dust) Vfx.Dust(hitCenter, w.range * reach);
+                    // White sparks thrown up all around the strike area.
+                    for (int k = 0; k < w.sparkRing; k++)
+                    {
+                        Vector3 around = Quaternion.Euler(0f, Random.value * 360f, 0f) * Vector3.forward * (w.range * reach * Random.Range(0.2f, 0.95f));
+                        Effects.Sparks(hitCenter + around + Vector3.up * 0.2f, Vfx.Accent, 1, 6f);
+                    }
                     if (w.impact)
                     {
                         Vfx.GroundImpact(hitCenter, w.range * reach, atk.heavy ? 1.4f : 1f);
