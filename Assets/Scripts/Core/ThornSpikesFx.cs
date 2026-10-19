@@ -9,7 +9,7 @@ namespace KingLastPiece
     /// </summary>
     public class ThornSpikesFx : MonoBehaviour
     {
-        const float Out = 0.07f, Hold = 0.1f, Back = 0.16f, RingTime = 0.32f, RingWidth = 0.14f;
+        const float Out = 0.07f, Hold = 0.1f, Back = 0.16f, RingTime = 0.32f, RingWidth = 0.03f;
         static Mesh cone, ring;
         static Material steel, ringBase;
 
@@ -45,7 +45,7 @@ namespace KingLastPiece
             cone ??= BuildCone(10);
             ring ??= BuildRing(64);
             steel ??= MaterialLib.Get(new Color(0.78f, 0.79f, 0.82f), 0.85f, 0.9f, new Color(0.35f, 0.35f, 0.38f));
-            ringBase ??= MaterialLib.Transparent(new Color(1f, 0.98f, 0.94f, 0.9f), new Color(1.6f, 1.55f, 1.45f));
+            ringBase ??= RingMaterial();
             // The ring: an outline (not a filled disc) lying on the board under the King.
             ringT = new GameObject("Ring").transform;
             ringT.SetParent(transform, false);
@@ -87,7 +87,7 @@ namespace KingLastPiece
             float rr = Mathf.Lerp(0.6f, radius, PoseTrack.Curve(Ease.Out, rp));
             ringT.localScale = new Vector3(rr, 1f, rr);
             var rc = ringMat.GetColor("_BaseColor");
-            rc.a = 0.9f * (1f - rp);
+            rc.a = 1f - rp;
             ringMat.SetColor("_BaseColor", rc);
             float k = t < Out ? PoseTrack.Curve(Ease.Out, t / Out)
                     : t < Out + Hold ? 1f
@@ -103,6 +103,21 @@ namespace KingLastPiece
         void OnDestroy()
         {
             if (ringMat != null) Destroy(ringMat);
+        }
+
+        /// <summary>
+        /// Pure white whatever the lighting: an unlit alpha-blended copy of the Dark aura's particle material with a plain
+        /// white texture (a lit material greys out on the board).
+        /// </summary>
+        static Material RingMaterial()
+        {
+            var lib = FxLibrary.Instance;
+            var template = lib != null && lib.eliteAuraBlack != null && lib.eliteAuraBlack.Length > 0 ? lib.eliteAuraBlack[0] : null;
+            if (template == null) return MaterialLib.Emissive(Color.white, 2f);
+            var m = new Material(template) { name = "Thorn Ring" };
+            m.SetTexture("_BaseMap", Texture2D.whiteTexture);
+            m.SetColor("_BaseColor", Color.white);
+            return m;
         }
 
         /// <summary>A flat ring (annulus) of outer radius 1 and width <see cref="RingWidth"/>, facing up.</summary>
@@ -121,7 +136,9 @@ namespace KingLastPiece
                 tris[i * 6 + 0] = i * 2; tris[i * 6 + 1] = i * 2 + 1; tris[i * 6 + 2] = n * 2;
                 tris[i * 6 + 3] = n * 2; tris[i * 6 + 4] = i * 2 + 1; tris[i * 6 + 5] = n * 2 + 1;
             }
-            var m = new Mesh { name = "Thorn Ring", vertices = verts, triangles = tris };
+            var colors = new Color[verts.Length];
+            for (int i = 0; i < colors.Length; i++) colors[i] = Color.white;   // the particle shader multiplies by them
+            var m = new Mesh { name = "Thorn Ring", vertices = verts, triangles = tris, colors = colors };
             m.RecalculateNormals();
             m.RecalculateBounds();
             return m;

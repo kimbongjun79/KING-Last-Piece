@@ -341,7 +341,8 @@ namespace KingLastPiece
 
         // ---------------------------------------------------------------- Thorn Armor (special item)
 
-        const float ThornRadius = 4f, ThornBase = 10f, StaggerThorns = 10f;
+        const float ThornRadius = 4f, ThornBase = 10f, StaggerThorns = 10f, ThornCooldown = 2f;
+        float thornReadyAt;   // the thorns fire at most once every 2 seconds
 
         /// <summary>
         /// Hit, the King bristles like a hedgehog: every piece within two squares takes (10 + defense) × the damage bonus
@@ -1461,7 +1462,11 @@ namespace KingLastPiece
             }
             Health -= taken;
             Momentum = 0;   // Momentum (special item) is lost on a hit
-            if (taken > 0f && Has(Special.Thorns)) ThornBurst();
+            if (taken > 0f && Has(Special.Thorns) && Time.time >= thornReadyAt)
+            {
+                thornReadyAt = Time.time + ThornCooldown;
+                ThornBurst();
+            }
             Game.ReportPlayerDamage(taken);
             Flash(new Color(2f, 0.1f, 0.05f), 0.15f);
             SetGlow(Color.black);
