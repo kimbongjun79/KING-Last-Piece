@@ -68,7 +68,7 @@ namespace KingLastPiece
             {
                 if (!scalesMotion) return 1.2f;
                 float p = Mathf.InverseLerp(0.7f, 1.7f, attackPower);
-                float s = Mathf.InverseLerp(0.9f, 1.35f, attackSpeed);
+                float s = Mathf.InverseLerp(0.9f, 1.5f, attackSpeed);
                 float r = Mathf.InverseLerp(0.7f, 1.3f, attackRange);
                 return Mathf.Lerp(0.8f, 1.4f, (p + s + r) / 3f);
             }
@@ -147,7 +147,7 @@ namespace KingLastPiece
         {
             { UpgradeKind.AttackPower,   new UpgradeDef { title = "공격력",        step = 0.05f, cap = Inf,   floor = 0.3f, percent = true, desc = "모든 공격의 기본 피해 배율. 1단계 +5% (더하기)." } },
             { UpgradeKind.Damage,        new UpgradeDef { title = "데미지",        step = 0.05f, cap = Inf,   floor = -0.5f, percent = true, desc = "공격력과 따로 곱해지는 최종 피해 증가. 1단계 +5%. 공격력이 높아도 효율이 줄지 않습니다. 단점으로 음수가 되면 피해가 줄어듭니다." } },
-            { UpgradeKind.AttackSpeed,   new UpgradeDef { title = "공격 속도",     step = 0.04f, cap = 1.35f, floor = 0.6f, percent = true, desc = "공격 동작(준비·휘두르기·회복) 속도. 1단계 +4%. 빠를수록 빈틈도 짧아집니다." } },
+            { UpgradeKind.AttackSpeed,   new UpgradeDef { title = "공격 속도",     step = 0.04f, cap = 1.5f,  floor = 0.6f, percent = true, desc = "공격 동작(준비·휘두르기·회복) 속도. 1단계 +4%. 빠를수록 빈틈도 짧아집니다." } },
             { UpgradeKind.AttackRange,   new UpgradeDef { title = "공격 범위",     step = 0.07f, cap = 1.3f,  floor = 0.5f, percent = true, desc = "공격이 닿는 거리와 돌진 거리. 1단계 +7%." } },
             { UpgradeKind.CritChance,    new UpgradeDef { title = "치명타 확률",   step = 0.06f, cap = 0.6f,  floor = 0f,   percent = true, desc = "공격이 치명타가 될 확률. 1단계 +6%. 치명타는 경직 피해도 2배." } },
             { UpgradeKind.CritDamage,    new UpgradeDef { title = "치명타 피해",   step = 0.25f, cap = 3f,    floor = 1.2f, percent = true, desc = "치명타의 피해 배율. 1단계 +25%." } },
@@ -217,6 +217,7 @@ namespace KingLastPiece
             I("incense",        "명상의 향로",    R, E(StR, 2), E(St, 1)),
             I("rapier",         "가벼운 세검",    R, E(LC, 2), E(Spd, 1)),
             I("assassin_poison","암살자의 독",    R, E(CrD, 3)),
+            I("wind_gloves",    "바람의 장갑",    R, E(Spd, 3)),
             // Epic (≈ 4–5 steps)
             I("apothecary_bag", "약제사의 가방",  H, E(Fl, 1), E(Heal, 1)),
             I("guard_insignia", "근위대 휘장",    H, E(Pow, 2), E(Def_, 2), E(Hp, 1)),
@@ -228,6 +229,7 @@ namespace KingLastPiece
             I("kings_warhammer","왕의 전쟁망치",  H, E(Stg, 3), E(HC, 2)),
             I("war_drum",       "전쟁의 북",      H, E(LC, 2), E(HC, 2), E(StR, 1)),
             I("shadow_cloak",   "그림자 망토",    H, E(Dg, 1), E(Mv, 2), E(DRc, 1)),
+            I("sword_dance",    "검무의 두루마리", H, E(Spd, 3), E(LC, 1), E(StR, 1)),
             // Legendary (≈ 6–7 steps)
             I("kings_seal",     "왕의 인장",      L, E(Pow, 1), E(Spd, 1), E(Rng, 1), E(Hp, 1), E(Def_, 1), E(Heal, 1), E(Stg, 1)),
             I("sacrifice",      "희생",           L, E(Pow, 9), E(CrC, 1), E(Hp, -3)),

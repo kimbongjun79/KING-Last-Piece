@@ -772,7 +772,7 @@ namespace KingLastPiece
             {
                 ("공격력", $"{Mathf.RoundToInt(s.attackPower * 100f)}%", D(UpgradeKind.AttackPower)),
                 ("데미지", $"{(s.damage >= 0f ? "+" : "−")}{Mathf.RoundToInt(Mathf.Abs(s.damage) * 100f)}%   (최종 피해 ×{s.DamageMultiplier:0.00})", D(UpgradeKind.Damage)),
-                ("공격 속도", $"{Mathf.RoundToInt(s.attackSpeed * 100f)}%   (최대 135%)", D(UpgradeKind.AttackSpeed)),
+                ("공격 속도", $"{Mathf.RoundToInt(s.attackSpeed * 100f)}%   (최대 150%)", D(UpgradeKind.AttackSpeed)),
                 ("공격 범위", $"{Mathf.RoundToInt(s.attackRange * 100f)}%   (최대 130%)", D(UpgradeKind.AttackRange)),
                 ("치명타", $"확률 {Mathf.RoundToInt(s.critChance * 100f)}% (최대 60%)   ·   피해 {Mathf.RoundToInt(s.critDamage * 100f)}% (최대 300%)",
                     D(UpgradeKind.CritChance) + "\n" + D(UpgradeKind.CritDamage)),
