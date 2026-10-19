@@ -302,6 +302,35 @@ namespace KingLastPiece
             Sfx.Play(e.IsBoss ? "HIT_Boss" : "HIT_Light", e.transform.position + Vector3.up);
         }
 
+        // ---------------------------------------------------------------- Thorn Armor (special item)
+
+        const float ThornRadius = 4f, ThornBase = 10f, StaggerThorns = 10f;
+
+        /// <summary>
+        /// Hit, the King bristles like a hedgehog: every piece within two squares takes (10 + defense) × the damage bonus
+        /// (the 데미지 stat, not attack power) — the tougher and the harder-hitting the King, the more it hurts.
+        /// </summary>
+        void ThornBurst()
+        {
+            float damage = (ThornBase + Mathf.Max(0f, Stats.defense)) * (1f + Stats.damage);
+            if (damage <= 0f) return;
+            Effects.Shockwave(FlatPos, ThornRadius, Vfx.Accent, 0.3f);
+            for (int k = 0; k < 16; k++)
+            {
+                Vector3 d = Quaternion.Euler(0f, k * 22.5f, 0f) * Vector3.forward;
+                Effects.Sparks(transform.position + Vector3.up * 1f + d * 0.6f, Vfx.Accent, 1, 9f);
+            }
+            foreach (var e in Game.Enemies)
+            {
+                if (e == null || e.IsDead || !e.Targetable) continue;
+                if ((e.FlatPos - FlatPos).magnitude > ThornRadius + e.Radius) continue;
+                if (!e.TakeHit(damage, StaggerThorns, transform.position)) continue;
+                Game.ReportDamage(e, damage);
+                Vector3 toE = (e.FlatPos - FlatPos).normalized;
+                Vfx.Hit(e.Visual.position + Vector3.up * 1.0f, toE, false, e.Visual);
+            }
+        }
+
         /// <summary>Holds the special item <paramref name="s"/>.</summary>
         public bool Has(Special s)
         {
@@ -1391,6 +1420,7 @@ namespace KingLastPiece
             }
             Health -= taken;
             Momentum = 0;   // Momentum (special item) is lost on a hit
+            if (taken > 0f && Has(Special.Thorns)) ThornBurst();
             Game.ReportPlayerDamage(taken);
             Flash(new Color(2f, 0.1f, 0.05f), 0.15f);
             SetGlow(Color.black);
