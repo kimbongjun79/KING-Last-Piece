@@ -33,7 +33,7 @@ namespace KingLastPiece
         public float critChance = 0.05f, critDamage = 1.5f;
         /// <summary>Walk / sprint speed multiplier, and stamina refill speed multiplier.</summary>
         public float moveSpeed = 1f, staminaRegen = 1f;
-        /// <summary>Life steal ("흡혈"): health regained for every piece captured (scaled by the round, see GameManager.SustainScale).</summary>
+        /// <summary>Life steal ("흡혈"): health regained for every piece captured.</summary>
         public float lifeSteal;
         /// <summary>Multiplier on the stagger every blow deals.</summary>
         public float staggerPower = 1f;
@@ -149,14 +149,14 @@ namespace KingLastPiece
             { UpgradeKind.Damage,        new UpgradeDef { title = "데미지",        step = 0.05f, cap = Inf,   floor = -0.5f, percent = true, desc = "공격력과 따로 곱해지는 최종 피해 증가. 1단계 +5%. 공격력이 높아도 효율이 줄지 않습니다. 단점으로 음수가 되면 피해가 줄어듭니다." } },
             { UpgradeKind.AttackSpeed,   new UpgradeDef { title = "공격 속도",     step = 0.04f, cap = 1.5f,  floor = 0.6f, percent = true, desc = "공격 동작(준비·휘두르기·회복) 속도. 1단계 +4%. 빠를수록 빈틈도 짧아집니다." } },
             { UpgradeKind.AttackRange,   new UpgradeDef { title = "공격 범위",     step = 0.07f, cap = 1.3f,  floor = 0.5f, percent = true, desc = "공격이 닿는 거리와 돌진 거리. 1단계 +7%." } },
-            { UpgradeKind.CritChance,    new UpgradeDef { title = "치명타 확률",   step = 0.06f, cap = 0.6f,  floor = 0f,   percent = true, desc = "공격이 치명타가 될 확률. 1단계 +6%. 치명타는 경직 피해도 2배." } },
+            { UpgradeKind.CritChance,    new UpgradeDef { title = "치명타 확률",   step = 0.06f, cap = Inf,   floor = 0f,   percent = true, desc = "공격이 치명타가 될 확률. 1단계 +6%. 상한 없음 (100%면 모든 공격이 치명타). 치명타는 경직 피해도 2배." } },
             { UpgradeKind.CritDamage,    new UpgradeDef { title = "치명타 피해",   step = 0.25f, cap = 3f,    floor = 1.2f, percent = true, desc = "치명타의 피해 배율. 1단계 +25%." } },
             { UpgradeKind.StaggerPower,  new UpgradeDef { title = "경직 피해",     step = 0.1f,  cap = 2f,    floor = 0.5f, percent = true, desc = "공격이 적의 경직도를 깎는 양. 1단계 +10%. 경직도가 다 깎인 적은 기절해 움직이지 못합니다." } },
             { UpgradeKind.MaxHealth,     new UpgradeDef { title = "최대 체력",     step = 8f,    cap = Inf,   floor = 30f,  desc = "최대 체력. 1단계 +8. 늘어난 만큼 바로 회복됩니다." } },
             { UpgradeKind.Defense,       new UpgradeDef { title = "방어력",        step = 6f,    cap = Inf,   floor = -60f, desc = "받는 피해 = 피해 × 100 / (100 + 방어력). 1단계 +6. 단점으로 음수가 되면 받는 피해가 늘어납니다 (−30이면 약 1.4배)." } },
             { UpgradeKind.HealAmount,    new UpgradeDef { title = "회복약 회복량", step = 4f,    cap = Inf,   floor = 5f,   desc = "회복약 하나가 회복하는 체력. 1단계 +4." } },
             { UpgradeKind.Flask,         new UpgradeDef { title = "회복약 개수",   step = 1f,    cap = 5f,    floor = 1f,   whole = true, desc = "가질 수 있는 회복약 수 (최대 5). 라운드를 마칠 때마다 1개 채워지고, 다 차 있으면 그만큼 체력이 회복됩니다." } },
-            { UpgradeKind.LifeSteal,     new UpgradeDef { title = "흡혈",          step = 1f,    cap = 20f,   floor = 0f,   desc = "기물을 잡을 때마다 체력 회복. 1단계 +1. 라운드가 진행될수록 효율이 올라갑니다 (1라운드 ×0.34 · 20라운드 ×1.0 · 40라운드 ×1.7, 상한 없음)." } },
+            { UpgradeKind.LifeSteal,     new UpgradeDef { title = "흡혈",          step = 1f,    cap = 20f,   floor = 0f,   desc = "기물을 잡을 때마다 흡혈 수치만큼 체력 회복 (흡혈 5면 처치마다 5). 1단계 +1." } },
             { UpgradeKind.MoveSpeed,     new UpgradeDef { title = "이동 속도",     step = 0.06f, cap = 1.3f,  floor = 0.7f, percent = true, desc = "걷기·달리기 속도. 1단계 +6%." } },
             { UpgradeKind.DodgeRecharge, new UpgradeDef { title = "회피 충전 속도", step = 0.15f, cap = 1.6f, floor = 0.3f, percent = true, desc = "회피 횟수가 다시 차는 속도. 1단계 +15%." } },
             { UpgradeKind.MaxDodges,     new UpgradeDef { title = "회피 횟수",     step = 1f,    cap = 3f,    floor = 1f,   whole = true, desc = "연달아 쓸 수 있는 회피(무적 구르기) 수 (최대 3)." } },
@@ -199,6 +199,8 @@ namespace KingLastPiece
             I("loot_pouch",     "전리품 주머니",  C, E(Ls, 1), E(Heal, 1)),
             I("iron_flail",     "쇠사슬 철퇴",    C, E(Stg, 2)),
             I("waterskin",      "가죽 수통",      C, E(St, 2)),
+            I("lucky_coin",     "행운의 동전",    C, E(CrC, 2)),
+            I("long_haft",      "긴 자루",        C, E(Rng, 2)),
             // Rare (≈ 3 steps)
             I("knight_sword",   "기사의 검",      R, E(Pow, 2), E(CrC, 2)),
             I("herald_wings",   "전령의 날개",    R, E(Mv, 2), E(DRc, 2)),
@@ -218,6 +220,10 @@ namespace KingLastPiece
             I("rapier",         "가벼운 세검",    R, E(LC, 2), E(Spd, 1)),
             I("assassin_poison","암살자의 독",    R, E(CrD, 3)),
             I("wind_gloves",    "바람의 장갑",    R, E(Spd, 3)),
+            I("marksman_scope", "명사수의 망원경", R, E(CrC, 3)),
+            I("sturdy_heart",   "튼튼한 심장",    R, E(Hp, 3)),
+            I("herb_pouch",     "약초 주머니",    R, E(Heal, 3)),
+            I("endurance_ring", "지구력의 반지",  R, E(St, 2), E(StR, 1)),
             // Epic (≈ 4–5 steps)
             I("apothecary_bag", "약제사의 가방",  H, E(Fl, 1), E(Heal, 1)),
             I("guard_insignia", "근위대 휘장",    H, E(Pow, 2), E(Def_, 2), E(Hp, 1)),
@@ -230,6 +236,8 @@ namespace KingLastPiece
             I("war_drum",       "전쟁의 북",      H, E(LC, 2), E(HC, 2), E(StR, 1)),
             I("shadow_cloak",   "그림자 망토",    H, E(Dg, 1), E(Mv, 2), E(DRc, 1)),
             I("sword_dance",    "검무의 두루마리", H, E(Spd, 3), E(LC, 1), E(StR, 1)),
+            I("giant_arm",      "거인의 팔",      H, E(Rng, 3), E(Pow, 1), E(Stg, 1)),
+            I("royal_plate",    "왕의 갑주",      H, E(Hp, 3), E(Def_, 2)),
             // Legendary (≈ 6–7 steps)
             I("kings_seal",     "왕의 인장",      L, E(Pow, 1), E(Spd, 1), E(Rng, 1), E(Hp, 1), E(Def_, 1), E(Heal, 1), E(Stg, 1)),
             I("sacrifice",      "희생",           L, E(Pow, 9), E(CrC, 1), E(Hp, -3)),

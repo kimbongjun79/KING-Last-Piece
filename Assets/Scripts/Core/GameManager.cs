@@ -414,17 +414,11 @@ namespace KingLastPiece
 
         public RunRecord Record { get; private set; } = new RunRecord();
 
-        /// <summary>
-        /// How well life steal (health back for each capture) works right now: weak early, strong late, no ceiling
-        /// (endless mode: ×0.34 at round 1, ×1 at round 20, ×1.7 at 40, ×2.4 at 60; elsewhere ×1).
-        /// </summary>
-        public float SustainScale => IsEndless ? EndlessRounds.SustainScale(Round) : 1f;
-
         public void ReportKill(EnemyBase e)
         {
             Record.kills++;
             if (e.EliteTier > 0) Record.darkKills++;
-            if (Player != null) Player.Restore(Player.Stats.lifeSteal * SustainScale);   // life steal: health back for every capture
+            if (Player != null) Player.Restore(Player.Stats.lifeSteal);   // life steal: a fixed amount of health back for every capture
         }
 
         public void ReportPlayerDamage(float amount) => Record.damageTaken += amount;

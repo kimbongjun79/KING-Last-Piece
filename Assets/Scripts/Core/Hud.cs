@@ -766,7 +766,6 @@ namespace KingLastPiece
         {
             var s = p.Stats;
             float dmgCut = 1f - s.DamageTaken(100f) / 100f;
-            float sustain = GameManager.Instance != null ? GameManager.Instance.SustainScale : 1f;
             tooltipPlayer = p;
             DrawTable(area, new (string, string, string)[]
             {
@@ -774,13 +773,13 @@ namespace KingLastPiece
                 ("데미지", $"{(s.damage >= 0f ? "+" : "−")}{Mathf.RoundToInt(Mathf.Abs(s.damage) * 100f)}%   (최종 피해 ×{s.DamageMultiplier:0.00})", D(UpgradeKind.Damage)),
                 ("공격 속도", $"{Mathf.RoundToInt(s.attackSpeed * 100f)}%   (최대 150%)", D(UpgradeKind.AttackSpeed)),
                 ("공격 범위", $"{Mathf.RoundToInt(s.attackRange * 100f)}%   (최대 130%)", D(UpgradeKind.AttackRange)),
-                ("치명타", $"확률 {Mathf.RoundToInt(s.critChance * 100f)}% (최대 60%)   ·   피해 {Mathf.RoundToInt(s.critDamage * 100f)}% (최대 300%)",
+                ("치명타", $"확률 {Mathf.RoundToInt(s.critChance * 100f)}%   ·   피해 {Mathf.RoundToInt(s.critDamage * 100f)}% (최대 300%)",
                     D(UpgradeKind.CritChance) + "\n" + D(UpgradeKind.CritDamage)),
                 ("경직 피해", $"{Mathf.RoundToInt(s.staggerPower * 100f)}%   (최대 200%)", D(UpgradeKind.StaggerPower)),
                 ("최대 체력", $"{Mathf.RoundToInt(p.MaxHealth)}", D(UpgradeKind.MaxHealth)),
                 ("방어력", $"{Mathf.RoundToInt(s.defense)}   (받는 피해 {(dmgCut >= 0f ? "−" : "+")}{Mathf.RoundToInt(Mathf.Abs(dmgCut) * 100f)}%)", D(UpgradeKind.Defense)),
                 ("회복약", $"{p.MaxFlasks}개 (최대 5)   ·   회복량 {Mathf.RoundToInt(s.healAmount)}", D(UpgradeKind.Flask) + "\n" + D(UpgradeKind.HealAmount)),
-                ("흡혈", $"처치마다 {s.lifeSteal * sustain:0.#} 회복   (기본 {Mathf.RoundToInt(s.lifeSteal)} × 지금 효율 {sustain:0.00})", D(UpgradeKind.LifeSteal)),
+                ("흡혈", $"처치마다 {Mathf.RoundToInt(s.lifeSteal)} 회복   (최대 20)", D(UpgradeKind.LifeSteal)),
                 ("기력", $"최대 {Mathf.RoundToInt(p.MaxStamina)}   ·   회복 속도 {Mathf.RoundToInt(s.staminaRegen * 100f)}% (최대 200%)",
                     D(UpgradeKind.MaxStamina) + "\n" + D(UpgradeKind.StaminaRegen)),
                 ("공격당 기력 소모", $"일반공격 {p.LightAttackCost:0.#} (−{Mathf.RoundToInt(s.lightCostCut * 100f)}%)   ·   강공격 {p.HeavyAttackCost:0.#} (−{Mathf.RoundToInt(s.heavyCostCut * 100f)}%)",
