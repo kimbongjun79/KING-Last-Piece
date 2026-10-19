@@ -35,7 +35,7 @@ namespace KingLastPiece
         /// <summary>Stagger resistance multiplier for every piece: +30% for each 40 rounds reached (permanent).</summary>
         public static float StaggerMultiplier(int round) => 1f + 0.3f * (round / 40);
 
-        /// <summary>Life steal / heal-on-capture efficiency: grows steadily with the round, without a ceiling.</summary>
+        /// <summary>Life steal efficiency: grows steadily with the round, without a ceiling.</summary>
         public static float SustainScale(int round) => 0.3f + 0.035f * round;
 
         /// <summary>Board size: 8×8, plus a ring of squares (2 per side) for every 20 rounds cleared.</summary>

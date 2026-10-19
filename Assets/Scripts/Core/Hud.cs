@@ -734,7 +734,8 @@ namespace KingLastPiece
                 Text(new Rect(r.x + 24 * scale, y, r.width - 48 * scale, line), rows[i].value, value, new Color(0.93f, 0.9f, 0.83f));
                 y += line;
             }
-            if (hover != null) DrawTooltip(hover, mouse);
+            if (hover == ItemsTooltip) DrawItemTooltip(tooltipPlayer, mouse);
+            else if (hover != null) DrawTooltip(hover, mouse);
         }
 
         /// <summary>Lab: stands in for the mouse position over the stats rows (null: the real mouse).</summary>
@@ -756,12 +757,17 @@ namespace KingLastPiece
 
         static string D(UpgradeKind k) => Upgrades.Def(k).desc;
 
-        /// <summary>The King's stats (pause ▸ 능력치); hover a row for what it does.</summary>
+        /// <summary>A row description that asks for the owned items as icons instead of text.</summary>
+        const string ItemsTooltip = "\u0001items";
+        PlayerController tooltipPlayer;
+
+        /// <summary>The King's stats (pause ▸ 능력치); hover a row for what it does, the last row for the items held.</summary>
         void DrawStats(PlayerController p, Rect area)
         {
             var s = p.Stats;
             float dmgCut = 1f - s.DamageTaken(100f) / 100f;
             float sustain = GameManager.Instance != null ? GameManager.Instance.SustainScale : 1f;
+            tooltipPlayer = p;
             DrawTable(area, new (string, string, string)[]
             {
                 ("공격력", $"{Mathf.RoundToInt(s.attackPower * 100f)}%", D(UpgradeKind.AttackPower)),
@@ -774,26 +780,48 @@ namespace KingLastPiece
                 ("최대 체력", $"{Mathf.RoundToInt(p.MaxHealth)}", D(UpgradeKind.MaxHealth)),
                 ("방어력", $"{Mathf.RoundToInt(s.defense)}   (받는 피해 {(dmgCut >= 0f ? "−" : "+")}{Mathf.RoundToInt(Mathf.Abs(dmgCut) * 100f)}%)", D(UpgradeKind.Defense)),
                 ("회복약", $"{p.MaxFlasks}개 (최대 5)   ·   회복량 {Mathf.RoundToInt(s.healAmount)}", D(UpgradeKind.Flask) + "\n" + D(UpgradeKind.HealAmount)),
-                ("흡혈 · 처치 회복", $"{Upgrades.Format(UpgradeKind.LifeSteal, s.lifeSteal)}  ·  처치마다 {Mathf.RoundToInt(s.killHeal)}   (지금 효율 ×{sustain:0.00})",
-                    D(UpgradeKind.LifeSteal) + "\n" + D(UpgradeKind.KillHeal) + $"\n효율: 1라운드 ×0.34 · 20라운드 ×1.0 · 40라운드 ×1.7 (상한 없음)"),
+                ("흡혈", $"처치마다 {s.lifeSteal * sustain:0.#} 회복   (기본 {Mathf.RoundToInt(s.lifeSteal)} × 지금 효율 {sustain:0.00})", D(UpgradeKind.LifeSteal)),
                 ("기력", $"최대 {Mathf.RoundToInt(p.MaxStamina)}   ·   회복 속도 {Mathf.RoundToInt(s.staminaRegen * 100f)}% (최대 200%)",
                     D(UpgradeKind.MaxStamina) + "\n" + D(UpgradeKind.StaminaRegen)),
                 ("공격당 기력 소모", $"일반공격 {p.LightAttackCost:0.#} (−{Mathf.RoundToInt(s.lightCostCut * 100f)}%)   ·   강공격 {p.HeavyAttackCost:0.#} (−{Mathf.RoundToInt(s.heavyCostCut * 100f)}%)",
                     D(UpgradeKind.LightCost) + "\n" + D(UpgradeKind.HeavyCost)),
                 ("이동 속도", $"{Mathf.RoundToInt(s.moveSpeed * 100f)}%   (최대 130%)", D(UpgradeKind.MoveSpeed)),
                 ("회피", $"{p.MaxDodges}회 (최대 3)   ·   1회 충전 {p.DodgeRechargeTime:0.00}초", D(UpgradeKind.MaxDodges) + "\n" + D(UpgradeKind.DodgeRecharge)),
-                ("공격 역동감", $"{Mathf.RoundToInt(s.Dynamism * 100f)}%   (80~140%)", "공격 동작의 기울기·도약·카메라 반동의 크기. 공격력·공격 속도·공격 범위가 오를수록 커집니다."),
-                ("보유 아이템", p.Items.Count == 0 ? "없음" : $"{p.Items.Count}개", ItemList(p)),
+                ("보유 아이템", p.Items.Count == 0 ? "없음" : $"{p.Items.Count}개   (마우스를 올려 보기)", ItemsTooltip),
             }, area.width * 0.36f);
         }
 
-        /// <summary>The items picked this run, one per line (newest last).</summary>
-        static string ItemList(PlayerController p)
+        /// <summary>
+        /// The items held, as icons on grade-coloured plates with their names, oldest first (pause ▸ 능력치 ▸ 보유 아이템).
+        /// </summary>
+        void DrawItemTooltip(PlayerController p, Vector2 at)
         {
-            if (p.Items.Count == 0) return "라운드를 마칠 때마다 아이템 3개 중 하나를 고릅니다.";
-            var sb = new System.Text.StringBuilder();
-            foreach (var it in p.Items) sb.Append($"[{it.GradeName}] {it.name}\n");
-            return sb.ToString().TrimEnd();
+            if (p == null || p.Items.Count == 0)
+            {
+                DrawTooltip("라운드를 마칠 때마다 아이템 3개 중 하나를 고릅니다.", at);
+                return;
+            }
+            int n = p.Items.Count, cols = Mathf.Min(6, n), rows = (n + cols - 1) / cols;
+            float icon = 64 * scale, cell = 92 * scale, nameH = 22 * scale, pad = 12 * scale;
+            float w = cols * cell + 2 * pad, h = rows * (icon + nameH + 8 * scale) + 2 * pad;
+            var box = new Rect(at.x + 18 * scale, at.y + 14 * scale, w, h);
+            if (box.xMax > Screen.width - 8) box.x = at.x - w - 18 * scale;
+            if (box.yMax > Screen.height - 8) box.y = Mathf.Max(8, Screen.height - 8 - h);
+            Fill(new Rect(box.x - 2 * scale, box.y - 2 * scale, box.width + 4 * scale, box.height + 4 * scale), new Color(Gold.r, Gold.g, Gold.b, 0.8f));
+            Fill(box, new Color(0.04f, 0.035f, 0.04f, 0.97f));
+            var nameStyle = new GUIStyle(small) { fontSize = Mathf.RoundToInt(13 * scale), alignment = TextAnchor.UpperCenter, clipping = TextClipping.Clip };
+            for (int i = 0; i < n; i++)
+            {
+                var it = p.Items[i];
+                Color gc = GradeColor(it.grade);
+                float cx = box.x + pad + (i % cols) * cell + cell / 2f, cy = box.y + pad + (i / cols) * (icon + nameH + 8 * scale);
+                var plate = new Rect(cx - icon / 2f, cy, icon, icon);
+                Fill(new Rect(plate.x - 2 * scale, plate.y - 2 * scale, plate.width + 4 * scale, plate.height + 4 * scale), gc);
+                Fill(plate, new Color(0.02f, 0.02f, 0.025f));
+                if (it.Icon != null) GUI.DrawTexture(plate, it.Icon, ScaleMode.ScaleToFit);
+                else Diamond(plate.center, 12f * scale, gc);
+                Text(new Rect(cx - cell / 2f, plate.yMax + 3 * scale, cell, nameH), it.name, nameStyle, new Color(0.92f, 0.89f, 0.82f));
+            }
         }
 
         /// <summary>How to play (pause ▸ 조작법): keyboard and mouse, then the gamepad.</summary>

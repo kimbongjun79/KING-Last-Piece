@@ -33,12 +33,10 @@ namespace KingLastPiece
         public float critChance = 0.05f, critDamage = 1.5f;
         /// <summary>Walk / sprint speed multiplier, and stamina refill speed multiplier.</summary>
         public float moveSpeed = 1f, staminaRegen = 1f;
-        /// <summary>Share of the damage dealt that heals the King (0.05 = 5%).</summary>
+        /// <summary>Life steal ("흡혈"): health regained for every piece captured (scaled by the round, see GameManager.SustainScale).</summary>
         public float lifeSteal;
         /// <summary>Multiplier on the stagger every blow deals.</summary>
         public float staggerPower = 1f;
-        /// <summary>Health regained for every piece captured.</summary>
-        public float killHeal;
         /// <summary>The King's attack motion follows his power, speed and range (endless mode); classic keeps it fixed.</summary>
         public bool scalesMotion;
 
@@ -88,7 +86,7 @@ namespace KingLastPiece
     public enum UpgradeKind
     {
         Flask, HealAmount, AttackPower, Defense, MaxHealth, AttackRange, AttackSpeed, DodgeRecharge, MaxDodges, MaxStamina,
-        LightCost, HeavyCost, CritChance, CritDamage, MoveSpeed, StaminaRegen, LifeSteal, StaggerPower, KillHeal, Damage,
+        LightCost, HeavyCost, CritChance, CritDamage, MoveSpeed, StaminaRegen, LifeSteal, StaggerPower, Damage,
     }
 
     /// <summary>How strong an item is (its total worth in steps): the rarer the grade, the stronger the item.</summary>
@@ -158,8 +156,7 @@ namespace KingLastPiece
             { UpgradeKind.Defense,       new UpgradeDef { title = "방어력",        step = 6f,    cap = Inf,   floor = -60f, desc = "받는 피해 = 피해 × 100 / (100 + 방어력). 1단계 +6. 단점으로 음수가 되면 받는 피해가 늘어납니다 (−30이면 약 1.4배)." } },
             { UpgradeKind.HealAmount,    new UpgradeDef { title = "회복약 회복량", step = 4f,    cap = Inf,   floor = 5f,   desc = "회복약 하나가 회복하는 체력. 1단계 +4." } },
             { UpgradeKind.Flask,         new UpgradeDef { title = "회복약 개수",   step = 1f,    cap = 5f,    floor = 1f,   whole = true, desc = "가질 수 있는 회복약 수 (최대 5). 라운드를 마칠 때마다 1개 채워지고, 다 차 있으면 그만큼 체력이 회복됩니다." } },
-            { UpgradeKind.LifeSteal,     new UpgradeDef { title = "흡혈",          step = 0.005f, cap = 0.15f, floor = 0f,  percent = true, desc = "가한 피해의 일부만큼 체력 회복. 1단계 +0.5%. 라운드가 진행될수록 효율이 올라갑니다 (초반 약함, 후반 강함)." } },
-            { UpgradeKind.KillHeal,      new UpgradeDef { title = "처치 시 회복",  step = 1f,    cap = 20f,   floor = 0f,   desc = "기물을 잡을 때마다 체력 회복. 1단계 +1. 라운드가 진행될수록 효율이 올라갑니다 (초반 약함, 후반 강함)." } },
+            { UpgradeKind.LifeSteal,     new UpgradeDef { title = "흡혈",          step = 1f,    cap = 20f,   floor = 0f,   desc = "기물을 잡을 때마다 체력 회복. 1단계 +1. 라운드가 진행될수록 효율이 올라갑니다 (1라운드 ×0.34 · 20라운드 ×1.0 · 40라운드 ×1.7, 상한 없음)." } },
             { UpgradeKind.MoveSpeed,     new UpgradeDef { title = "이동 속도",     step = 0.06f, cap = 1.3f,  floor = 0.7f, percent = true, desc = "걷기·달리기 속도. 1단계 +6%." } },
             { UpgradeKind.DodgeRecharge, new UpgradeDef { title = "회피 충전 속도", step = 0.15f, cap = 1.6f, floor = 0.3f, percent = true, desc = "회피 횟수가 다시 차는 속도. 1단계 +15%." } },
             { UpgradeKind.MaxDodges,     new UpgradeDef { title = "회피 횟수",     step = 1f,    cap = 3f,    floor = 1f,   whole = true, desc = "연달아 쓸 수 있는 회피(무적 구르기) 수 (최대 3)." } },
@@ -180,7 +177,7 @@ namespace KingLastPiece
         const UpgradeGrade C = UpgradeGrade.Common, R = UpgradeGrade.Rare, H = UpgradeGrade.Epic, L = UpgradeGrade.Legendary;
         const UpgradeKind Pow = UpgradeKind.AttackPower, Dmg = UpgradeKind.Damage, Spd = UpgradeKind.AttackSpeed, Rng = UpgradeKind.AttackRange,
             CrC = UpgradeKind.CritChance, CrD = UpgradeKind.CritDamage, Stg = UpgradeKind.StaggerPower, Hp = UpgradeKind.MaxHealth,
-            Def_ = UpgradeKind.Defense, Heal = UpgradeKind.HealAmount, Fl = UpgradeKind.Flask, Ls = UpgradeKind.LifeSteal, Kh = UpgradeKind.KillHeal,
+            Def_ = UpgradeKind.Defense, Heal = UpgradeKind.HealAmount, Fl = UpgradeKind.Flask, Ls = UpgradeKind.LifeSteal,
             Mv = UpgradeKind.MoveSpeed, DRc = UpgradeKind.DodgeRecharge, Dg = UpgradeKind.MaxDodges, St = UpgradeKind.MaxStamina,
             StR = UpgradeKind.StaminaRegen, LC = UpgradeKind.LightCost, HC = UpgradeKind.HeavyCost;
 
@@ -199,7 +196,7 @@ namespace KingLastPiece
             I("heavy_manual",   "강타 교본",      C, E(HC, 2), E(Stg, 1)),
             I("sharp_edge",     "날 선 칼날",     C, E(Dmg, 2)),
             I("vampire_fang",   "흡혈귀의 송곳니", C, E(Ls, 2)),
-            I("loot_pouch",     "전리품 주머니",  C, E(Kh, 2)),
+            I("loot_pouch",     "전리품 주머니",  C, E(Ls, 1), E(Heal, 1)),
             // Rare (≈ 3 steps)
             I("knight_sword",   "기사의 검",      R, E(Pow, 2), E(CrC, 2)),
             I("herald_wings",   "전령의 날개",    R, E(Mv, 2), E(DRc, 2)),
@@ -213,7 +210,7 @@ namespace KingLastPiece
             I("iron_armor",     "철갑옷",         R, E(Def_, 4), E(Mv, -1)),
             I("headsman_blade", "처형인의 칼날",  R, E(Dmg, 3)),
             I("mad_seal",       "광기의 인장",    R, E(Dmg, 4), E(Def_, -1)),
-            I("blood_cup",      "피의 잔",        R, E(Ls, 2), E(Kh, 1)),
+            I("blood_cup",      "피의 잔",        R, E(Ls, 3)),
             // Epic (≈ 4–5 steps)
             I("apothecary_bag", "약제사의 가방",  H, E(Fl, 1), E(Heal, 1)),
             I("guard_insignia", "근위대 휘장",    H, E(Pow, 2), E(Def_, 2), E(Hp, 1)),
@@ -262,7 +259,6 @@ namespace KingLastPiece
             UpgradeKind.StaminaRegen => s.staminaRegen,
             UpgradeKind.LifeSteal => s.lifeSteal,
             UpgradeKind.StaggerPower => s.staggerPower,
-            UpgradeKind.KillHeal => s.killHeal,
             UpgradeKind.Damage => s.damage,
             _ => s.maxStamina,
         };
@@ -289,7 +285,6 @@ namespace KingLastPiece
                 case UpgradeKind.StaminaRegen: s.staminaRegen = v; break;
                 case UpgradeKind.LifeSteal: s.lifeSteal = v; break;
                 case UpgradeKind.StaggerPower: s.staggerPower = v; break;
-                case UpgradeKind.KillHeal: s.killHeal = v; break;
                 case UpgradeKind.Damage: s.damage = v; break;
             }
         }
