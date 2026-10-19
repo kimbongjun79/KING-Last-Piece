@@ -118,10 +118,10 @@ namespace KingLastPiece
             Slash(kind, pos, rot, scale, tint, null, mirror);
 
         /// <summary>A slash that rides along with <paramref name="follow"/> (its particles move with it).</summary>
-        public static bool SlashFollowing(SlashFxKind kind, Vector3 pos, Quaternion rot, float scale, Color? tint, Transform follow)
+        public static bool SlashFollowing(SlashFxKind kind, Vector3 pos, Quaternion rot, float scale, Color? tint, Transform follow, bool mirror = false)
         {
             followTarget = follow;
-            try { return Slash(kind, pos, rot, scale, tint, null); }
+            try { return Slash(kind, pos, rot, scale, tint, null, mirror); }
             finally { followTarget = null; }
         }
 

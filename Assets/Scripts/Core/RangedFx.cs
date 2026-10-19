@@ -219,12 +219,13 @@ namespace KingLastPiece
 
         PlayerController owner;
         Vector3 dir;
-        float reach, travelled, sparkTimer, slashTimer = SlashEvery;
+        float reach, size = 1f, travelled, sparkTimer, slashTimer = SlashEvery;
         bool namu;
         Material coreMat, glowMat;
         readonly HashSet<EnemyBase> struck = new HashSet<EnemyBase>();
 
-        public static void Spawn(PlayerController owner, Vector3 from, Vector3 dir, float reach)
+        /// <param name="size">Scales the wave (its width and slashes) — the attack range.</param>
+        public static void Spawn(PlayerController owner, Vector3 from, Vector3 dir, float reach, float size = 1f)
         {
             var go = new GameObject("Sword Wave");
             go.transform.position = new Vector3(from.x, 0.9f, from.z);
@@ -234,6 +235,7 @@ namespace KingLastPiece
             w.owner = owner;
             w.dir = dir.normalized;
             w.reach = reach;
+            w.size = size;
             w.Build();
         }
 
@@ -246,11 +248,19 @@ namespace KingLastPiece
             glowMat = new Material(RangedFx.Streak);
             Layer("Core", coreMat, new Vector3(1f, 1f, 1f), 0.02f);
             Layer("Glow", glowMat, new Vector3(1.25f, 1f, 1.6f), 0f);
-            transform.localScale = Vector3.one * HalfWidth;
+            transform.localScale = Vector3.one * HalfWidth * size;
         }
 
-        /// <summary>A white NamuFX slash riding along with the wave.</summary>
-        bool Slash() => Vfx.SlashFollowing(SlashFxKind.SlashB, transform.position, transform.rotation, SlashScale, Vfx.Accent, transform);
+        /// <summary>
+        /// White NamuFX slashes riding along with the wave: the slash and its mirror image laid over each other, so the
+        /// lopsided arc reads as a symmetric crescent.
+        /// </summary>
+        bool Slash()
+        {
+            bool ok = Vfx.SlashFollowing(SlashFxKind.SlashB, transform.position, transform.rotation, SlashScale * size, Vfx.Accent, transform);
+            if (ok) Vfx.SlashFollowing(SlashFxKind.SlashB, transform.position, transform.rotation, SlashScale * size, Vfx.Accent, transform, true);
+            return ok;
+        }
 
         void Layer(string name, Material m, Vector3 scale, float lift)
         {
@@ -273,7 +283,7 @@ namespace KingLastPiece
             transform.position += dir * step;
             float p = Mathf.Clamp01(travelled / reach);
             // Grows a little as it flies; fades over the last third.
-            transform.localScale = Vector3.one * HalfWidth * Mathf.Lerp(0.8f, 1.2f, p);
+            transform.localScale = Vector3.one * HalfWidth * size * Mathf.Lerp(0.8f, 1.2f, p);
             float a = p < 0.66f ? 1f : 1f - (p - 0.66f) / 0.34f;
             if (namu)
             {
@@ -290,11 +300,11 @@ namespace KingLastPiece
             if (sparkTimer <= 0f)
             {
                 sparkTimer = 0.035f;
-                Vector3 side = Vector3.Cross(Vector3.up, dir) * Random.Range(-HalfWidth, HalfWidth);
+                Vector3 side = Vector3.Cross(Vector3.up, dir) * Random.Range(-HalfWidth, HalfWidth) * size;
                 Effects.Sparks(transform.position + side, Vfx.Accent, 1, 4f);
             }
 
-            float width = HalfWidth * Mathf.Lerp(0.8f, 1.2f, p);
+            float width = HalfWidth * size * Mathf.Lerp(0.8f, 1.2f, p);
             Vector3 flat = new Vector3(transform.position.x, 0f, transform.position.z);
             foreach (var e in GameManager.Instance.Enemies.ToArray())
             {

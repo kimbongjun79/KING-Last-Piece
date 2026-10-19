@@ -368,16 +368,33 @@ namespace KingLastPiece
         // ---------------------------------------------------------------- Sword Wave (special item)
 
         const float SwordWaveReach = 7f, SwordWaveShare = 0.5f, StaggerSwordWave = 12f;
-        bool atkSwordWave;   // the current attack is the 4th light hit, with the Sword Wave held
+        bool atkSwordWave;   // the current attack sends sword waves (Sword Wave held, not the gap-closer dash)
+        int atkComboHit;     // which light hit the current attack is (0-based), -1 for the heavy
         float swordWaveDamage;
 
-        /// <summary>The 4th light hit sends a crescent of blade light straight ahead, through every piece in its path.</summary>
+        /// <summary>
+        /// Every attack sends crescents of blade light through every piece in their path, sized by the attack range:
+        /// hits 1–2 straight ahead, hit 3 the bishop's four diagonals, hit 4 the rook's four lines (along the board),
+        /// the heavy all eight.
+        /// </summary>
         void LaunchSwordWave()
         {
             float total = 0f;
             foreach (var h in atk.hits) total += h.damage;
-            swordWaveDamage = total * SwordWaveShare * DamageMult;
-            SwordWaveFx.Spawn(this, FlatPos + transform.forward * 0.6f, transform.forward, SwordWaveReach * Stats.attackRange);
+            swordWaveDamage = total * SwordWaveShare * DamageMult * atkDamageMul;
+            float reach = SwordWaveReach * Stats.attackRange;
+            void Wave(Vector3 d) => SwordWaveFx.Spawn(this, FlatPos + d * 0.6f, d, reach, Stats.attackRange);
+            if (atkComboHit < 0 || atkComboHit >= 2)
+            {
+                // Board directions: diagonals start at 45°, lines at 0°; the heavy fires both.
+                bool lines = atkComboHit < 0 || atkComboHit == 3, diagonals = atkComboHit < 0 || atkComboHit == 2;
+                for (int k = 0; k < 8; k++)
+                {
+                    bool diagonal = k % 2 == 1;
+                    if (diagonal ? diagonals : lines) Wave(Quaternion.Euler(0f, k * 45f, 0f) * Vector3.forward);
+                }
+            }
+            else Wave(transform.forward);
             Sfx.Play("THR_Release", FlatPos);
         }
 
@@ -394,28 +411,39 @@ namespace KingLastPiece
             Sfx.Play(e.IsBoss ? "HIT_Boss" : "HIT_Light", e.transform.position + Vector3.up);
         }
 
-        // ---------------------------------------------------------------- Echo (special item)
+        // ---------------------------------------------------------------- Tempest (special item)
 
-        const float EchoShare = 0.3f, EchoRadius = 1.6f, EchoOffset = 1.2f, StaggerEcho = 4f;
+        // The 3rd light hit (the cyclone) becomes the finisher: far wider and harder, at twice its stamina; no 4th hit.
+        const int WhirlHit = 2;
+        const float WhirlRange = 1.8f, WhirlDamage = 1.6f, WhirlCost = 2f;
+        bool atkWhirl;
+        float atkRangeMul = 1f, atkDamageMul = 1f;   // the current attack's reach and damage factors
+
+        /// <summary>Light hits in the combo before it starts over (the Tempest ends it at the cyclone).</summary>
+        int ComboLength(AttackStyle style) => Has(Special.Tempest) && style.lights.Length > WhirlHit + 1 ? WhirlHit + 1 : style.lights.Length;
 
         /// <summary>
-        /// A light hit rings on through the struck piece: a small burst just behind it hurts whatever stands there
-        /// (<see cref="EchoShare"/> of the hit, no crit, a little stagger).
+        /// A storm over the whole reach, in the NamuFX prefabs' own colours: a huge area slash layered twice (mirrored)
+        /// and a ring of big slashes all around, with dust, a ground impact and a heavier shake.
         /// </summary>
-        void EchoBurst(EnemyBase struck, Vector3 dir, float hitDamage)
+        void WhirlFx(HitWindow w, float reach)
         {
-            Vector3 at = struck.FlatPos + dir * (struck.Radius + EchoOffset);
-            Effects.Shockwave(at, EchoRadius, Vfx.Accent, 0.25f);
-            RangedFx.Burst(at + Vector3.up * 0.9f, 1.4f, new Color(1f, 0.95f, 0.85f), 0.2f);
-            float damage = hitDamage * EchoShare;
-            foreach (var e in Game.Enemies.ToArray())
+            float r = w.range * reach;
+            Vector3 c = FlatPos;
+            Quaternion face = transform.rotation;
+            Vfx.Slash(SlashFxKind.AoeA, c + Vector3.up * 0.9f, face, 1.05f * reach);
+            Vfx.Slash(SlashFxKind.AoeA, c + Vector3.up * 1.3f, face * Quaternion.Euler(0f, 90f, 0f), 0.9f * reach, null, true);
+            float spin = Random.value * 360f;
+            for (int k = 0; k < 6; k++)
             {
-                if (e == null || e == struck || e.IsDead || !e.Targetable) continue;
-                if ((e.FlatPos - at).magnitude > EchoRadius + e.Radius) continue;
-                if (!e.TakeHit(damage, StaggerEcho * Stats.staggerPower, struck.transform.position)) continue;
-                Game.ReportDamage(e, damage, false, quiet: true);
-                Effects.Sparks(e.Visual.position + Vector3.up, Vfx.Accent, 4, 4f);
+                Quaternion rot = Quaternion.Euler(0f, spin + k * 60f, 0f);
+                Vfx.Slash(k % 2 == 0 ? SlashFxKind.SlashB : SlashFxKind.SlashA, c + rot * Vector3.forward * (r * 0.45f) + Vector3.up * 0.9f,
+                    rot, 1.4f * reach, null, k % 2 == 1);
             }
+            Vfx.Dust(c, r);
+            Vfx.GroundImpact(c, r, 1.3f);
+            Effects.Shockwave(c, r, Vfx.Accent, 0.35f);
+            Game.Rig.Shake(0.45f);
         }
 
         // ---------------------------------------------------------------- Chain Lightning (special item)
@@ -828,7 +856,7 @@ namespace KingLastPiece
             var style = Style ?? AttackStyles.Default;
             bool chain = state == State.Attack && !atk.heavy && !heavy;
             // King's Dance (special item): after the 4th light hit the combo goes on into the heavy, at half its stamina.
-            bool danceFinisher = chain && Has(Special.KingsDance) && comboIndex == style.lights.Length - 1 &&
+            bool danceFinisher = chain && Has(Special.KingsDance) && comboIndex == ComboLength(style) - 1 &&
                                  (InfiniteStamina || Stamina >= HeavyAttackCost * 0.5f);
             if (danceFinisher) heavy = true;
             EnemyBase gapTarget = null;
@@ -843,14 +871,19 @@ namespace KingLastPiece
             }
             else
             {
-                comboIndex = chain ? (comboIndex + 1) % style.lights.Length : 0;
+                comboIndex = chain ? (comboIndex + 1) % ComboLength(style) : 0;
                 atk = style.lights[comboIndex];
             }
             // Stagger this attack deals, spread over its hit windows.
-            float stagger = heavy ? StaggerHeavy : atkIsGapCloser ? StaggerLightEarly : ComboStagger(comboIndex, style.lights.Length);
+            float stagger = heavy ? StaggerHeavy : atkIsGapCloser ? StaggerLightEarly : ComboStagger(comboIndex, ComboLength(style));
             atkStagger = stagger / Mathf.Max(1, atk.hits.Length);
-            atkSwordWave = !heavy && !atkIsGapCloser && comboIndex == style.lights.Length - 1 && Has(Special.SwordWave);
-            Consume(heavy ? atk.cost * (1f - Stats.heavyCostCut) * (danceFinisher ? 0.5f : 1f) : atk.cost * LightCostScale * (1f - Stats.lightCostCut));
+            atkSwordWave = !atkIsGapCloser && Has(Special.SwordWave);
+            atkWhirl = !heavy && !atkIsGapCloser && comboIndex == WhirlHit && Has(Special.Tempest) && style.lights.Length > WhirlHit;
+            atkRangeMul = atkWhirl ? WhirlRange : 1f;
+            atkDamageMul = atkWhirl ? WhirlDamage : 1f;
+            atkComboHit = heavy ? -1 : comboIndex;
+            Consume(heavy ? atk.cost * (1f - Stats.heavyCostCut) * (danceFinisher ? 0.5f : 1f)
+                          : atk.cost * LightCostScale * (1f - Stats.lightCostCut) * (atkWhirl ? WhirlCost : 1f));
             atkUsesSlashFx = FxLibrary.Instance != null && System.Array.Exists(atk.hits, h => h.fx != SlashFxKind.None);
             hitStopUsed = false;
 
@@ -1020,7 +1053,7 @@ namespace KingLastPiece
             if (buffer == Buffered.Dodge && !inActive && TryAct()) return;
 
             // Root motion from move segments (stronger / weaker with the motion's dynamism).
-            float dyn = Motion, reach = Stats.attackRange;
+            float dyn = Motion, reach = Stats.attackRange * atkRangeMul;
             float lunge = atkIsGapCloser ? 1f : dyn;
             bool blocked = LungeBlocked();
             if (!blocked)
@@ -1080,8 +1113,10 @@ namespace KingLastPiece
                         Vfx.GroundImpact(hitCenter, w.range * reach, atk.heavy ? 1.4f : 1f);
                         Game.Rig.Shake(w.shake * dyn);
                     }
-                    // Sword Wave (special item): the 4th light hit's last window sends the blade light flying.
+                    // Sword Wave (special item): each attack's last window sends the blade light flying.
                     if (atkSwordWave && i == atk.hits.Length - 1) LaunchSwordWave();
+                    // Tempest (special item): the 3rd hit's windows open with a storm of NamuFX slashes over the whole reach.
+                    if (atkWhirl) WhirlFx(w, reach);
                 }
                 if (w.sparkTrail)
                 {
@@ -1110,8 +1145,8 @@ namespace KingLastPiece
             bool landed = false;
             int hitCount = 0;
             // Attack range scales the reach (and how far ahead the hit is centred); attack power the damage.
-            float range = w.range * Stats.attackRange, damage = w.damage * DamageMult;
-            Vector3 center = FlatPos + transform.forward * (w.forward * Stats.attackRange);
+            float range = w.range * Stats.attackRange * atkRangeMul, damage = w.damage * DamageMult * atkDamageMul;
+            Vector3 center = FlatPos + transform.forward * (w.forward * Stats.attackRange * atkRangeMul);
             scratch.Clear();
             scratch.AddRange(Game.Enemies);
             foreach (var e in scratch)
@@ -1143,7 +1178,6 @@ namespace KingLastPiece
                     Sfx.Play(e.IsBoss ? "HIT_Boss" : atk.heavy ? "HIT_Heavy" : "HIT_Light", e.transform.position + Vector3.up);
                     hitCount++;
                     if (w.launch) e.ForceLaunch(transform.position);
-                    if (!atk.heavy && Has(Special.Echo)) EchoBurst(e, toE, damage * mult);
                     if (crit && Has(Special.ChainLightning)) ChainLightning(e, damage);
                 }
             }
