@@ -402,8 +402,33 @@ namespace KingLastPiece
             }
         }
 
+        // Slowed (the King's Black Aurora): walking speed scaled down until the slow runs out.
+        float slowFactor = 1f, slowUntil;
+
+        /// <summary>Walks at <paramref name="factor"/> of its speed for the next <paramref name="duration"/> seconds.</summary>
+        public void Slow(float factor, float duration)
+        {
+            slowFactor = factor;
+            slowUntil = Time.time + duration;
+        }
+
+        /// <summary>
+        /// Damage over time (the King's Black Aurora): health only — no flinch, no stagger, no knockback, no reel.
+        /// True if it captured the piece.
+        /// </summary>
+        public bool TakeAuraDamage(float damage, Vector3 source)
+        {
+            if (IsDead || OffBoard || state == EState.Spawning || damage <= 0f) return false;
+            Health -= damage;
+            if (Health > 0f) return false;
+            Health = 0f;
+            Die(source);
+            return true;
+        }
+
         protected void MoveTowards(Vector3 target, float speed, float dt)
         {
+            if (Time.time < slowUntil) speed *= slowFactor;
             target.y = 0f;
             Vector3 d = target - FlatPos;
             float dist = d.magnitude;

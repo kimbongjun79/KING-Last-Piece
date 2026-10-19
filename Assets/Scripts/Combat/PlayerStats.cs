@@ -102,7 +102,7 @@ namespace KingLastPiece
 
     /// <summary>A round-end item: a fixed set of stat steps and a grade set by how much they are worth.</summary>
     /// <summary>What a special item does (none: a stat item).</summary>
-    public enum Special { None, Stalemate, KingsDance, MartyrCrown, Execution, Gambit, Momentum, BoomerangCrown, Thorns }
+    public enum Special { None, Stalemate, KingsDance, MartyrCrown, Execution, Gambit, Momentum, BoomerangCrown, Thorns, BlackAurora }
 
     public class Item
     {
@@ -137,6 +137,8 @@ namespace KingLastPiece
     public static class Upgrades
     {
         public const int Offered = 3, Picks = 1;
+        /// <summary>After a boss round: five offered, two kept.</summary>
+        public const int BossOffered = 5, BossPicks = 2;
 
         public struct UpgradeDef
         {
@@ -260,8 +262,9 @@ namespace KingLastPiece
             S("execution",      "처형",           H, Special.Execution, "기절한 적을 강공격으로 치면 피해가 100% 추가됩니다."),
             S("gambit",         "갬빗",           R, Special.Gambit, "라운드마다 처음 받는 피해 1번을 무시합니다. 폰 하나를 내주고 왕을 지킵니다."),
             S("momentum",       "기세",           R, Special.Momentum, "맞지 않고 적을 잡을 때마다 공격 속도와 이동 속도가 5%씩 오릅니다 (최대 5번, +25%). 피해를 받으면 처음부터 다시 쌓입니다."),
-            S("boomerang_crown","부메랑 왕관",    L, Special.BoomerangCrown, "강공격 버튼으로 왕관을 던집니다. 왕관은 앞으로 날아갔다가 돌아오며, 오갈 때마다 닿는 모든 적에게 피해를 줍니다. 돌아온 왕관을 받아야 다시 던질 수 있습니다."),
+            S("boomerang_crown","부메랑 왕관",    L, Special.BoomerangCrown, "왕관이 가장 가까운 적을 향해 저절로 날아갑니다. 앞으로 날아갔다가 돌아오며 오갈 때마다 닿는 모든 적에게 피해를 주고, 돌아온 뒤 4초가 지나면 다시 던집니다."),
             S("thorn_armor",    "고슴도치 갑옷",  H, Special.Thorns, "피해를 받을 때마다 주변 2칸의 적에게 가시 피해를 돌려줍니다. 피해량은 (10 + 방어력) × 데미지 배율 — 방어력과 데미지가 높을수록 아픕니다."),
+            S("black_aurora",   "검은 오로라",    H, Special.BlackAurora, "킹 주변 넓은 범위(3칸)에 검은 오로라 장판이 깔립니다. 안에 든 적은 이동 속도가 40% 줄고, 최대 체력과 데미지에 비례한 약한 피해를 계속 받습니다. 치명타·경직·넉백은 없습니다."),
             I("fountain_of_life","생명의 샘",     L, E(Fl, 1), E(Heal, 2), E(Hp, 2)),
         };
 
@@ -338,35 +341,24 @@ namespace KingLastPiece
             return fx.steps >= 0 ? Mathf.Max(now, Mathf.Min(d.cap, next)) : Mathf.Min(now, Mathf.Max(d.floor, next));
         }
 
-        /// <summary>Special items that can't be held together.</summary>
-        static bool Excludes(Special a, Special b) =>
-            (a == Special.KingsDance && b == Special.BoomerangCrown) || (a == Special.BoomerangCrown && b == Special.KingsDance);
-
-        /// <summary>Worth offering: at least one of its gains still has room under its cap (a special item: not held, not excluded).</summary>
+        /// <summary>Worth offering: at least one of its gains still has room under its cap (a special item: not held yet).</summary>
         public static bool Useful(PlayerStats s, Item item, IList<Item> owned = null)
         {
-            if (item.IsSpecial)
-            {
-                if (owned == null) return true;
-                if (owned.Contains(item)) return false;   // a special item only once
-                // Both take over the heavy button: King's Dance and the Boomerang Crown exclude each other.
-                foreach (var o in owned)
-                    if (Excludes(o.special, item.special)) return false;
-                return true;
-            }
+            if (item.IsSpecial) return owned == null || !owned.Contains(item);   // a special item only once
             foreach (var fx in item.effects)
                 if (fx.steps > 0 && Current(s, fx.kind) < Def(fx.kind).cap - 0.0001f) return true;
             return false;
         }
 
         /// <summary>
-        /// Three different items, each of a rolled grade (falling back to a neighbouring grade when every item of that
-        /// grade is useless now). <paramref name="bossCleared"/>: the first one is epic or better.
+        /// <paramref name="count"/> different items (3 after a round, 5 after a boss round), each of a rolled grade
+        /// (falling back to a neighbouring grade when every item of that grade is useless now). <paramref name="bossCleared"/>:
+        /// the first one is epic or better.
         /// </summary>
-        public static List<Item> Roll(PlayerStats s, IList<Item> owned, int round = 1, bool bossCleared = false)
+        public static List<Item> Roll(PlayerStats s, IList<Item> owned, int round = 1, bool bossCleared = false, int count = Offered)
         {
             var offer = new List<Item>();
-            for (int slot = 0; slot < Offered; slot++)
+            for (int slot = 0; slot < count; slot++)
             {
                 var grade = RollGrade(round);
                 if (bossCleared && slot == 0 && grade < UpgradeGrade.Epic) grade = UpgradeGrade.Epic;

@@ -285,7 +285,8 @@ namespace KingLastPiece
         }
 
         /// <summary>How many cards must be chosen before the confirm button unlocks (one item).</summary>
-        public int PicksNeeded => Mathf.Min(Upgrades.Picks, Offers.Count);
+        public int PicksNeeded => Mathf.Min(bossPick ? Upgrades.BossPicks : Upgrades.Picks, Offers.Count);
+        bool bossPick;   // after a boss round: five items offered, two kept
         public bool CanConfirmUpgrades => State == GameState.Upgrade && upgradeDoneAt < 0f && Picked.Count == PicksNeeded;
         /// <summary>The cursor index of the confirm button (after the cards).</summary>
         public int ConfirmSlot => Offers.Count;
@@ -315,7 +316,8 @@ namespace KingLastPiece
         void EnterUpgrade()
         {
             Offers.Clear();
-            Offers.AddRange(Upgrades.Roll(Player.Stats, Player.Items, Round, EndlessRounds.IsBossRound(Round)));
+            bossPick = EndlessRounds.IsBossRound(Round);
+            Offers.AddRange(Upgrades.Roll(Player.Stats, Player.Items, Round, bossPick, bossPick ? Upgrades.BossOffered : Upgrades.Offered));
             Picked.Clear();
             OfferCursor = -1;
             upgradeDoneAt = Offers.Count == 0 ? 0f : -1f;
@@ -427,6 +429,9 @@ namespace KingLastPiece
 
         public void ReportPlayerDamage(float amount) => Record.damageTaken += amount;
         public void ReportFlask() => Record.flasksUsed++;
+
+        /// <summary>Damage over time (Black Aurora): counted in the run record, but no popup (it ticks too often).</summary>
+        public void ReportDotDamage(float amount) => Record.damageDealt += amount;
 
         public void ReportDamage(EnemyBase e, float amount, bool crit = false)
         {

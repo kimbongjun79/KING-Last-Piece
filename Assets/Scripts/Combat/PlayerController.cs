@@ -259,33 +259,37 @@ namespace KingLastPiece
 
         // ---------------------------------------------------------------- Boomerang Crown (special item)
 
-        const float CrownRange = 9f, CrownDamage = 30f, StaggerCrown = 20f;
-        /// <summary>The heavy button's throw: a quick fling with no hit windows of its own (the crown does the hitting).</summary>
-        static readonly AttackDef CrownThrowDef = new AttackDef
-        {
-            name = "Crown Throw", duration = 0.42f, cancelAt = 0.26f, cost = 18f, heavy = true, sfx = "ATK_Charge",
-            pose = new PoseTrack()
-                .Key(0f, BodyPose.P())
-                .Key(0.12f, BodyPose.P(tilt: -16f, squash: -0.1f), Ease.Out)
-                .Key(0.2f, BodyPose.P(tilt: 26f), Ease.In)
-                .Key(0.42f, BodyPose.P(), Ease.OutBack),
-            hits = new HitWindow[0],
-            moves = new MoveSeg[0],
-        };
+        const float CrownRange = 9f, CrownDamage = 30f, StaggerCrown = 20f, CrownInterval = 4f;
         CrownBoomerang crownInFlight;
         public bool CrownOut => crownInFlight != null;
-        float CrownThrowCost => CrownThrowDef.cost * (1f - Stats.heavyCostCut);
+        /// <summary>Seconds until the crown flies again (it counts from the moment it comes back).</summary>
+        public float CrownCooldown { get; private set; }
 
-        void ThrowCrown()
+        /// <summary>Every <see cref="CrownInterval"/> seconds after the catch, the crown flies at the nearest piece in reach.</summary>
+        void UpdateCrown(float dt)
         {
-            crownInFlight = CrownBoomerang.Spawn(this, transform.forward, CrownRange * Stats.attackRange);
+            if (!Has(Special.BoomerangCrown) || crownInFlight != null) return;
+            CrownCooldown = Mathf.Max(0f, CrownCooldown - dt);
+            if (CrownCooldown > 0f) return;
+            float reach = CrownRange * Stats.attackRange;
+            EnemyBase target = null;
+            float best = float.MaxValue;
+            foreach (var e in Game.Enemies)
+            {
+                if (e == null || e.IsDead || !e.Targetable) continue;
+                float d = (e.FlatPos - FlatPos).magnitude;
+                if (d < best && d <= reach + e.Radius) { best = d; target = e; }
+            }
+            if (target == null) return;   // nothing in reach: thrown as soon as something is
+            crownInFlight = CrownBoomerang.Spawn(this, target.FlatPos - FlatPos, reach);
             Sfx.Play("THR_Release", FlatPos);
         }
 
-        /// <summary>The crown is back in the King's hand.</summary>
+        /// <summary>The crown is back in the King's hand: the next throw in <see cref="CrownInterval"/> seconds.</summary>
         public void CatchCrown()
         {
             crownInFlight = null;
+            CrownCooldown = CrownInterval;
             Sfx.Play("UI_Confirm", FlatPos);
             Effects.Sparks(transform.position + Vector3.up * 1.6f, Vfx.Accent, 6, 3f);
         }
@@ -302,6 +306,77 @@ namespace KingLastPiece
             Sfx.Play(e.IsBoss ? "HIT_Boss" : "HIT_Light", e.transform.position + Vector3.up);
         }
 
+        // ---------------------------------------------------------------- Black Aurora (special item)
+
+        // A wide field around the King: pieces in it walk 40% slower and keep taking a little damage — (max health × 4%)
+        // per second × the damage bonus. No crits, no stagger, no knockback.
+        const float AuroraRadius = 6f, AuroraTick = 0.5f, AuroraSlow = 0.6f, AuroraHealthShare = 0.04f;
+        GameObject aurora;
+        float auroraTimer;
+
+        void UpdateAurora(float dt)
+        {
+            bool on = Has(Special.BlackAurora);
+            if (!on)
+            {
+                if (aurora != null) Destroy(aurora);
+                return;
+            }
+            if (aurora == null) aurora = BuildAurora();
+
+            auroraTimer -= dt;
+            if (auroraTimer > 0f) return;
+            auroraTimer = AuroraTick;
+            float damage = MaxHealth * AuroraHealthShare * (1f + Stats.damage) * AuroraTick;
+            foreach (var e in Game.Enemies.ToArray())
+            {
+                if (e == null || e.IsDead || !e.Targetable) continue;
+                if ((e.FlatPos - FlatPos).magnitude > AuroraRadius + e.Radius) continue;
+                e.Slow(AuroraSlow, AuroraTick + 0.15f);
+                e.TakeAuraDamage(damage, transform.position);
+                Game.ReportDotDamage(damage);
+            }
+        }
+
+        /// <summary>
+        /// The field's look: Tazo FX's swirling "Bughole" circle laid under the King, scaled to the field and turned into a
+        /// black aurora (its additive materials swapped for alpha-blended copies, its colours made ink-black).
+        /// </summary>
+        GameObject BuildAurora()
+        {
+            var lib = FxLibrary.Instance;
+            if (lib == null || lib.auraField == null) return new GameObject("Black Aurora (no fx)");
+            var fx = Instantiate(lib.auraField, transform);
+            fx.name = "Black Aurora";
+            fx.transform.localPosition = Vector3.up * 0.05f;
+            fx.transform.localRotation = Quaternion.identity;
+            fx.transform.localScale = Vector3.one * (AuroraRadius / 2.5f);
+            foreach (var ps in fx.GetComponentsInChildren<ParticleSystem>(true))
+            {
+                var main = ps.main;
+                main.scalingMode = ParticleSystemScalingMode.Hierarchy;
+                main.simulationSpace = ParticleSystemSimulationSpace.Local;   // the field follows the King
+            }
+            foreach (var a in fx.GetComponentsInChildren<AudioSource>(true)) a.enabled = false;
+            // Alpha-blended black copies of its materials (black would vanish in additive), built from the Dark aura's.
+            var sources = new System.Collections.Generic.List<Material>();
+            foreach (var r in fx.GetComponentsInChildren<ParticleSystemRenderer>(true))
+                foreach (var m in r.sharedMaterials)
+                    if (m != null && !sources.Contains(m)) sources.Add(m);
+            var template = lib.eliteAuraBlack != null && lib.eliteAuraBlack.Length > 0 ? lib.eliteAuraBlack[0] : null;
+            if (template != null)
+            {
+                var blacks = new Material[sources.Count];
+                for (int i = 0; i < sources.Count; i++)
+                {
+                    blacks[i] = new Material(template) { name = "Aurora " + sources[i].name };
+                    if (sources[i].HasProperty("_MainTex")) blacks[i].SetTexture("_BaseMap", sources[i].GetTexture("_MainTex"));
+                }
+                EliteAura.Blacken(fx, sources.ToArray(), blacks, 1.6f);
+            }
+            return fx;
+        }
+
         // ---------------------------------------------------------------- Thorn Armor (special item)
 
         const float ThornRadius = 4f, ThornBase = 10f, StaggerThorns = 10f;
@@ -314,12 +389,8 @@ namespace KingLastPiece
         {
             float damage = (ThornBase + Mathf.Max(0f, Stats.defense)) * (1f + Stats.damage);
             if (damage <= 0f) return;
-            Effects.Shockwave(FlatPos, ThornRadius, Vfx.Accent, 0.3f);
-            for (int k = 0; k < 16; k++)
-            {
-                Vector3 d = Quaternion.Euler(0f, k * 22.5f, 0f) * Vector3.forward;
-                Effects.Sparks(transform.position + Vector3.up * 1f + d * 0.6f, Vfx.Accent, 1, 9f);
-            }
+            ThornSpikesFx.Spawn(FlatPos, ThornRadius);
+            Sfx.Play("HIT_Armor", transform.position + Vector3.up);
             foreach (var e in Game.Enemies)
             {
                 if (e == null || e.IsDead || !e.Targetable) continue;
@@ -472,6 +543,11 @@ namespace KingLastPiece
             UpdateStamina(dt);
             UpdateDodgeCharges(dt);
             UpdateLockTarget();
+            if (!roundOver)
+            {
+                UpdateCrown(dt);
+                UpdateAurora(dt);
+            }
             if (justTarget != null && !Game.SlowMoActive) justTarget = null;
             UpdateWarnings();
 
@@ -520,13 +596,6 @@ namespace KingLastPiece
                     StartAttack(false);
                     return true;
                 case Buffered.Heavy:
-                    // Boomerang Crown (special item): the heavy button throws the crown (once it is back in hand).
-                    if (Has(Special.BoomerangCrown))
-                    {
-                        if (CrownOut || !(InfiniteStamina || Stamina >= CrownThrowCost)) { buffer = Buffered.None; return false; }
-                        StartAttack(true);
-                        return true;
-                    }
                     // King's Dance (special item): no heavy button — the heavy comes as the light combo's 5th hit.
                     if (Has(Special.KingsDance)) { buffer = Buffered.None; return false; }
                     // The heavy needs its whole stamina cost up front (the light combo only needs some left).
@@ -703,8 +772,7 @@ namespace KingLastPiece
             if (danceFinisher) heavy = true;
             EnemyBase gapTarget = null;
             atkIsGapCloser = false;
-            bool crownThrow = heavy && !danceFinisher && Has(Special.BoomerangCrown);
-            if (heavy) atk = crownThrow ? CrownThrowDef : style.heavy;
+            if (heavy) atk = style.heavy;
             else if (!chain && style.gapCloser != null && TryFindGapTarget(style, out gapTarget, out float gap))
             {
                 // Mid range: dash in first; the combo continues with hit 1 (index -1 + 1 = 0).
@@ -748,7 +816,6 @@ namespace KingLastPiece
             else if (LockTarget != null) dir = LockTarget.FlatPos - FlatPos;
             else if (!steering && TryFindAssistDirection(transform.forward, out var best)) dir = best;
             if (dir.sqrMagnitude > 0.01f) transform.rotation = Quaternion.LookRotation(new Vector3(dir.x, 0f, dir.z));
-            if (crownThrow) ThrowCrown();
         }
 
         /// <summary>

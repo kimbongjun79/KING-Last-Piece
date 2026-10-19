@@ -128,7 +128,7 @@ namespace KingLastPiece
             // Special items with a live state: Momentum stacks, the Boomerang Crown in hand or in flight.
             string status = "";
             if (p.Has(Special.Momentum)) status += $"기세 {p.Momentum}/5 (+{p.Momentum * 5}%)    ";
-            if (p.Has(Special.BoomerangCrown)) status += p.CrownOut ? "왕관: 비행 중" : "왕관: 준비";
+            if (p.Has(Special.BoomerangCrown)) status += p.CrownOut ? "왕관: 비행 중" : $"왕관: {p.CrownCooldown:0.0}초";
             if (status.Length > 0)
                 SmallText(new Rect(bx + p.MaxFlasks * 28 * u + 120 * u, fy + 6 * u, 260 * u, 22 * u), status, TextAnchor.MiddleLeft, 15);
         }
@@ -972,10 +972,11 @@ namespace KingLastPiece
             Fill(new Rect(0, 0, Screen.width, Screen.height), new Color(0f, 0f, 0f, 0.6f * a));
             Text(new Rect(0, Screen.height * 0.1f, Screen.width, 50 * scale), $"{g.Round} 라운드 클리어", mid, new Color(Gold.r, Gold.g, Gold.b, a));
             Text(new Rect(0, Screen.height * 0.1f + 52 * scale, Screen.width, 34 * scale),
-                "아이템 하나를 고르세요   —   다른 카드를 누르면 바꾸고, 같은 카드를 다시 누르면 취소", small, new Color(0.9f, 0.88f, 0.8f, a));
+                g.PicksNeeded > 1 ? $"보스 보상: 아이템 {g.PicksNeeded}개를 고르세요  ({g.Picked.Count} / {g.PicksNeeded})   —   같은 카드를 다시 누르면 취소"
+                    : "아이템 하나를 고르세요   —   다른 카드를 누르면 바꾸고, 같은 카드를 다시 누르면 취소", small, new Color(0.9f, 0.88f, 0.8f, a));
 
             int n = g.Offers.Count;
-            float cw = 300 * scale, ch = 410 * scale, gap = 30 * scale;
+            float cw = (n > 3 ? 270 : 300) * scale, ch = 410 * scale, gap = (n > 3 ? 22 : 30) * scale;
             float x0 = (Screen.width - (n * cw + (n - 1) * gap)) / 2f, y0 = Screen.height * 0.1f + 110 * scale;
             var title = new GUIStyle(label) { alignment = TextAnchor.MiddleCenter, fontSize = Mathf.RoundToInt(26 * scale), wordWrap = true };
             var info = new GUIStyle(small) { fontSize = Mathf.RoundToInt(19 * scale) };
@@ -1064,7 +1065,7 @@ namespace KingLastPiece
             Fill(b, ready ? (bHot ? new Color(0.36f, 0.27f, 0.1f, a) : new Color(0.24f, 0.18f, 0.07f, a)) : new Color(0.08f, 0.08f, 0.08f, 0.9f * a));
             Text(b, "확인", new GUIStyle(mid) { fontSize = Mathf.RoundToInt(28 * scale) },
                 ready ? new Color(1f, 0.95f, 0.85f, a) : new Color(1f, 1f, 1f, 0.3f * a));
-            Text(new Rect(0, b.yMax + 10 * scale, Screen.width, 26 * scale), "클릭  ·  숫자 1–3  ·  ← → 와 Enter",
+            Text(new Rect(0, b.yMax + 10 * scale, Screen.width, 26 * scale), $"클릭  ·  숫자 1–{n}  ·  ← → 와 Enter",
                 new GUIStyle(small) { fontSize = Mathf.RoundToInt(15 * scale) }, new Color(1f, 1f, 1f, 0.4f * a));
         }
 

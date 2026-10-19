@@ -20,6 +20,7 @@ MonoBehaviour:
   slashWater: {fileID: 607914935907159708, guid: 22b9fc8929c1f1e43b844b37ab4cb21b, type: 3}
   slashAoeA: {fileID: 6855955652325114174, guid: f8dc879bd6649cb4782409815764d676, type: 3}
   recoverHold: {fileID: 100004, guid: d9751637d4fc2de40a234b45e10cb88d, type: 3}
+  auraField: {fileID: 100004, guid: 409fabb6ee48d8f49adc485b8c5d693f, type: 3}
   eliteAura:
   - {fileID: 2720650084040897827, guid: de283b37bdd532540a43a9dabc14ffce, type: 3}
   - {fileID: 6397433411572311964, guid: 3ad6581d9e6a10e4987680f1483aab44, type: 3}
