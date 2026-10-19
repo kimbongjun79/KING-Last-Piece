@@ -397,7 +397,9 @@ namespace KingLastPiece
                 v.y = Mathf.Abs(v.y) + 0.6f;
                 p.velocity = (v.normalized + dir * 0.7f).normalized * speed * Random.Range(0.5f, 1.1f);
                 p.spin = Random.onUnitSphere * Random.Range(300f, 900f);
-                p.life = p.maxLife = Random.Range(0.8f, 1.3f);
+                // Played a bit faster and gone quickly: a snappy burst rather than litter on the board.
+                p.rate = 1.35f;
+                p.life = p.maxLife = Random.Range(0.45f, 0.7f);
             }
         }
     }

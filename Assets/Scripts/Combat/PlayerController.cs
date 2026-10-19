@@ -90,6 +90,9 @@ namespace KingLastPiece
         GameObject healFx;   // looping healing aura, while the flask is being drunk
         HashSet<EnemyBase>[] hitSets = new HashSet<EnemyBase>[0];
         bool[] windowStarted = new bool[0];
+        int[] sparksEmitted = new int[0];
+        /// <summary>White sparks a spark-trail window throws off its crown over the whole window (whatever the frame rate or attack speed).</summary>
+        const int SparkTrailCount = 40;
         readonly List<EnemyBase> scratch = new List<EnemyBase>();
         Vector3 dodgeDir, knockback;
         Buffered buffer;
@@ -556,12 +559,14 @@ namespace KingLastPiece
             {
                 hitSets = new HashSet<EnemyBase>[atk.hits.Length];
                 windowStarted = new bool[atk.hits.Length];
+                sparksEmitted = new int[atk.hits.Length];
             }
             for (int i = 0; i < hitSets.Length; i++)
             {
                 hitSets[i] ??= new HashSet<EnemyBase>();
                 hitSets[i].Clear();
                 windowStarted[i] = false;
+                sparksEmitted[i] = 0;
             }
             Enter(State.Attack);
             Sfx.Play(atk.sfx, FlatPos);
@@ -771,8 +776,17 @@ namespace KingLastPiece
                         Game.Rig.Shake(w.shake * dyn);
                     }
                 }
-                if (w.sparkTrail && Random.value < 0.8f)
-                    Effects.Sparks(crownTrail.transform.position, Vfx.Accent, 2, 6f);
+                if (w.sparkTrail)
+                {
+                    // Spread evenly over the window: the same shower at any frame rate or attack speed.
+                    float wp = Mathf.Clamp01((t - w.start) / Mathf.Max(0.001f, w.end - w.start));
+                    int owed = Mathf.RoundToInt(wp * SparkTrailCount) - sparksEmitted[i];
+                    if (owed > 0)
+                    {
+                        Effects.Sparks(crownTrail.transform.position, Vfx.Accent, owed, 6f);
+                        sparksEmitted[i] += owed;
+                    }
+                }
                 DoHits(w, hitSets[i], Mathf.Clamp01((t - w.start) / Mathf.Max(0.001f, w.end - w.start)));
             }
 
