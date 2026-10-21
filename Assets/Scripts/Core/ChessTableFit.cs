@@ -69,6 +69,28 @@ namespace KingLastPiece
                 clock.localPosition = p + away * (board - clockBoardHalf);
                 clockBoardHalf = board;
             }
+            // Other things lying on the table beside the board (the score sheet) move out with its edge the same way.
+            for (int i = 0; i < followers.Count && i < followerHalf.Count; i++)
+            {
+                var t = followers[i];
+                if (t == null || Mathf.Approximately(board, followerHalf[i])) continue;
+                var p = t.localPosition;
+                var away = new Vector3(p.x, 0f, p.z);
+                away = away.sqrMagnitude > 0.01f ? away.normalized : Vector3.right;
+                t.localPosition = p + away * (board - followerHalf[i]);
+                followerHalf[i] = board;
+            }
+        }
+
+        [Tooltip("Things on the table that keep beside the board's edge as it grows (with the board half they were placed for).")]
+        public System.Collections.Generic.List<Transform> followers = new System.Collections.Generic.List<Transform>();
+        public System.Collections.Generic.List<float> followerHalf = new System.Collections.Generic.List<float>();
+
+        /// <summary><paramref name="t"/> (a child of the table) now keeps beside the board's edge.</summary>
+        public void Follow(Transform t)
+        {
+            followers.Add(t);
+            followerHalf.Add(GameManager.BoardHalf);
         }
     }
 }

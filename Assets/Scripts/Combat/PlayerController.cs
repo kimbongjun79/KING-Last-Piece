@@ -586,7 +586,8 @@ namespace KingLastPiece
             crownTrail.Clear();
             baseTrail.Clear();
             LockTarget = null;
-            Effects.Shockwave(FlatPos, 1.4f, gold, 0.4f);
+            // Set down on e1 like a piece: the same ripple the black pieces make, in white.
+            Effects.Wave(FlatPos, 2.4f, Color.white);
             Effects.Sparks(transform.position + Vector3.up, gold, 14, 3f);
         }
 

@@ -141,6 +141,8 @@ namespace KingLastPiece
                 WorldBuilder.ApplyLighting();
             }
             WorldBuilder.EnsureColliders(board);
+            // Normal mode: gem towers stand around the hall in place of the stone pillars.
+            if (CurrentMode == Mode.Game) WorldBuilder.GemTowers(board.transform);
             BoardSlots.SetSize(8);   // static: a previous endless run may have grown it
             BoardFx.Register(board.Grid);
 

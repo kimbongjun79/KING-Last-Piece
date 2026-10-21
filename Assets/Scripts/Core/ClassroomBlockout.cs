@@ -62,7 +62,7 @@ namespace KingLastPiece
         {
             var root = new GameObject(RootName).transform;
             root.SetParent(arena, false);
-            var wall = MaterialLib.Get(WallGrey, 0.2f);
+            var wall = Resources.Load<Material>(WallpaperMaterial) ?? MaterialLib.Get(WallGrey, 0.2f);
             var prop = MaterialLib.Get(PropGrey, 0.3f);
             var dark = MaterialLib.Get(DarkGrey, 0.4f);
 
@@ -486,6 +486,165 @@ namespace KingLastPiece
             'r' => ("Models/Black_Chess_Rook_v03", 0.055f),
             _ => ("Models/Black_Chess_Pawn_v03", 0.05f),
         };
+
+        // ---------------------------------------------------------------- wallpaper and props
+
+        const string WallpaperMaterial = "Materials/Wallpaper", ScoreSheetMaterial = "Materials/Score Sheet";
+        const string PenModel = "Models/Silver_Ballpoint_Pen_v01_with VARCO";
+        const string CabinetModel = "Models/Metal_Filing_Cabinet_v01_with VARCO";
+        const string LightPanelModel = "Models/Rectangular_Light_Panel_v01_with VARCO";
+        /// <summary>Real size of one wallpaper repeat.</summary>
+        const float WallpaperRepeat = 0.8f;
+        /// <summary>The baked plain wall material (named by its colour), swapped for the wallpaper at runtime.</summary>
+        const string PlainWallName = "KLP_DBDBD6";
+
+        /// <summary>
+        /// Dresses the (baked) classroom at runtime: papers the walls (each wall box gets a mesh whose UVs repeat the
+        /// wallpaper every <see cref="WallpaperRepeat"/> m instead of stretching it), and — once — lays a score sheet
+        /// and a pen on the chess table beside the board, stands a filing cabinet against the south wall and hangs LED
+        /// light panels under the ceiling.
+        /// </summary>
+        public static void Dress(Transform classroom)
+        {
+            var paper = Resources.Load<Material>(WallpaperMaterial);
+            if (paper != null)
+                foreach (var r in classroom.GetComponentsInChildren<MeshRenderer>(true))
+                {
+                    var m = r.sharedMaterial;
+                    if (m == null || (m != paper && !m.name.StartsWith(PlainWallName))) continue;
+                    r.sharedMaterial = paper;
+                    var mf = r.GetComponent<MeshFilter>();
+                    if (mf != null) mf.sharedMesh = RepeatingBox(r.transform.localScale, M(WallpaperRepeat));
+                }
+            if (classroom.Find("Props") != null) return;
+            var props = Group(classroom, "Props");
+            ScoreSheet(classroom);
+            var room = classroom.Find("Room");
+            if (room == null) return;
+            Cabinet(room);
+            LightPanels(room);
+            props.SetAsLastSibling();
+        }
+
+        /// <summary>A unit cube whose UVs count repeats of <paramref name="repeat"/> world units across each face of a box this size.</summary>
+        static Mesh RepeatingBox(Vector3 size, float repeat)
+        {
+            var src = Resources.GetBuiltinResource<Mesh>("Cube.fbx");
+            var v = src.vertices;
+            var n = src.normals;
+            var uv = new Vector2[v.Length];
+            for (int i = 0; i < v.Length; i++)
+            {
+                Vector3 a = new Vector3(Mathf.Abs(n[i].x), Mathf.Abs(n[i].y), Mathf.Abs(n[i].z));
+                Vector3 p = Vector3.Scale(v[i], size) / repeat;
+                uv[i] = a.x > 0.5f ? new Vector2(p.z, p.y) : a.y > 0.5f ? new Vector2(p.x, p.z) : new Vector2(p.x, p.y);
+            }
+            var mesh = Object.Instantiate(src);
+            mesh.name = "Wallpapered Box";
+            mesh.uv = uv;
+            return mesh;
+        }
+
+        /// <summary>The score sheet (with a pen on it) lying on the table beside the board, on the side away from the clock.</summary>
+        static void ScoreSheet(Transform classroom)
+        {
+            var mat = Resources.Load<Material>(ScoreSheetMaterial);
+            var fit = classroom.GetComponentInChildren<ChessTableFit>(true);
+            if (mat == null || fit == null) return;
+            // Keep table room for the sheet beside the board as the endless board grows (the table widens to suit).
+            fit.margin = Mathf.Max(fit.margin, M(0.21f) + 4f);
+            fit.Fit();
+            float board = GameManager.BoardHalf;
+            float side = fit.clock != null && fit.clock.position.x > 0f ? -1f : 1f;
+            // The picture is square with the A4 sheet in its middle (≈ 55% of its width): 0.385 m across in all.
+            float size = M(0.385f);
+            var sheet = new GameObject("Score Sheet").transform;
+            sheet.SetParent(fit.transform, false);
+            sheet.position = new Vector3(side * (board + 1.2f + M(0.21f) * 0.5f + 0.8f), TableTop + 0.02f, -1.5f);
+            sheet.rotation = Quaternion.Euler(0f, side * -7f, 0f);
+            var quad = GameObject.CreatePrimitive(PrimitiveType.Quad).transform;
+            Object.Destroy(quad.GetComponent<Collider>());
+            quad.name = "Sheet";
+            quad.SetParent(sheet, false);
+            quad.localRotation = Quaternion.Euler(90f, 0f, 0f);
+            quad.localScale = Vector3.one * size;
+            quad.GetComponent<Renderer>().sharedMaterial = mat;
+            fit.Follow(sheet);
+
+            // The pen across the sheet's lower half.
+            var pen = PieceFactory.LoadModel(PenModel, sheet, 1f, 0f, standUp: false);
+            if (pen == null) return;
+            pen.name = "Pen";
+            LayFlat(pen);
+            FitLongest(pen, M(0.145f));
+            pen.rotation = Quaternion.Euler(0f, 35f, 0f) * pen.rotation;
+            Settle(pen, sheet.position + sheet.rotation * new Vector3(0.8f, 0f, -2.2f), sheet.position.y + 0.01f);
+        }
+
+        /// <summary>A metal filing cabinet against the south wall, between the corner plant and the door.</summary>
+        static void Cabinet(Transform room)
+        {
+            var cabinet = Model(room, CabinetModel, 1.32f, AlignWidthAlongX);
+            if (cabinet == null) return;
+            float half = M(RoomHalf), thick = M(WallThick);
+            var b = Bounds(cabinet);
+            float depth = Mathf.Min(b.size.x, b.size.z);   // its width runs along the wall
+            cabinet.localPosition = new Vector3(-M(3.2f), Floor, -half + thick / 2f + depth / 2f + M(0.02f));
+        }
+
+        /// <summary>LED light panels (2 × 3) just under the ceiling, glowing.</summary>
+        static void LightPanels(Transform room)
+        {
+            float top = Floor + M(RoomHeight);
+            var group = Group(room, "LED Panels");
+            foreach (var x in new[] { -M(2f), M(2f) })
+            foreach (var z in new[] { -M(2.6f), 0f, M(2.6f) })
+            {
+                var panel = PieceFactory.LoadModel(LightPanelModel, group, 1f, 0f, standUp: false);
+                if (panel == null) return;
+                panel.name = "LED Panel";
+                LayFlat(panel);
+                FitLongest(panel, M(1.2f));
+                foreach (var r in panel.GetComponentsInChildren<Renderer>())
+                {
+                    r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                    var mats = r.sharedMaterials;
+                    for (int i = 0; i < mats.Length; i++)
+                    {
+                        if (mats[i] == null) continue;
+                        mats[i] = new Material(mats[i]);
+                        mats[i].EnableKeyword("_EMISSION");
+                        mats[i].SetColor("_EmissionColor", new Color(1f, 0.97f, 0.9f) * 1.6f);
+                    }
+                    r.sharedMaterials = mats;
+                }
+                var b = Bounds(panel);
+                Vector3 at = room.TransformPoint(new Vector3(x, 0f, z));
+                panel.position += new Vector3(at.x - b.center.x, top - 0.5f - b.max.y, at.z - b.center.z);
+            }
+        }
+
+        /// <summary>Turns a model so its thinnest side is vertical (a pen or a panel lying flat).</summary>
+        static void LayFlat(Transform m)
+        {
+            var s = Bounds(m).size;
+            if (s.y <= s.x && s.y <= s.z) return;
+            m.rotation = (s.x <= s.z ? Quaternion.Euler(0f, 0f, 90f) : Quaternion.Euler(90f, 0f, 0f)) * m.rotation;
+        }
+
+        /// <summary>Scales a model so its longest side is <paramref name="length"/>.</summary>
+        static void FitLongest(Transform m, float length)
+        {
+            var s = Bounds(m).size;
+            m.localScale *= length / Mathf.Max(0.001f, Mathf.Max(s.x, Mathf.Max(s.y, s.z)));
+        }
+
+        /// <summary>Moves a model so its footprint is centred on <paramref name="at"/> with its underside at <paramref name="y"/>.</summary>
+        static void Settle(Transform m, Vector3 at, float y)
+        {
+            var b = Bounds(m);
+            m.position += new Vector3(at.x - b.center.x, y - b.min.y, at.z - b.center.z);
+        }
 
         // ---------------------------------------------------------------- provided models
 

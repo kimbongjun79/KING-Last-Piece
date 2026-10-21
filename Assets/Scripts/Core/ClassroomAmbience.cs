@@ -45,7 +45,11 @@ namespace KingLastPiece
         float savedShadowDistance = -1f;
         static readonly int SmoothnessId = Shader.PropertyToID("_Smoothness");
 
-        void Start() => Apply();
+        void Start()
+        {
+            Apply();
+            ClassroomBlockout.Dress(transform);
+        }
 
         public void Apply()
         {

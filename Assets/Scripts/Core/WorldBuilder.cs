@@ -72,6 +72,33 @@ namespace KingLastPiece
             return board;
         }
 
+        const string GemTowerModel = "Models/Black_Gothic_Gem_Tower_v01_with VARCO";
+        const float GemTowerHeight = 8f, HallFloorTop = -0.7f;
+
+        /// <summary>
+        /// Normal mode's surroundings: each stone pillar (column, capital, brazier bowl) gives way to a black gothic gem
+        /// tower standing on the hall floor in its place, turned to face the board. The brazier lights stay. Once only.
+        /// </summary>
+        public static void GemTowers(Transform arena)
+        {
+            var pillars = arena != null ? arena.Find("Pillars") : null;
+            if (pillars == null) return;
+            foreach (Transform pillar in pillars)
+            {
+                if (pillar.Find("Gem Tower") != null) continue;
+                var column = pillar.Find("Column");
+                if (column == null) continue;
+                Vector3 at = new Vector3(column.position.x, HallFloorTop, column.position.z);
+                float yaw = Quaternion.LookRotation(-new Vector3(at.x, 0f, at.z)).eulerAngles.y;
+                var tower = PieceFactory.LoadModel(GemTowerModel, pillar, GemTowerHeight, yaw, standUp: false);
+                if (tower == null) return;   // the model is missing: keep the pillars
+                tower.name = "Gem Tower";
+                tower.position += at;
+                foreach (Transform part in pillar)
+                    if (part.name == "Column" || part.name == "Capital" || part.name == "Brazier Fire") part.gameObject.SetActive(false);
+            }
+        }
+
         /// <summary>
         /// Runtime board setup: static colliders for physics rubble (board top at y = 0, frame rails, hall floor — pieces
         /// and the King never use colliders) and the decal layer on the squares. Idempotent, so older baked scenes get it.

@@ -36,7 +36,13 @@ namespace KingLastPiece
         /// Dark ripple: translucent black rings that spread out across the board and fade (a piece being set down).
         /// <paramref name="rings"/> waves follow each other a moment apart.
         /// </summary>
-        public static void DarkWave(Vector3 center, float radius, float duration = 0.6f, int rings = 2)
+        public static void DarkWave(Vector3 center, float radius, float duration = 0.6f, int rings = 2) =>
+            Wave(center, radius, Onyx, duration, rings);
+
+        static readonly Color Onyx = new Color(0.02f, 0.02f, 0.03f);
+
+        /// <summary>The same ripple as <see cref="DarkWave"/> in another colour (white for the King set down on his square).</summary>
+        public static void Wave(Vector3 center, float radius, Color color, float duration = 0.6f, int rings = 2)
         {
             for (int i = 0; i < rings; i++)
             {
@@ -47,6 +53,7 @@ namespace KingLastPiece
                 w.duration = duration;
                 w.delay = i * 0.12f;
                 w.thickness = i == 0 ? 0.22f : 0.12f;
+                w.color = color;
             }
         }
     }
@@ -99,6 +106,7 @@ namespace KingLastPiece
     public class DarkWaveFx : MonoBehaviour
     {
         public float radius = 1.5f, duration = 0.6f, delay, thickness = 0.2f;
+        public Color color = new Color(0.02f, 0.02f, 0.03f);
         const int Segments = 72;
         float t;
         Mesh mesh;
@@ -124,7 +132,7 @@ namespace KingLastPiece
             mr = gameObject.AddComponent<MeshRenderer>();
             mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             // Own material instance so the alpha can fade without touching the shared cache.
-            mat = new Material(MaterialLib.Transparent(new Color(0.02f, 0.02f, 0.03f, 0.75f)));
+            mat = new Material(MaterialLib.Transparent(new Color(color.r, color.g, color.b, 0.75f)));
             mr.sharedMaterial = mat;
             mr.enabled = false;
         }
