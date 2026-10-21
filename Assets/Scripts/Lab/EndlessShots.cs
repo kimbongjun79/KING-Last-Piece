@@ -36,6 +36,10 @@ namespace KingLastPiece
             game.DebugStartGame();
             game.Player.GodMode = true;
             yield return Frames(60);
+            yield return ClockShots();
+            File.WriteAllText(Path.Combine(dir, "endless_stats.tsv"), stats.ToString());
+            Application.Quit();
+            yield break;
             yield return MusouRun();
             File.WriteAllText(Path.Combine(dir, "endless_stats.tsv"), stats.ToString());
             Application.Quit();
@@ -182,6 +186,34 @@ namespace KingLastPiece
         }
 
         /// <summary>The grey-box classroom: a wide view across the room, and the play camera's usual view.</summary>
+        /// <summary>The chess clock: the play view, then close from the front and from behind, with its digits' placement logged.</summary>
+        IEnumerator ClockShots()
+        {
+            yield return Frames(120);
+            yield return Shot("60_Play_View.png");
+            var clock = GameObject.Find("Chess Clock");
+            if (clock == null) { stats.Append("NoClock\n"); yield break; }
+            var t = clock.transform;
+            stats.Append($"Clock\tpos={t.position}\tfwd={t.forward}\tcam={game.Rig.Cam.transform.position}\n");
+            foreach (var r in clock.GetComponentsInChildren<Renderer>())
+                if (r.name == "Segment" || r.name.StartsWith("Display") || r.name.StartsWith("Face"))
+                {
+                    stats.Append($"{r.name}\t{t.InverseTransformPoint(r.bounds.center)}\tparent={r.transform.parent.name}\n");
+                    if (r.name == "Segment") break;
+                }
+            var hud = game.GetComponent<Hud>();
+            if (hud != null) hud.enabled = false;
+            game.Rig.UseOverride = true;
+            Vector3 c = t.position + Vector3.up * 1.5f;
+            game.Rig.OverridePosition = c - t.forward * 9f + Vector3.up * 3f;
+            game.Rig.OverrideLookAt = c;
+            yield return Frames(5);
+            yield return Shot("61_Clock_Front.png");
+            game.Rig.OverridePosition = c + t.forward * 9f + Vector3.up * 3f;
+            yield return Frames(5);
+            yield return Shot("62_Clock_Back.png");
+        }
+
         IEnumerator ClassroomShots()
         {
             var hud = game.GetComponent<Hud>();

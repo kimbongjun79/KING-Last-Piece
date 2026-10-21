@@ -552,12 +552,14 @@ namespace KingLastPiece
             Flasks = Mathf.Min(MaxFlasks, Flasks + Mathf.Max(0, MaxFlasks - flasksBefore));
             DodgeCharges = Mathf.Min(MaxDodges, DodgeCharges + Mathf.Max(0, MaxDodges - dodgesBefore));
             Stamina = MaxStamina > staminaBefore ? MaxStamina : Mathf.Min(Stamina, MaxStamina);
+            // Potions handed over by the item (회복약 획득), up to what the belt holds.
+            foreach (var fx in item.effects)
+                if (fx.kind == UpgradeKind.Flask && fx.steps > 0) Flasks = Mathf.Min(MaxFlasks, Flasks + fx.steps);
         }
-        /// <summary>무쌍 level-up: <paramref name="n"/> flasks back, and the once-a-round items (Stalemate, Gambit) ready again.</summary>
-        public void RefillFlasks(int n)
+        /// <summary>무쌍 level-up: the once-a-round items (Stalemate, Gambit) are ready again.</summary>
+        public void OnLevelUp()
         {
             stalemateUsed = gambitUsed = false;
-            Flasks = Mathf.Min(MaxFlasks, Flasks + n);
         }
 
         /// <summary>

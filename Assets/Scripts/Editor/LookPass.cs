@@ -87,7 +87,14 @@ namespace KingLastPiece.EditorTools
                 {
                     ClassroomBlockout.Dress(classroom);
                     var fit = classroom.GetComponentInChildren<ChessTableFit>(true);
-                    if (fit != null) { fit.Fit(); EditorUtility.SetDirty(fit); }
+                    if (fit != null)
+                    {
+                        // The clock (static: it cannot move in play) and the score sheet stand beside the 무쌍 board.
+                        BoardSlots.SetSize(MusouDirector.BoardSize);
+                        fit.Fit();
+                        BoardSlots.SetSize(8);
+                        EditorUtility.SetDirty(fit);
+                    }
                 }
                 SaveMeshes();
                 WorldBake.SaveMaterials(board.gameObject, Dir);

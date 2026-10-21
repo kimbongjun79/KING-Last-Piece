@@ -65,7 +65,10 @@ namespace KingLastPiece
             // the endless board grows, and back when it shrinks.
             // clockMargin keeps it a little further out than where it was first placed.
             float clockAt = board + clockMargin;
-            if (clock != null && !Mathf.Approximately(clockAt, clockBoardHalf))
+            // A static clock is batched into the scene's geometry: moving it in play would only move its digits (built at
+            // run time), leaving them behind the body. It is placed in the scene for the 무쌍 board instead.
+            bool frozen = Application.isPlaying && clock != null && clock.gameObject.isStatic;
+            if (clock != null && !frozen && !Mathf.Approximately(clockAt, clockBoardHalf))
             {
                 var p = clock.localPosition;
                 var away = new Vector3(p.x, 0f, p.z);

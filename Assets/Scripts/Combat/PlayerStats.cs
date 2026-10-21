@@ -42,7 +42,7 @@ namespace KingLastPiece
 
         public static PlayerStats Classic() => new PlayerStats();
 
-        /// <summary>The 무쌍 mode's starting King: full health, stamina and attack power, but slower and shorter-reaching, one flask, two rolls.</summary>
+        /// <summary>The 무쌍 mode's starting King: full health, stamina and attack power, but slower and shorter-reaching; three flasks, two rolls.</summary>
         public static PlayerStats EndlessStart() => new PlayerStats
         {
             maxHealth = 100f,
@@ -52,7 +52,7 @@ namespace KingLastPiece
             attackRange = 0.7f,
             scalesMotion = true,
             defense = 0f,
-            maxFlasks = 1,
+            maxFlasks = 3,
             healAmount = 20f,
             maxDodges = 2,
             dodgeRecharge = 0.45f,
@@ -165,7 +165,7 @@ namespace KingLastPiece
             { UpgradeKind.MaxHealth,     new UpgradeDef { title = "최대 체력",     step = 8f,    cap = Inf,   floor = 30f,  desc = "최대 체력. 1단계 +8. 늘어난 만큼 바로 회복됩니다." } },
             { UpgradeKind.Defense,       new UpgradeDef { title = "방어력",        step = 6f,    cap = Inf,   floor = -60f, desc = "받는 피해 = 피해 × 100 / (100 + 방어력). 1단계 +6. 단점으로 음수가 되면 받는 피해가 늘어납니다 (−30이면 약 1.4배)." } },
             { UpgradeKind.HealAmount,    new UpgradeDef { title = "회복약 회복량", step = 4f,    cap = Inf,   floor = 5f,   desc = "회복약 하나가 회복하는 체력. 1단계 +4." } },
-            { UpgradeKind.Flask,         new UpgradeDef { title = "회복약 개수",   step = 1f,    cap = Inf,      floor = 1f,   whole = true, desc = "가질 수 있는 회복약 수. 무쌍 모드에서는 레벨이 오를 때마다 1개 채워집니다." } },
+            { UpgradeKind.Flask,         new UpgradeDef { title = "회복약 획득",   step = 1f,    cap = Inf,      floor = 1f,   whole = true, desc = "회복약을 바로 얻습니다. 1단계 1개. 가질 수 있는 수(기본 3개)를 넘으면 그 이상은 버려집니다." } },
             { UpgradeKind.LifeSteal,     new UpgradeDef { title = "흡혈",          step = 1f,    cap = Inf,     floor = 0f,   desc = "기물을 잡을 때마다 흡혈 수치만큼 체력 회복 (흡혈 5면 처치마다 5). 1단계 +1." } },
             { UpgradeKind.MoveSpeed,     new UpgradeDef { title = "이동 속도",     step = 0.06f, cap = Inf,    floor = 0.7f, percent = true, desc = "걷기·달리기 속도. 1단계 +6%." } },
             { UpgradeKind.DodgeRecharge, new UpgradeDef { title = "회피 충전 속도", step = 0.15f, cap = Inf,   floor = 0.3f, percent = true, desc = "회피 횟수가 다시 차는 속도. 1단계 +15%." } },
@@ -240,7 +240,7 @@ namespace KingLastPiece
             I("spiked_gauntlet","가시 건틀릿",    R, E(CrD, 2), E(CrC, 1)),
             I("royal_rations",  "왕실 식량",      R, E(Hp, 2), E(Heal, 1)),
             // Epic (≈ 4–5 steps)
-            I("apothecary_bag", "약제사의 가방",  H, E(Fl, 1), E(Heal, 1)),
+            I("apothecary_bag", "약제사의 가방",  H, E(Fl, 2), E(Heal, 1)),
             I("guard_insignia", "근위대 휘장",    H, E(Pow, 2), E(Def_, 2), E(Hp, 1)),
             I("spare_boots",    "여분의 신발",    H, E(Dg, 1), E(DRc, 2)),
             I("glass_cannon",   "유리 대포",      H, E(Pow, 5), E(CrD, 3), E(Hp, -2)),
@@ -273,7 +273,7 @@ namespace KingLastPiece
             S("sword_wave",     "검기",           L, Special.SwordWave, "공격할 때마다 흰 검기가 날아가 닿는 모든 적을 관통합니다 (그 공격 피해의 50%). 1·2타는 앞으로, 3타는 비숍처럼 대각선 4방향, 4타는 룩처럼 가로·세로 4방향, 강공격은 8방향으로 나갑니다. 검기의 크기와 사거리는 공격 범위에 비례합니다."),
             S("chain_lightning","연쇄 번개",      H, Special.ChainLightning, "치명타가 터지면 맞은 적에서 번개가 튀어 가까운 적 2마리에게 차례로 옮겨 갑니다 (각각 그 타격 기본 피해의 60%)."),
             S("tempest",        "폭풍의 왕관",    H, Special.Tempest, "3타 회오리가 연속기의 마지막 타가 됩니다. 범위가 80%, 피해가 60% 커지고 거대한 폭풍이 판을 휩쓸지만, 4타는 사라지고 3타의 기력 소모가 두 배가 됩니다."),
-            I("fountain_of_life","생명의 샘",     L, E(Fl, 1), E(Heal, 2), E(Hp, 2)),
+            I("fountain_of_life","생명의 샘",     L, E(Fl, 3), E(Heal, 2), E(Hp, 2)),
         };
 
         /// <summary>
@@ -392,7 +392,8 @@ namespace KingLastPiece
 
         public static void Apply(PlayerStats s, Item item)
         {
-            foreach (var fx in item.effects) Set(s, fx.kind, After(s, fx));
+            // Flask effects are potions handed over (PlayerController.ApplyItem), not a bigger flask belt.
+            foreach (var fx in item.effects) if (fx.kind != UpgradeKind.Flask) Set(s, fx.kind, After(s, fx));
         }
 
         /// <summary>"▲▲" / "▼" for the effect's steps.</summary>
@@ -408,6 +409,7 @@ namespace KingLastPiece
         }
 
         /// <summary>"85% → 95%" preview of one effect of an item.</summary>
-        public static string Preview(PlayerStats s, ItemEffect fx) => $"{Format(fx.kind, Current(s, fx.kind))} → {Format(fx.kind, After(s, fx))}";
+        public static string Preview(PlayerStats s, ItemEffect fx) => fx.kind == UpgradeKind.Flask ? $"+{fx.steps}개"
+            : $"{Format(fx.kind, Current(s, fx.kind))} → {Format(fx.kind, After(s, fx))}";
     }
 }

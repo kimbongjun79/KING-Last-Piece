@@ -258,8 +258,8 @@ namespace KingLastPiece
             else if (Director.PendingLevels > 0)
             {
                 Director.PendingLevels--;
-                // Each level also refills one flask.
-                Player.RefillFlasks(1);
+                // (Flasks come only from items now; the once-a-round items are ready again.)
+                Player.OnLevelUp();
                 EnterUpgrade(boss: false);
             }
         }
