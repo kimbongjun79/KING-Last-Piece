@@ -155,6 +155,8 @@ namespace KingLastPiece
             var cam = WorldBuilder.SetupCamera();
             Rig = cam.GetComponent<CameraRig>();
             Rig.Init(cam, Player);
+            // Normal mode: the dark hall's light (moon, stage light over the board, glowing gem towers, the King's light).
+            if (CurrentMode == Mode.Game) HallAmbience.Ensure(board.transform);
 
             if (GetComponent<Hud>() == null) gameObject.AddComponent<Hud>();
             EnterState(UsesRounds ? GameState.Title : GameState.Playing);

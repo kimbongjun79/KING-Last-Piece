@@ -23,7 +23,8 @@ namespace KingLastPiece.EditorTools
         // 3: marble is not metal — the piece materials lose their metallic sheen (the King looked black).
         // 4: the chess clock moves a little further out from the board.
         // 5: placed against the 8×8 board (a play session can leave the static board size at 12), props rebuilt there.
-        const int Version = 5;
+        // 6: the dark hall's light in NormalMode (HallAmbience + its post-processing profile).
+        const int Version = 6;
         static readonly string[] NewModels =
         {
             "Black_Gothic_Gem_Tower_v01_with VARCO", "Metal_Filing_Cabinet_v01_with VARCO",
@@ -81,7 +82,11 @@ namespace KingLastPiece.EditorTools
                 foreach (var t in board.GetComponentsInChildren<Transform>(true))
                     if (System.Array.IndexOf(Rebuilt, t.name) >= 0) stale.Add(t.gameObject);
                 foreach (var go in stale) if (go != null) Object.DestroyImmediate(go);
-                if (path.EndsWith("NormalMode.unity")) WorldBuilder.GemTowers(board.transform);
+                if (path.EndsWith("NormalMode.unity"))
+                {
+                    WorldBuilder.GemTowers(board.transform);
+                    HallLook(board);
+                }
                 var classroom = board.transform.Find(ClassroomBlockout.RootName);
                 if (classroom != null)
                 {
@@ -188,6 +193,34 @@ namespace KingLastPiece.EditorTools
                 r.sharedMaterial = pick;
                 sq.localRotation = Quaternion.Euler(0f, 90f * rng.Next(4), 0f);
             }
+        }
+
+        const string HallProfilePath = "Assets/Settings/HallLook.asset";
+
+        /// <summary>The dark hall's light on the arena, with its post-processing saved as a profile asset.</summary>
+        static void HallLook(ArenaBoard board)
+        {
+            var profile = AssetDatabase.LoadAssetAtPath<UnityEngine.Rendering.VolumeProfile>(HallProfilePath);
+            if (profile == null)
+            {
+                profile = ScriptableObject.CreateInstance<UnityEngine.Rendering.VolumeProfile>();
+                AssetDatabase.CreateAsset(profile, HallProfilePath);
+            }
+            profile.components.RemoveAll(c => c == null);
+            HallAmbience.Fill(profile);
+            // The overrides live inside the profile asset (otherwise they are lost on save).
+            foreach (var c in profile.components)
+                if (!AssetDatabase.Contains(c))
+                {
+                    c.name = c.GetType().Name;
+                    AssetDatabase.AddObjectToAsset(c, profile);
+                }
+            EditorUtility.SetDirty(profile);
+            var hall = board.GetComponent<HallAmbience>();
+            if (hall == null) hall = board.gameObject.AddComponent<HallAmbience>();
+            hall.profile = profile;
+            hall.Apply();
+            EditorUtility.SetDirty(hall);
         }
 
         /// <summary>The wallpapered wall meshes become assets (the scene can't keep meshes made in memory).</summary>
