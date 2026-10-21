@@ -42,13 +42,13 @@ namespace KingLastPiece
 
         public static PlayerStats Classic() => new PlayerStats();
 
-        /// <summary>The 무쌍 mode's starting King: full health and stamina, attack power 120% and +20% damage, but slower and shorter-reaching; three flasks, two rolls.</summary>
+        /// <summary>The 무쌍 mode's starting King: full health and stamina, attack power 110% and +10% damage, but slower and shorter-reaching; three flasks, two rolls.</summary>
         public static PlayerStats EndlessStart() => new PlayerStats
         {
             maxHealth = 100f,
             maxStamina = 100f,
-            attackPower = 1.2f,
-            damage = 0.2f,
+            attackPower = 1.1f,
+            damage = 0.1f,
             attackSpeed = 0.9f,
             attackRange = 0.7f,
             scalesMotion = true,
