@@ -262,11 +262,11 @@ namespace KingLastPiece
             I("phoenix_feather","불사조의 깃털",  L, E(Dg, 1), E(Ls, 3), E(StR, 2)),
 
             // Special items: a new way to fight, not more of a stat. Offered like the others, never twice.
-            S("stalemate",      "스테일메이트",   L, Special.Stalemate, "라운드마다 1번, 치명상을 받아도 체력 1로 버팁니다. 발동하면 2초간 무적이 되고 주변 2칸의 적이 모두 기절합니다."),
+            S("stalemate",      "스테일메이트",   L, Special.Stalemate, "60초마다 1번, 치명상을 받아도 체력 1로 버팁니다. 발동하면 2초간 무적이 되고 주변 2칸의 적이 모두 기절합니다."),
             S("kings_dance",    "왕의 연무",      L, Special.KingsDance, "강공격 버튼이 사라지고, 일반공격 4타 뒤에 5타로 강공격(띄우기 포함)이 이어집니다. 이 5타 강공격의 기력 소모는 50% 줄어듭니다."),
             S("martyr_crown",   "순교자의 왕관",  H, Special.MartyrCrown, "체력이 낮을수록 주는 피해가 커집니다 (체력이 바닥에 가까울수록 최대 +50%). 체력 30% 이하에서는 받는 피해가 20% 줄어듭니다."),
             S("execution",      "처형",           H, Special.Execution, "기절한 적을 강공격으로 치면 피해가 100% 추가됩니다."),
-            S("gambit",         "갬빗",           R, Special.Gambit, "라운드마다 처음 받는 피해 1번을 무시합니다. 폰 하나를 내주고 왕을 지킵니다."),
+            S("gambit",         "갬빗",           R, Special.Gambit, "60초마다 받는 피해 1번을 무시합니다. 폰 하나를 내주고 왕을 지킵니다."),
             S("momentum",       "기세",           R, Special.Momentum, "맞지 않고 적을 잡을 때마다 공격 속도와 이동 속도가 5%씩 오릅니다 (최대 5번, +25%). 피해를 받으면 처음부터 다시 쌓입니다."),
             S("boomerang_crown","부메랑 왕관",    L, Special.BoomerangCrown, "왕관이 가장 가까운 적을 향해 저절로 날아갑니다. 앞으로 날아갔다가 돌아오며 오갈 때마다 닿는 모든 적에게 피해를 주고, 돌아온 뒤 4초가 지나면 다시 던집니다."),
             S("thorn_armor",    "고슴도치 갑옷",  H, Special.Thorns, "피해를 받을 때마다 주변 2칸의 적에게 가시 피해를 돌려줍니다. 피해량은 (10 + 방어력) × 데미지 배율 — 방어력과 데미지가 높을수록 아픕니다."),

@@ -165,7 +165,7 @@ namespace KingLastPiece
             crumbled = false;
             InitActor(Stats.maxHealth);
             Stamina = MaxStamina;
-            stalemateUsed = gambitUsed = false;
+            stalemateReadyAt = gambitReadyAt = 0f;
             stalemateTimer = 0f;
             if (crownInFlight != null) { Destroy(crownInFlight.gameObject); crownInFlight = null; }
             Flasks = MaxFlasks;
@@ -225,7 +225,7 @@ namespace KingLastPiece
         /// </summary>
         void TriggerStalemate()
         {
-            stalemateUsed = true;
+            stalemateReadyAt = Time.time + OnceItemRecharge;
             stalemateTimer = StalemateGuard;
             Health = 1f;
             Flash(new Color(1.6f, 1.5f, 1.2f), 0.5f);
@@ -533,7 +533,11 @@ namespace KingLastPiece
 
         // Stalemate (special item): once a round a lethal blow leaves the King at 1 health, invincible for a moment.
         const float StalemateGuard = 2f, StalemateRadius = 4f;
-        bool stalemateUsed, gambitUsed;   // Gambit (special item): the first blow of each round is ignored
+        // Stalemate and Gambit (special items) work once, then are ready again a minute later.
+        const float OnceItemRecharge = 60f;
+        float stalemateReadyAt, gambitReadyAt;   // Gambit: a blow is ignored (once a minute)
+        bool stalemateUsed => Time.time < stalemateReadyAt;
+        bool gambitUsed => Time.time < gambitReadyAt;
         float stalemateTimer;
 
         /// <summary>
@@ -556,10 +560,9 @@ namespace KingLastPiece
             foreach (var fx in item.effects)
                 if (fx.kind == UpgradeKind.Flask && fx.steps > 0) Flasks = Mathf.Min(MaxFlasks, Flasks + fx.steps);
         }
-        /// <summary>무쌍 level-up: a fifth of the maximum health back, stamina full, and the once-a-round items (Stalemate, Gambit) ready again.</summary>
+        /// <summary>무쌍 level-up: a fifth of the maximum health back and stamina full.</summary>
         public void OnLevelUp()
         {
-            stalemateUsed = gambitUsed = false;
             Restore(MaxHealth * 0.2f);
             Stamina = MaxStamina;
         }
@@ -570,7 +573,7 @@ namespace KingLastPiece
         /// </summary>
         public void Rest()
         {
-            stalemateUsed = gambitUsed = false;   // Stalemate and Gambit are ready again for the next round
+            stalemateReadyAt = gambitReadyAt = 0f;   // Stalemate and Gambit are ready again for the next round
             if (Flasks >= MaxFlasks && Health < MaxHealth)
             {
                 Restore(HealAmount);
@@ -609,7 +612,7 @@ namespace KingLastPiece
             Stamina = MaxStamina;
             Flasks = MaxFlasks;
             DodgeCharges = MaxDodges;
-            stalemateUsed = gambitUsed = false;
+            stalemateReadyAt = gambitReadyAt = 0f;
             stalemateTimer = 0f;
         }
 
@@ -1612,8 +1615,8 @@ namespace KingLastPiece
             if (Has(Special.MartyrCrown) && Health <= MaxHealth * 0.3f) taken *= 0.8f;
             if (Has(Special.Gambit) && !gambitUsed)
             {
-                // Gambit: the round's first blow is given up to a pawn — no damage.
-                gambitUsed = true;
+                // Gambit: a blow given up to a pawn — no damage (once a minute).
+                gambitReadyAt = Time.time + OnceItemRecharge;
                 Flash(new Color(1.4f, 1.4f, 1.3f), 0.25f);
                 Sfx.Play("HIT_Armor", transform.position + Vector3.up);
                 Effects.Shockwave(FlatPos, 1.6f, Vfx.Accent, 0.35f);

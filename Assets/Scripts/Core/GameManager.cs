@@ -258,7 +258,7 @@ namespace KingLastPiece
             else if (Director.PendingLevels > 0)
             {
                 Director.PendingLevels--;
-                // (Flasks come only from items now; the once-a-round items are ready again.)
+                // A fifth of the health back and full stamina (flasks come only from items).
                 Player.OnLevelUp();
                 EnterUpgrade(boss: false);
             }
