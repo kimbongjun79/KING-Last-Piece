@@ -184,8 +184,8 @@ namespace KingLastPiece
         }
 
         /// <summary>Stamina a light combo hit / the heavy attack costs (for the stats screen).</summary>
-        public float LightAttackCost => (Style ?? AttackStyles.Default).lights[0].cost * LightCostScale * Mathf.Max(0f, 1f - Stats.lightCostCut);
-        public float HeavyAttackCost => (Style ?? AttackStyles.Default).heavy.cost * Mathf.Max(0f, 1f - Stats.heavyCostCut);
+        public float LightAttackCost => (Style ?? AttackStyles.Default).lights[0].cost * LightCostScale * Mathf.Max(0f, 1f - Stats.attackCostCut);
+        public float HeavyAttackCost => (Style ?? AttackStyles.Default).heavy.cost * Mathf.Max(0f, 1f - Stats.attackCostCut);
         bool HeavyAffordable => InfiniteStamina || Stamina >= HeavyAttackCost;
 
         /// <summary>Rolls a critical hit: true with <see cref="PlayerStats.critChance"/>; <paramref name="mult"/> is the damage factor.</summary>
@@ -225,7 +225,7 @@ namespace KingLastPiece
         /// </summary>
         void TriggerStalemate()
         {
-            stalemateReadyAt = Time.time + OnceItemRecharge;
+            stalemateReadyAt = Time.time + StalemateRecharge;
             stalemateTimer = StalemateGuard;
             Health = 1f;
             Flash(new Color(1.6f, 1.5f, 1.2f), 0.5f);
@@ -533,8 +533,8 @@ namespace KingLastPiece
 
         // Stalemate (special item): once a round a lethal blow leaves the King at 1 health, invincible for a moment.
         const float StalemateGuard = 2f, StalemateRadius = 4f;
-        // Stalemate and Gambit (special items) work once, then are ready again a minute later.
-        const float OnceItemRecharge = 60f;
+        // Stalemate and Gambit (special items) work once, then are ready again after three minutes / a minute.
+        const float StalemateRecharge = 180f, GambitRecharge = 60f;
         float stalemateReadyAt, gambitReadyAt;   // Gambit: a blow is ignored (once a minute)
         bool stalemateUsed => Time.time < stalemateReadyAt;
         bool gambitUsed => Time.time < gambitReadyAt;
@@ -915,8 +915,8 @@ namespace KingLastPiece
             atkRangeMul = atkWhirl ? WhirlRange : 1f;
             atkDamageMul = atkWhirl ? WhirlDamage : 1f;
             atkComboHit = heavy ? -1 : comboIndex;
-            Consume(heavy ? atk.cost * Mathf.Max(0f, 1f - Stats.heavyCostCut) * (danceFinisher ? 0.5f : 1f)
-                          : atk.cost * LightCostScale * Mathf.Max(0f, 1f - Stats.lightCostCut) * (atkWhirl ? WhirlCost : 1f));
+            Consume(heavy ? atk.cost * Mathf.Max(0f, 1f - Stats.attackCostCut) * (danceFinisher ? 0.5f : 1f)
+                          : atk.cost * LightCostScale * Mathf.Max(0f, 1f - Stats.attackCostCut) * (atkWhirl ? WhirlCost : 1f));
             atkUsesSlashFx = FxLibrary.Instance != null && System.Array.Exists(atk.hits, h => h.fx != SlashFxKind.None);
             hitStopUsed = false;
 
@@ -1616,7 +1616,7 @@ namespace KingLastPiece
             if (Has(Special.Gambit) && !gambitUsed)
             {
                 // Gambit: a blow given up to a pawn — no damage (once a minute).
-                gambitReadyAt = Time.time + OnceItemRecharge;
+                gambitReadyAt = Time.time + GambitRecharge;
                 Flash(new Color(1.4f, 1.4f, 1.3f), 0.25f);
                 Sfx.Play("HIT_Armor", transform.position + Vector3.up);
                 Effects.Shockwave(FlatPos, 1.6f, Vfx.Accent, 0.35f);

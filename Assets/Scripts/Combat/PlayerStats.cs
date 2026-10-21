@@ -27,8 +27,8 @@ namespace KingLastPiece
         public int maxDodges = 3;
         /// <summary>Roll charge refill speed multiplier.</summary>
         public float dodgeRecharge = 1f;
-        /// <summary>Stamina cost cut for light / heavy attacks (0.2 = 20% cheaper).</summary>
-        public float lightCostCut, heavyCostCut;
+        /// <summary>Stamina cost cut for every attack, light and heavy (0.2 = 20% cheaper).</summary>
+        public float attackCostCut;
         /// <summary>Chance a hit is critical, and the damage multiplier of a critical hit.</summary>
         public float critChance = 0.05f, critDamage = 1.5f;
         /// <summary>Walk / sprint speed multiplier, and stamina refill speed multiplier.</summary>
@@ -87,7 +87,7 @@ namespace KingLastPiece
     public enum UpgradeKind
     {
         Flask, HealAmount, AttackPower, Defense, MaxHealth, AttackRange, AttackSpeed, DodgeRecharge, MaxDodges, MaxStamina,
-        LightCost, HeavyCost, CritChance, CritDamage, MoveSpeed, StaminaRegen, LifeSteal, StaggerPower, Damage,
+        AttackCost, CritChance, CritDamage, MoveSpeed, StaminaRegen, LifeSteal, StaggerPower, Damage,
     }
 
     /// <summary>How strong an item is (its total worth in steps): the rarer the grade, the stronger the item.</summary>
@@ -173,8 +173,7 @@ namespace KingLastPiece
             { UpgradeKind.MaxDodges,     new UpgradeDef { title = "회피 횟수",     step = 1f,    cap = Inf,      floor = 1f,   whole = true, desc = "연달아 쓸 수 있는 회피(무적 구르기) 수." } },
             { UpgradeKind.MaxStamina,    new UpgradeDef { title = "최대 기력",     step = 15f,   cap = Inf,   floor = 30f,  desc = "최대 기력. 공격·강공격·달리기에 쓰입니다. 1단계 +15." } },
             { UpgradeKind.StaminaRegen,  new UpgradeDef { title = "기력 회복 속도", step = 0.2f, cap = Inf,      floor = 0.5f, percent = true, desc = "기력이 다시 차는 속도. 1단계 +20%." } },
-            { UpgradeKind.LightCost,     new UpgradeDef { title = "일반공격 기력 절약", step = 0.08f, cap = Inf,   floor = 0f, percent = true, desc = "일반공격의 기력 소모 감소. 1단계 8%." } },
-            { UpgradeKind.HeavyCost,     new UpgradeDef { title = "강공격 기력 절약", step = 0.08f, cap = Inf,   floor = 0f, percent = true, desc = "강공격의 기력 소모 감소. 1단계 8%. 강공격은 필요한 기력이 다 있어야 나갑니다." } },
+            { UpgradeKind.AttackCost,    new UpgradeDef { title = "공격 기력 절약", step = 0.08f, cap = Inf,   floor = 0f, percent = true, desc = "일반공격·강공격의 기력 소모 감소. 1단계 8%. 강공격은 필요한 기력이 다 있어야 나갑니다." } },
         };
 
         public static UpgradeDef Def(UpgradeKind k) => defs[k];
@@ -192,7 +191,7 @@ namespace KingLastPiece
             CrC = UpgradeKind.CritChance, CrD = UpgradeKind.CritDamage, Hp = UpgradeKind.MaxHealth,
             Def_ = UpgradeKind.Defense, Heal = UpgradeKind.HealAmount, Fl = UpgradeKind.Flask, Ls = UpgradeKind.LifeSteal,
             Mv = UpgradeKind.MoveSpeed, DRc = UpgradeKind.DodgeRecharge, Dg = UpgradeKind.MaxDodges, St = UpgradeKind.MaxStamina,
-            StR = UpgradeKind.StaminaRegen, LC = UpgradeKind.LightCost, HC = UpgradeKind.HeavyCost;
+            StR = UpgradeKind.StaminaRegen, AC = UpgradeKind.AttackCost;
 
         /// <summary>Every item (stat items only for now; items that change how the King fights come later).</summary>
         public static readonly Item[] All =
@@ -205,8 +204,8 @@ namespace KingLastPiece
             I("training",       "체력 단련",      C, E(Hp, 2)),
             I("breathing",      "호흡법 교본",    C, E(StR, 1), E(St, 1)),
             I("big_flask",      "큰 약병",        C, E(Heal, 2)),
-            I("sword_manual",   "검술 교본",      C, E(LC, 2), E(St, 1)),
-            I("heavy_manual",   "강타 교본",      C, E(HC, 2), E(Pow, 1)),
+            I("sword_manual",   "검술 교본",      C, E(AC, 2), E(St, 1)),
+            I("heavy_manual",   "강타 교본",      C, E(AC, 2), E(Pow, 1)),
             I("sharp_edge",     "날 선 칼날",     C, E(Dmg, 2)),
             I("vampire_fang",   "흡혈귀의 송곳니", C, E(Ls, 2)),
             I("loot_pouch",     "전리품 주머니",  C, E(Ls, 1), E(Heal, 1)),
@@ -231,7 +230,7 @@ namespace KingLastPiece
             I("blood_cup",      "피의 잔",        R, E(Ls, 3)),
             I("battering_ram",  "파성추",         R, E(Dmg, 4), E(Mv, -1)),
             I("incense",        "명상의 향로",    R, E(StR, 2), E(St, 1)),
-            I("rapier",         "가벼운 세검",    R, E(LC, 2), E(Spd, 1)),
+            I("rapier",         "가벼운 세검",    R, E(AC, 2), E(Spd, 1)),
             I("assassin_poison","암살자의 독",    R, E(CrD, 3)),
             I("wind_gloves",    "바람의 장갑",    R, E(Spd, 3)),
             I("marksman_scope", "명사수의 망원경", R, E(CrC, 3)),
@@ -248,10 +247,10 @@ namespace KingLastPiece
             I("berserker_blood","광전사의 피",    H, E(Ls, 3), E(Pow, 3), E(Def_, -2)),
             I("running_king",   "질주하는 왕",    H, E(Mv, 4), E(StR, 3), E(St, 1), E(Def_, -2)),
             I("black_oath",     "검은 서약",      H, E(Dmg, 3), E(CrC, 1), E(CrD, 2)),
-            I("kings_warhammer","왕의 전쟁망치",  H, E(Pow, 3), E(HC, 2)),
-            I("war_drum",       "전쟁의 북",      H, E(LC, 2), E(HC, 2), E(StR, 1)),
+            I("kings_warhammer","왕의 전쟁망치",  H, E(Pow, 3), E(AC, 2)),
+            I("war_drum",       "전쟁의 북",      H, E(AC, 4), E(StR, 1)),
             I("shadow_cloak",   "그림자 망토",    H, E(Dg, 1), E(Mv, 2), E(DRc, 1)),
-            I("sword_dance",    "검무의 두루마리", H, E(Spd, 3), E(LC, 1), E(StR, 1)),
+            I("sword_dance",    "검무의 두루마리", H, E(Spd, 3), E(AC, 1), E(StR, 1)),
             I("giant_arm",      "거인의 팔",      H, E(Rng, 3), E(Pow, 2)),
             I("royal_plate",    "왕의 갑주",      H, E(Hp, 3), E(Def_, 2)),
             I("duelist_cape",   "결투가의 망토",  H, E(CrC, 2), E(Mv, 2), E(DRc, 1)),
@@ -262,7 +261,7 @@ namespace KingLastPiece
             I("phoenix_feather","불사조의 깃털",  L, E(Dg, 1), E(Ls, 3), E(StR, 2)),
 
             // Special items: a new way to fight, not more of a stat. Offered like the others, never twice.
-            S("stalemate",      "스테일메이트",   L, Special.Stalemate, "60초마다 1번, 치명상을 받아도 체력 1로 버팁니다. 발동하면 2초간 무적이 되고 주변 2칸의 적이 모두 기절합니다."),
+            S("stalemate",      "스테일메이트",   L, Special.Stalemate, "180초마다 1번, 치명상을 받아도 체력 1로 버팁니다. 발동하면 2초간 무적이 되고 주변 2칸의 적이 모두 기절합니다."),
             S("kings_dance",    "왕의 연무",      L, Special.KingsDance, "강공격 버튼이 사라지고, 일반공격 4타 뒤에 5타로 강공격(띄우기 포함)이 이어집니다. 이 5타 강공격의 기력 소모는 50% 줄어듭니다."),
             S("martyr_crown",   "순교자의 왕관",  H, Special.MartyrCrown, "체력이 낮을수록 주는 피해가 커집니다 (체력이 바닥에 가까울수록 최대 +50%). 체력 30% 이하에서는 받는 피해가 20% 줄어듭니다."),
             S("execution",      "처형",           H, Special.Execution, "기절한 적을 강공격으로 치면 피해가 100% 추가됩니다."),
@@ -303,8 +302,7 @@ namespace KingLastPiece
             UpgradeKind.AttackSpeed => s.attackSpeed,
             UpgradeKind.DodgeRecharge => s.dodgeRecharge,
             UpgradeKind.MaxDodges => s.maxDodges,
-            UpgradeKind.LightCost => s.lightCostCut,
-            UpgradeKind.HeavyCost => s.heavyCostCut,
+            UpgradeKind.AttackCost => s.attackCostCut,
             UpgradeKind.CritChance => s.critChance,
             UpgradeKind.CritDamage => s.critDamage,
             UpgradeKind.MoveSpeed => s.moveSpeed,
@@ -329,8 +327,7 @@ namespace KingLastPiece
                 case UpgradeKind.DodgeRecharge: s.dodgeRecharge = v; break;
                 case UpgradeKind.MaxDodges: s.maxDodges = Mathf.RoundToInt(v); break;
                 case UpgradeKind.MaxStamina: s.maxStamina = v; break;
-                case UpgradeKind.LightCost: s.lightCostCut = v; break;
-                case UpgradeKind.HeavyCost: s.heavyCostCut = v; break;
+                case UpgradeKind.AttackCost: s.attackCostCut = v; break;
                 case UpgradeKind.CritChance: s.critChance = v; break;
                 case UpgradeKind.CritDamage: s.critDamage = v; break;
                 case UpgradeKind.MoveSpeed: s.moveSpeed = v; break;

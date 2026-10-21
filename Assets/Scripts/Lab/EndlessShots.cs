@@ -461,7 +461,7 @@ namespace KingLastPiece
                 p.Stats.attackPower = c.power;
                 p.Stats.attackSpeed = c.speed;
                 p.Stats.attackRange = c.range;
-                p.Stats.lightCostCut = 0f;
+                p.Stats.attackCostCut = 0f;
                 var at = GameManager.SquareToWorld("e3");
                 p.ReturnToStart(at, 0f);
                 p.Rest();   // full stamina: the previous test may have drained it
