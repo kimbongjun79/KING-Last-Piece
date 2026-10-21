@@ -514,7 +514,8 @@ namespace KingLastPiece
                     if (m == null || (m != paper && !m.name.StartsWith(PlainWallName))) continue;
                     r.sharedMaterial = paper;
                     var mf = r.GetComponent<MeshFilter>();
-                    if (mf != null) mf.sharedMesh = RepeatingBox(r.transform.localScale, M(WallpaperRepeat));
+                    if (mf != null && (mf.sharedMesh == null || !mf.sharedMesh.name.StartsWith("Wallpapered Box")))
+                        mf.sharedMesh = RepeatingBox(r.transform.localScale, M(WallpaperRepeat));
                 }
             if (classroom.Find("Props") != null) return;
             var props = Group(classroom, "Props");
@@ -526,9 +527,15 @@ namespace KingLastPiece
             props.SetAsLastSibling();
         }
 
+        static readonly Dictionary<Vector3, Mesh> wallMeshes = new Dictionary<Vector3, Mesh>();
+        /// <summary>The wallpapered box meshes made so far (one per wall size) — the editor saves them as assets.</summary>
+        public static IEnumerable<Mesh> WallpaperMeshes => wallMeshes.Values;
+
         /// <summary>A unit cube whose UVs count repeats of <paramref name="repeat"/> world units across each face of a box this size.</summary>
         static Mesh RepeatingBox(Vector3 size, float repeat)
         {
+            var key = new Vector3(Mathf.Round(size.x * 100f), Mathf.Round(size.y * 100f), Mathf.Round(size.z * 100f));
+            if (wallMeshes.TryGetValue(key, out var made) && made != null) return made;
             var src = Resources.GetBuiltinResource<Mesh>("Cube.fbx");
             var v = src.vertices;
             var n = src.normals;
@@ -542,6 +549,7 @@ namespace KingLastPiece
             var mesh = Object.Instantiate(src);
             mesh.name = "Wallpapered Box";
             mesh.uv = uv;
+            wallMeshes[key] = mesh;
             return mesh;
         }
 
@@ -563,7 +571,7 @@ namespace KingLastPiece
             sheet.position = new Vector3(side * (board + 1.2f + M(0.21f) * 0.5f + 0.8f), TableTop + 0.02f, -1.5f);
             sheet.rotation = Quaternion.Euler(0f, side * -7f, 0f);
             var quad = GameObject.CreatePrimitive(PrimitiveType.Quad).transform;
-            Object.Destroy(quad.GetComponent<Collider>());
+            Object.DestroyImmediate(quad.GetComponent<Collider>());
             quad.name = "Sheet";
             quad.SetParent(sheet, false);
             quad.localRotation = Quaternion.Euler(90f, 0f, 0f);

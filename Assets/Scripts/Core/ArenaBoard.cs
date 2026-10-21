@@ -42,8 +42,16 @@ namespace KingLastPiece
             int o = (size - 8) / 2;
             float tile = GameManager.TileSize;
             Transform holder = squares[0].parent;
-            Material dark = squares[0].GetComponent<Renderer>().sharedMaterial;   // a1 is a dark square
-            Material light = squares[1].GetComponent<Renderer>().sharedMaterial;
+            // The board's own tile variants (each square shows a different tile of the marble texture): new squares pick
+            // from them by colour (a1 is dark), turned a random quarter.
+            var darks = new List<Material>();
+            var lights = new List<Material>();
+            for (int i = 0; i < squares.Length; i++)
+            {
+                var m = squares[i].GetComponent<Renderer>().sharedMaterial;
+                var list = (i / 8 + i % 8) % 2 == 0 ? darks : lights;
+                if (m != null && !list.Contains(m)) list.Add(m);
+            }
 
             foreach (var kv in extra) kv.Value.gameObject.SetActive(false);
             for (int f = -o; f < 8 + o; f++)
@@ -54,7 +62,10 @@ namespace KingLastPiece
                 if (!extra.TryGetValue(key, out var sq))
                 {
                     var pos = new Vector3((f - 3.5f) * tile, -0.2f, (r - 3.5f) * tile);
-                    sq = PieceFactory.Part(PrimitiveType.Cube, holder, pos, new Vector3(tile, 0.4f, tile), ((f + r) % 2 + 2) % 2 == 0 ? dark : light);
+                    var pool = ((f + r) % 2 + 2) % 2 == 0 ? darks : lights;
+                    var mat = pool.Count > 0 ? pool[Random.Range(0, pool.Count)] : null;
+                    sq = PieceFactory.Part(PrimitiveType.Cube, holder, pos, new Vector3(tile, 0.4f, tile), mat);
+                    sq.localRotation = Quaternion.Euler(0f, 90f * Random.Range(0, 4), 0f);
                     sq.name = $"ring {f},{r}";
                     sq.GetComponent<Renderer>().renderingLayerMask |= WorldBuilder.BoardDecalLayer;
                     extra[key] = sq;
