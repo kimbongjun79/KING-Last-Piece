@@ -22,7 +22,8 @@ namespace KingLastPiece.EditorTools
         // 2: the new models' embedded textures are extracted first, and their objects rebuilt with them.
         // 3: marble is not metal — the piece materials lose their metallic sheen (the King looked black).
         // 4: the chess clock moves a little further out from the board.
-        const int Version = 4;
+        // 5: placed against the 8×8 board (a play session can leave the static board size at 12), props rebuilt there.
+        const int Version = 5;
         static readonly string[] NewModels =
         {
             "Black_Gothic_Gem_Tower_v01_with VARCO", "Metal_Filing_Cabinet_v01_with VARCO",
@@ -58,6 +59,7 @@ namespace KingLastPiece.EditorTools
         {
             if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return;
             string back = EditorSceneManager.GetActiveScene().path;
+            BoardSlots.SetSize(8);   // the scenes hold the 8×8 board
             AssetDatabase.Refresh();
             ClassroomBake.EnsureTextures(NewModels);
             // The previous pass's model materials (saved without textures) go; the objects are rebuilt below.

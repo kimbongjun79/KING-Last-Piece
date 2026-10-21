@@ -81,7 +81,7 @@ namespace KingLastPiece
             if (!g.Paused) DrawBanner(g);   // the pause tabs would show it through their panels
             DrawPopups(g);
             if (g.UsesRounds) DrawRound(g);
-            DrawControlsHint();
+            // (no controls line on the play screen: the pause menu has the controls)
             if (g.CurrentMode == GameManager.Mode.Practice) DrawPracticePanel();
 
             if (g.State == GameManager.GameState.Dead) DrawDeath(g);
@@ -109,8 +109,7 @@ namespace KingLastPiece
             float w = 380 * u, h = 20 * u;
             Gauge(new Rect(bx, y + 2 * u, w, h), p.Health / p.MaxHealth, hpTrail / p.MaxHealth,
                 new Color(0.62f, 0.07f, 0.06f), new Color(0.95f, 0.3f, 0.22f));
-            SmallText(new Rect(bx + 8 * u, y + 2 * u, w - 16 * u, h), $"{Mathf.CeilToInt(p.Health)} / {Mathf.RoundToInt(p.MaxHealth)}",
-                TextAnchor.MiddleRight, 15);
+            // (the bars speak for themselves: no numbers on the play screen)
 
             // Stamina (pulses amber when nearly empty).
             float sy = y + h + 10 * u, sw = 320 * u, sh = 13 * u;
@@ -125,15 +124,6 @@ namespace KingLastPiece
             float fy = sy + sh + 8 * u;
             for (int i = 0; i < p.MaxFlasks; i++)
                 DrawVial(new Rect(bx + i * 28 * u, fy, 19 * u, 30 * u), i < p.Flasks);
-            SmallText(new Rect(bx + p.MaxFlasks * 28 * u + 4 * u, fy + 6 * u, 120 * u, 22 * u),
-                $"회복약  x{p.Flasks}", TextAnchor.MiddleLeft, 15);
-
-            // Special items with a live state: Momentum stacks, the Boomerang Crown in hand or in flight.
-            string status = "";
-            if (p.Has(Special.Momentum)) status += $"기세 {p.Momentum}/5 (+{p.Momentum * 5}%)    ";
-            if (p.Has(Special.BoomerangCrown)) status += p.CrownOut ? "왕관: 비행 중" : $"왕관: {p.CrownCooldown:0.0}초";
-            if (status.Length > 0)
-                SmallText(new Rect(bx + p.MaxFlasks * 28 * u + 120 * u, fy + 6 * u, 260 * u, 22 * u), status, TextAnchor.MiddleLeft, 15);
         }
 
         /// <summary>
@@ -342,8 +332,7 @@ namespace KingLastPiece
         }
 
         /// <summary>
-        /// 무쌍: the experience bar across the top edge with the level, the clock (time survived) under it, and what
-        /// comes next — the next queen's countdown, then the time left to survive — with the army's strength step.
+        /// 무쌍: the experience bar across the top edge with the level, and the clock (time survived) under it.
         /// </summary>
         void DrawMusouTop(MusouDirector d)
         {
@@ -354,11 +343,6 @@ namespace KingLastPiece
                 new GUIStyle(label) { alignment = TextAnchor.MiddleRight, fontSize = Mathf.RoundToInt(20 * scale) }, new Color(0.75f, 0.9f, 1f));
             Text(new Rect(0, bh + 6 * scale, W, 46 * scale), BestRecord.FormatTime(d.Elapsed),
                 new GUIStyle(mid) { fontSize = Mathf.RoundToInt(40 * scale) }, new Color(1f, 0.95f, 0.85f));
-            string next = d.NextBossIn >= 0f ? $"{d.NextBossName}까지 {BestRecord.FormatTime(d.NextBossIn)}"
-                : $"생존까지 {BestRecord.FormatTime(d.Remaining)}";
-            string era = $"   ·   강화 {d.StrengthLevel}단계 (체력 ×{d.HealthBoost:0.00}  공격 ×{d.DamageBoost:0.00})  다음 {BestRecord.FormatTime(d.NextStrengthIn)}";
-            Text(new Rect(0, bh + 52 * scale, W, 26 * scale), next + era,
-                new GUIStyle(small) { fontSize = Mathf.RoundToInt(18 * scale) }, new Color(Gold.r, Gold.g, Gold.b, 0.9f));
         }
 
         void DrawPopups(GameManager g)
