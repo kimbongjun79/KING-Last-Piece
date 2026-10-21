@@ -89,6 +89,8 @@ namespace KingLastPiece
         /// <summary><paramref name="t"/> (a child of the table) now keeps beside the board's edge.</summary>
         public void Follow(Transform t)
         {
+            for (int i = followers.Count - 1; i >= 0; i--)
+                if (followers[i] == null) { followers.RemoveAt(i); if (i < followerHalf.Count) followerHalf.RemoveAt(i); }
             followers.Add(t);
             followerHalf.Add(GameManager.BoardHalf);
         }

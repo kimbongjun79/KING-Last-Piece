@@ -19,7 +19,15 @@ namespace KingLastPiece.EditorTools
     [InitializeOnLoad]
     public static class LookPass
     {
-        const int Version = 1;
+        // 2: the new models' embedded textures are extracted first, and their objects rebuilt with them.
+        const int Version = 2;
+        static readonly string[] NewModels =
+        {
+            "Black_Gothic_Gem_Tower_v01_with VARCO", "Metal_Filing_Cabinet_v01_with VARCO",
+            "Rectangular_Light_Panel_v01_with VARCO", "Silver_Ballpoint_Pen_v01_with VARCO",
+        };
+        /// <summary>Objects made from the new models (rebuilt on every pass so they pick up the textures).</summary>
+        static readonly string[] Rebuilt = { "Gem Tower", "Props", "Score Sheet", "Metal_Filing_Cabinet_v01", "LED Panels" };
         const string PrefKey = "KLP.LookPass.Version";
         const string Dir = "Assets/Materials/Baked/Look";
         const string TileDir = "Assets/Materials/Baked/Tiles";
@@ -49,6 +57,11 @@ namespace KingLastPiece.EditorTools
             if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return;
             string back = EditorSceneManager.GetActiveScene().path;
             AssetDatabase.Refresh();
+            ClassroomBake.EnsureTextures(NewModels);
+            // The previous pass's model materials (saved without textures) go; the objects are rebuilt below.
+            if (AssetDatabase.IsValidFolder(Dir))
+                foreach (var guid in AssetDatabase.FindAssets("t:Material", new[] { Dir }))
+                    AssetDatabase.DeleteAsset(AssetDatabase.GUIDToAssetPath(guid));
             Marble("Assets/Materials/Baked/KLP_material_0.mat", "Marble014");                    // the White King
             foreach (var guid in AssetDatabase.FindAssets("KLP_Black_Plastic t:Material", new[] { "Assets/Materials/Baked" }))
                 Marble(AssetDatabase.GUIDToAssetPath(guid), "Marble006");                         // the black pieces
@@ -60,6 +73,10 @@ namespace KingLastPiece.EditorTools
                 var board = Object.FindFirstObjectByType<ArenaBoard>();
                 if (board == null) continue;
                 VaryTiles(board, lights, darks);
+                var stale = new List<GameObject>();
+                foreach (var t in board.GetComponentsInChildren<Transform>(true))
+                    if (System.Array.IndexOf(Rebuilt, t.name) >= 0) stale.Add(t.gameObject);
+                foreach (var go in stale) if (go != null) Object.DestroyImmediate(go);
                 if (path.EndsWith("NormalMode.unity")) WorldBuilder.GemTowers(board.transform);
                 var classroom = board.transform.Find(ClassroomBlockout.RootName);
                 if (classroom != null) ClassroomBlockout.Dress(classroom);

@@ -76,10 +76,11 @@ namespace KingLastPiece.EditorTools
         /// The provided models carry their textures embedded in the FBX, which the importer doesn't pull out on its
         /// own: extract them into Models/Textures (normal maps flagged as such) and reimport, so the materials find them.
         /// </summary>
-        static void EnsureTextures()
+        internal static void EnsureTextures(params string[] models)
         {
+            if (models == null || models.Length == 0) models = FurnitureModels;
             bool extracted = false;
-            foreach (var name in FurnitureModels)
+            foreach (var name in models)
             {
                 string p = $"{ModelDir}/{name}.fbx";
                 var importer = AssetImporter.GetAtPath(p) as ModelImporter;
@@ -105,7 +106,7 @@ namespace KingLastPiece.EditorTools
                     ti.SaveAndReimport();
                 }
             }
-            foreach (var name in FurnitureModels)
+            foreach (var name in models)
                 AssetDatabase.ImportAsset($"{ModelDir}/{name}.fbx", ImportAssetOptions.ForceUpdate);
         }
 
