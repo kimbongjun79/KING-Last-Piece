@@ -9,8 +9,8 @@ namespace KingLastPiece
 {
     /// <summary>
     /// Practice arena (Scenes/Practice.unity): the final combat kit (Royal Ensemble) against training dummies,
-    /// plus real pieces on demand. Keys: 1-5 spawn Pawn/Knight/Bishop/Rook/Queen, X clear pieces, C reset,
-    /// G invincible, I infinite stamina, H hit-stop.
+    /// plus real pieces on demand. Keys: 1-5 spawn Pawn/Knight/Bishop/Rook/Queen, 6 the 체스메가트론 boss (7 next pattern,
+    /// 8 its second phase), X clear pieces, C reset, G invincible, I infinite stamina, H hit-stop.
     /// A player build run with "-autoshot &lt;dir&gt;" captures regression sheets + stats (styles, dodge, stagger…).
     /// </summary>
     public class PracticeArena : MonoBehaviour
@@ -135,6 +135,31 @@ namespace KingLastPiece
             game.SpawnEmpowered(type, SpawnTier, GameManager.SquareToWorld(file + rank));
         }
 
+        // ---------------------------------------------------------------- 체스메가트론 (boss test)
+
+        /// <summary>The boss on the board, if any (the training dummies stay away while it is).</summary>
+        public ChessMegatron Megatron { get; private set; }
+        int megatronPattern = -1;
+        /// <summary>The pattern 7 started last (shown in the key list).</summary>
+        public string MegatronPatternName => megatronPattern < 0 ? "-" : ChessMegatron.AllPatterns[megatronPattern].ToString();
+
+        /// <summary>6: clears the board (dummies too) and drops the colossus on e6, facing the King.</summary>
+        void SpawnMegatron()
+        {
+            game.ClearEnemies();
+            for (int i = 0; i < dummies.Length; i++) dummies[i] = null;
+            Megatron = game.SpawnCustom<ChessMegatron>(PieceType.Pawn, GameManager.SquareToWorld("e6"));
+            megatronPattern = -1;
+        }
+
+        /// <summary>7: makes the boss use its next pattern now (cycling through all of them).</summary>
+        void NextMegatronPattern()
+        {
+            if (Megatron == null) return;
+            megatronPattern = (megatronPattern + 1) % ChessMegatron.AllPatterns.Length;
+            Megatron.DebugPattern(ChessMegatron.AllPatterns[megatronPattern]);
+        }
+
         /// <summary>E: empowered tier of the pieces spawned with 1–5 (0 normal, 1–2 dark).</summary>
         public int SpawnTier { get; private set; }
 
@@ -160,6 +185,9 @@ namespace KingLastPiece
             {
                 for (int i = 0; i < SpawnKeys.Length; i++)
                     if (kb[DigitKeys[i]].wasPressedThisFrame) SpawnPiece(SpawnKeys[i]);
+                if (kb.digit6Key.wasPressedThisFrame) SpawnMegatron();
+                if (kb.digit7Key.wasPressedThisFrame) NextMegatronPattern();
+                if (kb.digit8Key.wasPressedThisFrame && Megatron != null) Megatron.DebugPhase2();
                 if (kb.xKey.wasPressedThisFrame) ClearPieces();
                 if (kb.cKey.wasPressedThisFrame) ResetLab();
                 if (kb.hKey.wasPressedThisFrame) game.HitStopEnabled = !game.HitStopEnabled;
@@ -175,8 +203,10 @@ namespace KingLastPiece
             // Kept topped up — except while testing items (low-health items like Martyr's Crown need the King hurt).
             if (game.Player.Items.Count == 0 && game.Player.Health < game.Player.MaxHealth * 0.3f) game.Player.RefillForLab();
 
+            if (Megatron != null && Megatron.IsDead) Megatron = null;
             for (int i = 0; i < dummies.Length; i++)
             {
+                if (Megatron != null) break;   // no dummies under the colossus's feet
                 if (dummies[i] != null && !dummies[i].IsDead) continue;
                 respawnTimers[i] += Time.deltaTime;
                 if (respawnTimers[i] > 2.5f) SpawnDummy(i);

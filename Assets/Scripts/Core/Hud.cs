@@ -471,6 +471,8 @@ namespace KingLastPiece
             string[] rows =
             {
                 "1-5   폰 / 나이트 / 비숍 / 룩 / 퀸 소환",
+                "6     체스메가트론 (보스)     8  2페이즈",
+                $"7     보스 다음 패턴: {arena.MegatronPatternName}",
                 "X     기물 제거          C   연습장 초기화",
                 $"G     무적: {(arena.Invincible ? "켜짐" : "꺼짐")}",
                 $"I     무한 기력: {(arena.InfiniteStamina ? "켜짐" : "꺼짐")}",
@@ -560,7 +562,7 @@ namespace KingLastPiece
             // Mode select: two framed cards; ←/→ (or the mouse) to choose, Enter / click to start.
             (string name, string line)[] modes =
             {
-                ("일반 모드", "10 라운드  ·  흑색 군대와 여왕을 무너뜨려라"),
+                ("일반 모드", "10 라운드  ·  흑색 군대와 체스메가트론을 무너뜨려라"),
                 ("무쌍 모드", "30분 생존  ·  끝없는 흑색 군대  ·  레벨업 강화"),
             };
             var e = Event.current;
@@ -593,16 +595,21 @@ namespace KingLastPiece
             Text(new Rect(0, by + bh + 54 * scale, W, 28 * scale), "조작법은 게임 중  Esc  일시정지 메뉴에서 볼 수 있습니다",
                 new GUIStyle(small) { fontSize = Mathf.RoundToInt(16 * scale) }, new Color(1f, 1f, 1f, 0.35f * fade));
 
-            // The endless mode's best run, just above the cards.
-            string best = BestRecord.Exists
-                ? $"무쌍 모드 최고 기록   {BestRecord.FormatTime(BestRecord.Time)} 생존  ·  레벨 {BestRecord.Level}  ·  포획 {BestRecord.Kills}  ·  {BestRecord.Date}"
-                : "무쌍 모드 최고 기록   아직 없음";
+            // The selected mode's best run, just above the cards.
+            bool musou = g.TitleChoice == 1;
+            string best = musou
+                ? BestRecord.Exists
+                    ? $"무쌍 모드 최고 기록   {BestRecord.FormatTime(BestRecord.Time)} 생존  ·  레벨 {BestRecord.Level}  ·  포획 {BestRecord.Kills}  ·  {BestRecord.Date}"
+                    : "무쌍 모드 최고 기록   아직 없음"
+                : NormalRecord.Exists
+                    ? $"일반 모드 최고 기록   사망 {NormalRecord.Deaths}회  ·  {BestRecord.FormatTime(NormalRecord.Time)}  ·  {NormalRecord.Date}"
+                    : "일반 모드 최고 기록   아직 없음";
             Diamond(new Vector2(W / 2f - 400 * scale, by - 26 * scale), 4 * scale, gold);
             Diamond(new Vector2(W / 2f + 400 * scale, by - 26 * scale), 4 * scale, gold);
             Text(new Rect(0, by - 42 * scale, W, 32 * scale), best, new GUIStyle(small) { fontSize = Mathf.RoundToInt(18 * scale) },
                 new Color(Gold.r, Gold.g, Gold.b, 0.9f * fade));
 
-            DrawOnlineRanking(new Rect(W - 400 * scale, H * 0.2f, 360 * scale, 0f), fade);
+            DrawOnlineRanking(OnlineBoard.For(musou), musou, new Rect(W - 400 * scale, H * 0.2f, 360 * scale, 0f), fade);
         }
 
         /// <summary>
@@ -641,9 +648,17 @@ namespace KingLastPiece
                 ("획득한 아이템", $"{r.upgrades}개"),
             }, 260 * scale);
 
-            // Nickname for the online ranking, then confirm → the run is sent and the title comes back.
+            DrawSubmit(g, H * 0.07f + 168 * scale + 9 * 40 * scale + 44 * scale, a);
+        }
+
+        /// <summary>
+        /// Nickname for the online ranking, then confirm → the run is sent to its mode's ranking and the title comes back
+        /// (the 무쌍 results, the normal mode's victory).
+        /// </summary>
+        void DrawSubmit(GameManager g, float fy, float a)
+        {
+            float W = Screen.width;
             var e = Event.current;
-            float fy = H * 0.07f + 168 * scale + 9 * 40 * scale + 44 * scale;
             bool ready = g.StateTime > 1.8f && !g.Submitting;
             nickname ??= OnlineBoard.SavedName;
             var nameLabel = new GUIStyle(label) { fontSize = Mathf.RoundToInt(20 * scale), alignment = TextAnchor.MiddleRight };
@@ -682,24 +697,26 @@ namespace KingLastPiece
                 new GUIStyle(small) { fontSize = Mathf.RoundToInt(15 * scale) }, new Color(1f, 1f, 1f, 0.45f * a));
         }
 
-        bool rankingRequested;
-
-        /// <summary>Title side panel: the endless mode's online top 10 and this player's own rank (UGS Leaderboards).</summary>
-        void DrawOnlineRanking(Rect area, float fade)
+        /// <summary>
+        /// Title side panel: the selected mode's online top 10 and this player's own rank (UGS Leaderboards) — 무쌍 by the
+        /// time survived and the level, the normal mode by deaths and clear time.
+        /// </summary>
+        void DrawOnlineRanking(OnlineBoard board, bool musou, Rect area, float fade)
         {
-            if (!rankingRequested) { rankingRequested = true; OnlineBoard.Refresh(); }
+            if (board.State == OnlineBoard.Status.Idle) board.Refresh();
+            string Score(OnlineBoard.Entry en) => musou ? $"{BestRecord.FormatTime(en.time)}  Lv {en.value}" : $"사망 {en.value}  {BestRecord.FormatTime(en.time)}";
             float line = 30 * scale;
-            int rows = Mathf.Max(1, OnlineBoard.Top.Count);
+            int rows = Mathf.Max(1, board.Top.Count);
             var r = new Rect(area.x, area.y, area.width, 58 * scale + rows * line + 54 * scale);
             Fill(r, new Color(0f, 0f, 0f, 0.55f * fade));
             Fill(new Rect(r.x, r.y, r.width, 2 * scale), new Color(Gold.r, Gold.g, Gold.b, 0.7f * fade));
-            Text(new Rect(r.x, r.y + 10 * scale, r.width, 36 * scale), "무쌍 모드  온라인 순위", new GUIStyle(label) { alignment = TextAnchor.MiddleCenter, fontSize = Mathf.RoundToInt(20 * scale) },
-                new Color(Gold.r, Gold.g, Gold.b, fade));
+            Text(new Rect(r.x, r.y + 10 * scale, r.width, 36 * scale), musou ? "무쌍 모드  온라인 순위" : "일반 모드  온라인 순위",
+                new GUIStyle(label) { alignment = TextAnchor.MiddleCenter, fontSize = Mathf.RoundToInt(20 * scale) }, new Color(Gold.r, Gold.g, Gold.b, fade));
             var row = new GUIStyle(small) { fontSize = Mathf.RoundToInt(17 * scale), alignment = TextAnchor.MiddleLeft };
             var right = new GUIStyle(row) { alignment = TextAnchor.MiddleRight };
             float y = r.y + 54 * scale;
             var dim = new Color(0.85f, 0.82f, 0.75f, fade);
-            switch (OnlineBoard.State)
+            switch (board.State)
             {
                 case OnlineBoard.Status.Idle:
                 case OnlineBoard.Status.Loading:
@@ -709,24 +726,24 @@ namespace KingLastPiece
                     Text(new Rect(r.x, y, r.width, line), "온라인 순위를 불러올 수 없습니다", new GUIStyle(row) { alignment = TextAnchor.MiddleCenter }, dim);
                     break;
                 default:
-                    if (OnlineBoard.Top.Count == 0)
+                    if (board.Top.Count == 0)
                         Text(new Rect(r.x, y, r.width, line), "아직 기록이 없습니다", new GUIStyle(row) { alignment = TextAnchor.MiddleCenter }, dim);
-                    foreach (var en in OnlineBoard.Top)
+                    foreach (var en in board.Top)
                     {
                         var c = en.mine ? new Color(1f, 0.85f, 0.45f, fade) : dim;
                         if (en.mine) Fill(new Rect(r.x + 6 * scale, y, r.width - 12 * scale, line), new Color(Gold.r, Gold.g, Gold.b, 0.12f * fade));
                         Text(new Rect(r.x + 16 * scale, y, 44 * scale, line), $"{en.rank}", row, c);
                         Text(new Rect(r.x + 58 * scale, y, r.width * 0.5f, line), en.name, row, c);
-                        Text(new Rect(r.x, y, r.width - 16 * scale, line), $"{BestRecord.FormatTime(en.time)}  Lv {en.level}", right, c);
+                        Text(new Rect(r.x, y, r.width - 16 * scale, line), Score(en), right, c);
                         y += line;
                     }
                     break;
             }
             float my = r.yMax - 40 * scale;
             Fill(new Rect(r.x + 12 * scale, my - 4 * scale, r.width - 24 * scale, 1 * scale), new Color(Gold.r, Gold.g, Gold.b, 0.4f * fade));
-            string mine = OnlineBoard.Mine.HasValue
-                ? $"내 순위  {OnlineBoard.Mine.Value.rank}위  ·  {BestRecord.FormatTime(OnlineBoard.Mine.Value.time)}  Lv {OnlineBoard.Mine.Value.level}"
-                : OnlineBoard.State == OnlineBoard.Status.Ready ? "내 순위  기록 없음" : "";
+            string mine = board.Mine.HasValue
+                ? $"내 순위  {board.Mine.Value.rank}위  ·  {Score(board.Mine.Value)}"
+                : board.State == OnlineBoard.Status.Ready ? "내 순위  기록 없음" : "";
             Text(new Rect(r.x, my, r.width, 32 * scale), mine, new GUIStyle(row) { alignment = TextAnchor.MiddleCenter }, new Color(1f, 0.9f, 0.6f, fade));
         }
 
@@ -743,18 +760,35 @@ namespace KingLastPiece
                     "ENTER / START 를 눌러 다시 일어서기", small, new Color(0.85f, 0.8f, 0.75f, a));
         }
 
+        /// <summary>
+        /// The normal mode won: "승리!", the clear (time, deaths, damage, captures…), the best clear on this machine, and the
+        /// nickname to put the clear on the normal mode's online ranking (fewest deaths, then fastest).
+        /// </summary>
         void DrawVictory(GameManager g)
         {
-            float a = Mathf.Clamp01(g.StateTime / 1.5f);
-            Fill(new Rect(0, 0, Screen.width, Screen.height), new Color(0, 0, 0, 0.5f * a));
-            float cy = Screen.height * 0.32f;
-            Text(new Rect(0, cy, Screen.width, 120 * scale), "승리!", big, new Color(Gold.r, Gold.g, Gold.b, a));
-            int m = Mathf.FloorToInt(g.RunTime / 60f), s = Mathf.FloorToInt(g.RunTime % 60f);
-            Text(new Rect(0, cy + 130 * scale, Screen.width, 40 * scale),
-                $"시간 {m:00}:{s:00}     사망 {g.Deaths}회", mid, new Color(0.9f, 0.88f, 0.8f, a));
-            if (g.StateTime > 2.5f)
-                Text(new Rect(0, Screen.height * 0.8f, Screen.width, 40 * scale), "ENTER / START 를 눌러 타이틀로", small,
-                    new Color(1f, 1f, 1f, a));
+            float a = Mathf.Clamp01((g.StateTime - 0.3f) / 0.8f);
+            float W = Screen.width, H = Screen.height;
+            Fill(new Rect(0, 0, W, H), new Color(0f, 0f, 0f, 0.66f * a));
+            Text(new Rect(0, H * 0.07f, W, 120 * scale), "승리!", big, new Color(Gold.r, Gold.g, Gold.b, a));
+            string sub = g.NewBest ? "흑색 군대를 무너뜨렸다  ·  신기록!"
+                : $"흑색 군대를 무너뜨렸다  ·  최고 기록 사망 {NormalRecord.Deaths}회 ({BestRecord.FormatTime(NormalRecord.Time)})";
+            float glow = g.NewBest ? 0.75f + 0.25f * Mathf.Sin(Time.unscaledTime * 6f) : 1f;
+            Text(new Rect(0, H * 0.07f + 112 * scale, W, 36 * scale), sub, small, new Color(Gold.r, Gold.g, Gold.b, a * glow));
+            if (g.StateTime < 1.2f) return;
+
+            var r = g.Record;
+            var p = g.Player;
+            DrawTable(new Rect((W - 640 * scale) / 2f, H * 0.07f + 168 * scale, 640 * scale, 0f), new[]
+            {
+                ("클리어 시간", BestRecord.FormatTime(g.RunTime)),
+                ("사망", $"{g.Deaths}회"),
+                ("입힌 피해", $"{Mathf.RoundToInt(r.damageDealt):N0}   (최대 한 방 {Mathf.RoundToInt(r.biggestHit)})"),
+                ("받은 피해", $"{Mathf.RoundToInt(r.damageTaken):N0}"),
+                ("포획한 기물", $"{r.kills}   (다크 기물 {r.darkKills})"),
+                ("완벽한 회피  ·  로열 스로", $"{p.JustDodgeCount}회  ·  {p.ThrowCount}회"),
+                ("사용한 회복약", $"{r.flasksUsed}개"),
+            }, 260 * scale);
+            DrawSubmit(g, H * 0.07f + 168 * scale + 7 * 40 * scale + 44 * scale, a);
         }
 
         // ---------------------------------------------------------------- pause (tabs: game / stats / controls)

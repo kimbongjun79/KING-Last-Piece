@@ -185,12 +185,12 @@ namespace KingLastPiece
 
             yield return WaitPlaying(1);
             yield return Fight(480);                        // knight hops and leaps
-            game.DebugStartWave(2);                         // bishop
+            game.DebugStartWave(1);                         // bishop
             yield return Fight(480);
-            game.DebugStartWave(4);                         // rook: ram + close-range slam
+            game.DebugStartWave(2);                         // rook: ram + close-range slam
             yield return Fight(720, PieceType.Rook, swing: false);   // walk up and let it slam
 
-            game.DebugStartWave(9);                         // final round: the Queen
+            game.DebugStartWave(4);                         // the Black Queen (mid-boss)
             yield return Fight(720, PieceType.Queen);
             var queen = game.Boss;
             if (queen != null)

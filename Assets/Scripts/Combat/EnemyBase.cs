@@ -39,7 +39,7 @@ namespace KingLastPiece
         public bool IsOffBoard => OffBoard;
         /// <summary>Kind of the current (or last) attack and how many squares it strikes, for lab logs.</summary>
         public int AttacksStarted { get; private set; }
-        public string AttackLabel => plan.squares != null ? $"{plan.kind}[{plan.squares.Length}]" : plan.kind.ToString();
+        public virtual string AttackLabel => plan.squares != null ? $"{plan.kind}[{plan.squares.Length}]" : plan.kind.ToString();
         public bool IsAttacking => state == EState.Windup || state == EState.Attack;
         public float WindupProgress => state == EState.Windup ? Mathf.Clamp01(stateTime / Mathf.Max(0.01f, plan.windup)) : 0f;
 
@@ -110,7 +110,7 @@ namespace KingLastPiece
             return true;
         }
 
-        public bool IgnoresCollision =>
+        public virtual bool IgnoresCollision =>
             IsDead || OffBoard || state == EState.Spawning || state == EState.Grabbed || state == EState.Launched || state == EState.Airborne ||
             (state == EState.Attack && (plan.kind == AtkKind.Leap || plan.kind == AtkKind.Dash));
 
@@ -118,6 +118,8 @@ namespace KingLastPiece
         protected float stateTime, cooldown;
         protected float moveSpeed = 2.5f, maxPoise = 25f, poise, staggerDuration = 1.1f;
         protected bool hyperArmor;
+        /// <summary>How far a blow pushes the piece back while it walks (a colossus doesn't budge).</summary>
+        protected float hitShove = 0.25f;
         protected AttackPlan plan;
         protected PlayerController Player => Game != null ? Game.Player : null;
         protected bool moving;
@@ -657,11 +659,22 @@ namespace KingLastPiece
                         : Telegraph.Squares(plan.squares, plan.windup, plan.target.sqrMagnitude > 0f ? BoardSlots.ToSquare(plan.target) : MySquare);
                     break;
             }
+            // A piece that warns square by square itself (a sweep) takes the board's warning off.
+            if (DrawsOwnTelegraph) ClearTelegraph();
             Enter(EState.Windup);
             Sfx.Play("EN_Windup", transform.position);
             Sfx.Play("EN_Telegraph", plan.kind == AtkKind.Leap ? plan.target : atkStart);
             if (Type == PieceType.Queen && (plan.kind == AtkKind.Slam || plan.kind == AtkKind.Zone)) Sfx.Play("QUEEN_Check_Windup", transform.position);
         }
+
+        /// <summary>
+        /// True while the current slam / zone attack lands on its squares by itself during the active phase (the piece
+        /// hits the King and flashes the squares as it reaches them) instead of all at once at its end.
+        /// </summary>
+        protected virtual bool StrikesItself => false;
+
+        /// <summary>True while the current attack draws its own square warnings (none of the usual all-at-once one).</summary>
+        protected virtual bool DrawsOwnTelegraph => false;
 
         /// <summary>Called every wind-up frame with its progress (0–1): lets a piece move while it winds up.</summary>
         protected virtual void OnWindup(float p) { }
@@ -741,8 +754,8 @@ namespace KingLastPiece
             return best.sqrMagnitude > 0.0001f ? best.normalized : Vector3.forward;
         }
 
-        // Sound ids (Docs/Sound/sounds.json) for this piece's attack release and landing.
-        string ReleaseSfx => (Type, plan.kind) switch
+        // Sound ids (Docs/Sound/sounds.json) for this piece's attack release and landing (a boss may pick its own).
+        protected virtual string ReleaseSfx => (Type, plan.kind) switch
         {
             (PieceType.Pawn, _) => "PAWN_Thrust",
             (PieceType.Knight, AtkKind.Leap) => "KNIGHT_Leap",
@@ -753,7 +766,7 @@ namespace KingLastPiece
             _ => null,
         };
 
-        string LandSfx => (Type, plan.kind) switch
+        protected virtual string LandSfx => (Type, plan.kind) switch
         {
             (PieceType.Knight, AtkKind.Leap) => "KNIGHT_Land",
             (PieceType.Queen, AtkKind.Leap) => "QUEEN_Land",
@@ -862,6 +875,12 @@ namespace KingLastPiece
                     modelY = Mathf.Lerp(1.2f, 0f, p * p);
                     if (p >= 1f)
                     {
+                        // A piece that strikes its squares itself during the active phase (a sweeping arm) only ends it here.
+                        if (StrikesItself)
+                        {
+                            if (t >= plan.active + 0.1f) FinishAttack();
+                            break;
+                        }
                         if (!landed)
                         {
                             landed = true;
@@ -878,7 +897,7 @@ namespace KingLastPiece
             }
         }
 
-        /// <summary>Each struck square flares (a square ring and embers); a big set gets one shared crack sound.</summary>
+        /// <summary>Each struck square flares (a square ring and embers). Nothing is left where the King stands.</summary>
         void SquareImpacts(Vector2Int[] squares, float strength)
         {
             float tile = GameManager.TileSize;
@@ -889,7 +908,6 @@ namespace KingLastPiece
                 if (squares.Length <= 24 || Random.value < 24f / squares.Length)
                     Effects.Sparks(c + Vector3.up * 0.15f, new Color(0.7f, 0.12f, 0.05f), Mathf.RoundToInt(4 * strength) + 1, 3f);
             }
-            if (Player != null && plan.kind == AtkKind.Zone) Vfx.GroundImpact(Player.FlatPos, tile * 0.6f, 0.5f * strength, hostile: true);
         }
 
         void FinishAttack()
@@ -1070,7 +1088,7 @@ namespace KingLastPiece
             else if (state == EState.Move)
             {
                 Vector3 away = FlatPos - new Vector3(source.x, 0f, source.z);
-                if (away.sqrMagnitude > 0.001f) transform.position += away.normalized * 0.25f;
+                if (away.sqrMagnitude > 0.001f) transform.position += away.normalized * hitShove;
             }
             return true;
         }

@@ -8,15 +8,30 @@ using UnityEngine;
 namespace KingLastPiece
 {
     /// <summary>
-    /// Online ranking of the 무쌍 mode on Unity Gaming Services (anonymous sign-in + Leaderboards).
-    /// Ranked by the time survived, then by the level reached: both are packed into one score (higher is better),
-    /// <c>seconds × 1000 + level</c>. The leaderboard (id <see cref="LeaderboardId"/>) must exist in the
-    /// project's UGS dashboard, sorted high to low, keeping each player's best. Without a linked project or a
-    /// connection everything here just reports itself unavailable — the game never waits on it.
+    /// Online rankings on Unity Gaming Services (anonymous sign-in + Leaderboards), one per game mode:
+    /// <list type="bullet">
+    /// <item><see cref="Musou"/> ("endless_best"): ranked by the time survived, then by the level reached —
+    /// <c>seconds × 1000 + level</c>.</item>
+    /// <item><see cref="Normal"/> ("normal_best"): ranked by the fewest deaths, then by the shorter clear time —
+    /// <c>(999 − deaths) × 100000 + (99999 − seconds)</c>.</item>
+    /// </list>
+    /// Both scores are higher-is-better: each leaderboard must exist in the project's UGS dashboard sorted high to low,
+    /// keeping each player's best. Without a linked project or a connection everything here just reports itself
+    /// unavailable — the game never waits on it.
     /// </summary>
-    public static class OnlineBoard
+    public class OnlineBoard
     {
-        public const string LeaderboardId = "endless_best";
+        public static readonly OnlineBoard Musou = new OnlineBoard("endless_best",
+            (level, seconds) => Mathf.Clamp(Mathf.FloorToInt(seconds), 0, 99999) * 1000L + Mathf.Clamp(level, 0, 999),
+            score => (int)(score % 1000d), score => (float)System.Math.Floor(score / 1000d));
+
+        public static readonly OnlineBoard Normal = new OnlineBoard("normal_best",
+            (deaths, seconds) => (999L - Mathf.Clamp(deaths, 0, 999)) * 100000L + (99999L - Mathf.Clamp(Mathf.RoundToInt(seconds), 0, 99999)),
+            score => 999 - (int)(score / 100000d), score => 99999f - (float)(score % 100000d));
+
+        /// <summary>The ranking of a mode: the 무쌍 mode's, or the normal mode's.</summary>
+        public static OnlineBoard For(bool musou) => musou ? Musou : Normal;
+
         const string NameKey = "KLP.Nickname";
 
         public enum Status { Idle, Loading, Ready, Unavailable }
@@ -25,16 +40,30 @@ namespace KingLastPiece
         {
             public int rank;        // 1-based
             public string name;
-            public int level;
+            /// <summary>Level reached (무쌍) or deaths (normal).</summary>
+            public int value;
             public float time;
             public bool mine;
         }
 
-        public static Status State { get; private set; } = Status.Idle;
-        public static readonly List<Entry> Top = new List<Entry>();
-        public static Entry? Mine { get; private set; }
-        public static string Error { get; private set; }
-        static float loadedAt = -100f;
+        public readonly string LeaderboardId;
+        readonly System.Func<int, float, long> pack;
+        readonly System.Func<double, int> valueOf;
+        readonly System.Func<double, float> timeOf;
+
+        public Status State { get; private set; } = Status.Idle;
+        public readonly List<Entry> Top = new List<Entry>();
+        public Entry? Mine { get; private set; }
+        public string Error { get; private set; }
+        float loadedAt = -100f;
+
+        OnlineBoard(string id, System.Func<int, float, long> pack, System.Func<double, int> valueOf, System.Func<double, float> timeOf)
+        {
+            LeaderboardId = id;
+            this.pack = pack;
+            this.valueOf = valueOf;
+            this.timeOf = timeOf;
+        }
 
         /// <summary>The nickname entered last time (offered again on the next results screen).</summary>
         public static string SavedName
@@ -42,10 +71,6 @@ namespace KingLastPiece
             get => PlayerPrefs.GetString(NameKey, "");
             set { PlayerPrefs.SetString(NameKey, value); PlayerPrefs.Save(); }
         }
-
-        public static long Pack(float seconds, int level) => Mathf.Clamp(Mathf.FloorToInt(seconds), 0, 99999) * 1000L + Mathf.Clamp(level, 0, 999);
-        public static int LevelOf(double score) => (int)(score % 1000d);
-        public static float TimeOf(double score) => (float)System.Math.Floor(score / 1000d);
 
         /// <summary>UGS names come back as "name#1234": the tag is dropped for display.</summary>
         static string Clean(string playerName)
@@ -69,8 +94,13 @@ namespace KingLastPiece
             return AuthenticationService.Instance.IsSignedIn;
         }
 
+        Entry ToEntry(Unity.Services.Leaderboards.Models.LeaderboardEntry e, string me) => new Entry
+        {
+            rank = e.Rank + 1, name = Clean(e.PlayerName), value = valueOf(e.Score), time = timeOf(e.Score), mine = e.PlayerId == me,
+        };
+
         /// <summary>Loads the top 10 and this player's own entry (at most every 20 s unless forced).</summary>
-        public static async void Refresh(bool force = false)
+        public async void Refresh(bool force = false)
         {
             if (State == Status.Loading || (!force && Time.unscaledTime - loadedAt < 20f && State == Status.Ready)) return;
             State = Status.Loading;
@@ -80,13 +110,14 @@ namespace KingLastPiece
                 var page = await LeaderboardsService.Instance.GetScoresAsync(LeaderboardId, new GetScoresOptions { Limit = 10 });
                 string me = AuthenticationService.Instance.PlayerId;
                 Top.Clear();
-                foreach (var e in page.Results)
-                    Top.Add(new Entry { rank = e.Rank + 1, name = Clean(e.PlayerName), level = LevelOf(e.Score), time = TimeOf(e.Score), mine = e.PlayerId == me });
+                foreach (var e in page.Results) Top.Add(ToEntry(e, me));
                 Mine = null;
                 try
                 {
                     var mine = await LeaderboardsService.Instance.GetPlayerScoreAsync(LeaderboardId);
-                    Mine = new Entry { rank = mine.Rank + 1, name = Clean(mine.PlayerName), level = LevelOf(mine.Score), time = TimeOf(mine.Score), mine = true };
+                    var entry = ToEntry(mine, me);
+                    entry.mine = true;
+                    Mine = entry;
                 }
                 catch (System.Exception) { /* no score yet */ }
                 loadedAt = Time.unscaledTime;
@@ -97,12 +128,15 @@ namespace KingLastPiece
             {
                 Error = ex.Message;
                 State = Status.Unavailable;
-                Debug.LogWarning($"[OnlineBoard] {ex.Message}");
+                Debug.LogWarning($"[OnlineBoard] {LeaderboardId}: {ex.Message}");
             }
         }
 
-        /// <summary>Sends a finished run under <paramref name="nickname"/>; true when it reached the server.</summary>
-        public static async Task<bool> Submit(string nickname, float seconds, int level, int kills, float damage)
+        /// <summary>
+        /// Sends a finished run under <paramref name="nickname"/>: <paramref name="value"/> is the level reached (무쌍) or
+        /// the deaths (normal). True when it reached the server.
+        /// </summary>
+        public async Task<bool> Submit(string nickname, int value, float seconds, Dictionary<string, object> metadata)
         {
             try
             {
@@ -110,15 +144,15 @@ namespace KingLastPiece
                 nickname = Sanitize(nickname);
                 if (nickname.Length > 0 && Clean(AuthenticationService.Instance.PlayerName) != nickname)
                     await AuthenticationService.Instance.UpdatePlayerNameAsync(nickname);
-                await LeaderboardsService.Instance.AddPlayerScoreAsync(LeaderboardId, Pack(seconds, level),
-                    new AddPlayerScoreOptions { Metadata = new Dictionary<string, object> { { "level", level }, { "time", Mathf.FloorToInt(seconds) }, { "kills", kills }, { "damage", Mathf.RoundToInt(damage) } } });
+                await LeaderboardsService.Instance.AddPlayerScoreAsync(LeaderboardId, pack(value, seconds),
+                    new AddPlayerScoreOptions { Metadata = metadata });
                 loadedAt = -100f;   // the title reloads the ranking
                 return true;
             }
             catch (System.Exception ex)
             {
                 Error = ex.Message;
-                Debug.LogWarning($"[OnlineBoard] submit: {ex.Message}");
+                Debug.LogWarning($"[OnlineBoard] {LeaderboardId} submit: {ex.Message}");
                 return false;
             }
         }

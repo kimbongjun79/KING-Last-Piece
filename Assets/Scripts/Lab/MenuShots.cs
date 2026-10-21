@@ -44,11 +44,11 @@ namespace KingLastPiece
             if (SoundRefCapture.GetArg("-boardcheck") != null)
             {
                 // Read-only check of the online ranking: load it on the title, log it, nothing is submitted.
-                for (int f = 0; f < 900 && (OnlineBoard.State == OnlineBoard.Status.Idle || OnlineBoard.State == OnlineBoard.Status.Loading); f++)
+                for (int f = 0; f < 900 && (OnlineBoard.Musou.State == OnlineBoard.Status.Idle || OnlineBoard.Musou.State == OnlineBoard.Status.Loading); f++)
                     yield return null;
                 yield return Frames(30);
-                log.Append($"Board\tstate={OnlineBoard.State}\terror={OnlineBoard.Error}\tentries={OnlineBoard.Top.Count}\tmine={(OnlineBoard.Mine.HasValue ? OnlineBoard.Mine.Value.rank.ToString() : "-")}\n");
-                foreach (var e in OnlineBoard.Top) log.Append($"Entry\t{e.rank}\t{e.name}\tLv{e.level}\t{BestRecord.FormatTime(e.time)}\n");
+                log.Append($"Board\tstate={OnlineBoard.Musou.State}\terror={OnlineBoard.Musou.Error}\tentries={OnlineBoard.Musou.Top.Count}\tmine={(OnlineBoard.Musou.Mine.HasValue ? OnlineBoard.Musou.Mine.Value.rank.ToString() : "-")}\n");
+                foreach (var e in OnlineBoard.Musou.Top) log.Append($"Entry\t{e.rank}\t{e.name}\tLv{e.value}\t{BestRecord.FormatTime(e.time)}\n");
                 yield return Shot("46_Title_Online_Board.png");
                 File.WriteAllText(Path.Combine(dir, "board.tsv"), log.ToString());
                 Application.Quit();
@@ -81,7 +81,7 @@ namespace KingLastPiece
             g.SubmitRun("테스트킹");
             for (int f = 0; f < 600 && GameManager.Instance != null && GameManager.Instance.State == GameManager.GameState.Dead; f++) yield return null;
             yield return Frames(90);
-            log.Append($"Online\tstate={OnlineBoard.State}\terror={OnlineBoard.Error}\tsaved_name={OnlineBoard.SavedName}\n");
+            log.Append($"Online\tstate={OnlineBoard.Musou.State}\terror={OnlineBoard.Musou.Error}\tsaved_name={OnlineBoard.SavedName}\n");
             g = GameManager.Instance;
             log.Append($"AfterResults\tmode={g.CurrentMode}\tstate={g.State}\n");
             yield return Shot("45_Back_To_Title.png");

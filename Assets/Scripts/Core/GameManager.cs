@@ -28,8 +28,9 @@ namespace KingLastPiece
         public readonly List<EnemyBase> Enemies = new List<EnemyBase>();
 
         public int WaveIndex { get; private set; }
-        public int WaveCount => Waves.Length;
-        public string WaveName => Waves[Mathf.Clamp(WaveIndex, 0, Waves.Length - 1)].name;
+        /// <summary>Normal mode: the number of rounds (see <see cref="ClassicRounds"/>).</summary>
+        public int WaveCount => ClassicRounds.Count;
+        public string WaveName => ClassicRounds.All[Mathf.Clamp(WaveIndex, 0, ClassicRounds.Count - 1)].name;
         public string Banner { get; private set; }
         public float BannerTime { get; private set; }
         public float StateTime { get; private set; }
@@ -77,45 +78,6 @@ namespace KingLastPiece
             Player.ResetForWave(Player.FlatPos, Player.transform.eulerAngles.y);
             EnterState(GameState.Playing);
         }
-
-        struct WaveDef
-        {
-            public string name;
-            /// <summary>Piece, starting square and Dark tier (0 = a plain piece, 1–3 = Dark I–III with its aura).</summary>
-            public (PieceType type, string square, int tier)[] pieces;
-        }
-
-        const PieceType P = PieceType.Pawn, N = PieceType.Knight, B = PieceType.Bishop, R = PieceType.Rook, Q = PieceType.Queen;
-
-        // Ten rounds. Pieces enter on their real starting squares; difficulty ramps up to the Queen, with more and darker
-        // Dark-aura pieces mixed in as the rounds go on.
-        static readonly WaveDef[] Waves =
-        {
-            new WaveDef { name = "I. 오프닝", pieces = new[] {
-                (P, "c7", 0), (P, "d7", 0), (P, "e7", 0), (P, "f7", 0) } },
-            new WaveDef { name = "II. 나이트 갬빗", pieces = new[] {
-                (N, "g8", 0), (P, "d7", 1), (P, "e7", 0) } },
-            new WaveDef { name = "III. 긴 대각선", pieces = new[] {
-                (B, "c8", 1), (P, "c7", 0), (P, "d7", 0), (P, "f7", 0) } },
-            new WaveDef { name = "IV. 마이너 피스", pieces = new[] {
-                (N, "b8", 1), (B, "f8", 0), (P, "d7", 0), (P, "e7", 1) } },
-            new WaveDef { name = "V. 성벽", pieces = new[] {
-                (R, "a8", 1), (P, "b7", 0), (P, "d7", 1), (P, "f7", 0) } },
-            new WaveDef { name = "VI. 쌍둥이 기병", pieces = new[] {
-                (N, "b8", 1), (N, "g8", 1), (B, "c8", 0) } },
-            new WaveDef { name = "VII. 피앙케토", pieces = new[] {
-                (B, "c8", 1), (B, "f8", 0), (R, "h8", 2) } },
-            new WaveDef { name = "VIII. 룩 리프트", pieces = new[] {
-                (R, "a8", 1), (R, "h8", 0), (N, "g8", 2), (P, "d7", 1), (P, "e7", 0) } },
-            new WaveDef { name = "IX. 선봉대", pieces = new[] {
-                (N, "b8", 1), (N, "g8", 0), (B, "c8", 0), (B, "f8", 2),
-                (R, "a8", 2), (P, "d7", 1), (P, "e7", 0) } },
-            // Final round: the Queen with 6 pawns and one rook, knight and bishop.
-            new WaveDef { name = "X. 흑색 군대", pieces = new[] {
-                (P, "b7", 0), (P, "c7", 0), (P, "d7", 1),
-                (P, "e7", 1), (P, "f7", 0), (P, "g7", 0),
-                (N, "b8", 1), (Q, "d8", 0), (B, "f8", 2), (R, "h8", 2) } },
-        };
 
         public static Vector3 SquareToWorld(string sq)
         {
@@ -188,7 +150,9 @@ namespace KingLastPiece
 
         void StartWave(int index)
         {
-            if (index == 0 && State != GameState.WaveClear)
+            // A new run (from the title or a debug jump) starts its record afresh; retrying a round after a death keeps the
+            // deaths and the time (the normal mode's ranking counts them).
+            if (index == 0 && State != GameState.WaveClear && State != GameState.Dead)
             {
                 Deaths = 0;
                 RunTime = 0f;
@@ -215,15 +179,76 @@ namespace KingLastPiece
                 Rig.Snap();
             }
 
-            foreach (var (type, square, tier) in Waves[index].pieces)
-                SpawnEmpowered(type, tier, SquareToWorld(square));
-
-            ShowBanner(Waves[index].name);
+            bool boss = SetUpClassicRound(index);
+            ShowBanner(ClassicRounds.All[index].name);
             Sfx.Play("GAME_RoundStart");
-            bool final = index == Waves.Length - 1;
-            if (final) Sfx.Play("GAME_FinalRound");
-            Sfx.Play(final ? "BGM_Boss" : "BGM_Battle");
+            if (boss) Sfx.Play("GAME_FinalRound");
+            Sfx.Play(boss ? "BGM_Boss" : "BGM_Battle");
             EnterState(GameState.Playing);
+        }
+
+        // ---------------------------------------------------------------- normal mode rounds and reinforcements
+
+        // Each round remembers its own pieces; a capture that meets a reinforcement's condition queues it (each fires once
+        // per attempt), and it lands on the next playing frame — never while a fight loop is running — before the
+        // round-clear check, so a round never ends with a reinforcement still on its way.
+        ClassicRounds.Round classicRound;
+        readonly List<EnemyBase> roundPieces = new List<EnemyBase>();
+        bool[] reinforcementFired = new bool[0];
+        readonly List<ClassicRounds.Reinforcement> pendingReinforcements = new List<ClassicRounds.Reinforcement>();
+
+        /// <summary>Sets normal-mode round <paramref name="index"/> on the board; true when it is a boss round (boss music).</summary>
+        bool SetUpClassicRound(int index)
+        {
+            classicRound = ClassicRounds.All[index];
+            roundPieces.Clear();
+            pendingReinforcements.Clear();
+            reinforcementFired = new bool[classicRound.reinforcements?.Length ?? 0];
+            bool boss = false;
+            foreach (var (type, square, tier) in classicRound.pieces)
+            {
+                roundPieces.Add(SpawnEmpowered(type, tier, SquareToWorld(square)));
+                if (type == PieceType.Queen || type == PieceType.Megatron) boss = true;
+            }
+            return boss;
+        }
+
+        /// <summary>A piece of the round was captured: queue the reinforcements waiting on it.</summary>
+        void OnRoundPieceCaptured(EnemyBase piece)
+        {
+            int index = roundPieces.IndexOf(piece);
+            if (index < 0 || classicRound.reinforcements == null) return;   // reinforcements and summons call nobody
+            for (int k = 0; k < classicRound.reinforcements.Length; k++)
+            {
+                if (reinforcementFired[k]) continue;
+                var r = classicRound.reinforcements[k];
+                bool go = r.when switch
+                {
+                    ClassicRounds.When.Captured => r.piece == index,
+                    ClassicRounds.When.AnyCaptured => true,
+                    _ => AllRoundPiecesCaptured(r.ofType),
+                };
+                if (!go) continue;
+                reinforcementFired[k] = true;
+                pendingReinforcements.Add(r);
+            }
+        }
+
+        /// <summary>Every one of the round's own pieces of <paramref name="type"/> is gone.</summary>
+        bool AllRoundPiecesCaptured(PieceType type)
+        {
+            for (int i = 0; i < roundPieces.Count; i++)
+                if (classicRound.pieces[i].type == type && roundPieces[i] != null && !roundPieces[i].IsDead) return false;
+            return true;
+        }
+
+        /// <summary>Lands the reinforcements the captures called in.</summary>
+        void LandReinforcements()
+        {
+            if (pendingReinforcements.Count == 0) return;
+            foreach (var r in pendingReinforcements) SpawnEmpowered(r.type, r.tier, SquareToWorld(r.square));
+            pendingReinforcements.Clear();
+            Sfx.Play("QUEEN_Summon");
         }
 
         // ---------------------------------------------------------------- endless mode
@@ -284,10 +309,9 @@ namespace KingLastPiece
         {
             if (!IsEndless)
             {
-                // Classic: two pawns on the squares to either side of her.
+                // Classic: one pawn on a square beside her (the normal mode keeps few pieces on the board at a time).
                 Vector3 side = queen.transform.right * 3f;
                 SpawnEnemy(PieceType.Pawn, BoardSlots.Center(BoardSlots.ToSquare(queen.FlatPos + side)));
-                SpawnEnemy(PieceType.Pawn, BoardSlots.Center(BoardSlots.ToSquare(queen.FlatPos - side)));
                 return;
             }
             var summons = EndlessRounds.QueenSummons(Round);
@@ -383,6 +407,7 @@ namespace KingLastPiece
                 case PieceType.Bishop: return SpawnCustom<BishopEnemy>(type, pos);
                 case PieceType.Rook: return SpawnCustom<RookEnemy>(type, pos);
                 case PieceType.Queen: return SpawnCustom<QueenEnemy>(type, pos);
+                case PieceType.Megatron: return SpawnCustom<ChessMegatron>(PieceType.Pawn, pos);
                 default: return SpawnCustom<PawnEnemy>(type, pos);
             }
         }
@@ -447,6 +472,7 @@ namespace KingLastPiece
         {
             Record.kills++;
             if (e.EliteTier > 0) Record.darkKills++;
+            if (CurrentMode == Mode.Game) OnRoundPieceCaptured(e);   // a round's reinforcements may be waiting on this capture
             if (Player != null)
             {
                 Player.Restore(Player.Stats.lifeSteal);   // life steal: a fixed amount of health back for every capture
@@ -492,7 +518,7 @@ namespace KingLastPiece
             EnterState(GameState.Dead);
         }
 
-        /// <summary>The endless run that just ended beat the saved best.</summary>
+        /// <summary>The run that just ended (무쌍) or was won (normal) beat the saved best.</summary>
         public bool NewBest { get; private set; }
 
         /// <summary>
@@ -581,10 +607,13 @@ namespace KingLastPiece
                         CheckMusouRewards();
                         break;
                     }
+                    if (CurrentMode == Mode.Game) LandReinforcements();
                     if (UsesRounds && AliveCount() == 0 && StateTime > 1f)
                     {
-                        if (!IsEndless && WaveIndex >= Waves.Length - 1)
+                        if (!IsEndless && WaveIndex >= ClassicRounds.Count - 1)
                         {
+                            // The normal mode won: keep the clear if it's the best yet (fewest deaths, then fastest).
+                            NewBest = NormalRecord.Submit(Deaths, RunTime);
                             EnterState(GameState.Victory);
                             Sfx.Play("GAME_Victory");
                         }
@@ -631,9 +660,7 @@ namespace KingLastPiece
                     break;
 
                 case GameState.Victory:
-                    // The run is won: back to the title.
-                    // The run is won: back to the title (무쌍: from its results screen, after the nickname).
-                    if (!IsEndless && StateTime > 2.5f && GameInput.Confirm) BackToTitle();
+                    // The run is won: the results / victory screen takes the nickname and its own confirm (see SubmitRun).
                     break;
             }
         }
@@ -672,18 +699,34 @@ namespace KingLastPiece
         /// <summary>True while the finished run is on its way to the online ranking.</summary>
         public bool Submitting { get; private set; }
 
+        /// <summary>The finished run can go to the online ranking: a 무쌍 run that ended or was won, or the normal mode won.</summary>
+        public bool CanSubmitRun => IsEndless ? State == GameState.Dead || State == GameState.Victory : State == GameState.Victory;
+
         /// <summary>
-        /// Endless results confirm: sends the run to the online ranking under <paramref name="nickname"/> (at most a
-        /// few seconds — offline just skips it), then back to the title.
+        /// Results confirm (the 무쌍 mode's end, the normal mode's victory): sends the run to its mode's online ranking under
+        /// <paramref name="nickname"/> (at most a few seconds — offline just skips it), then back to the title.
+        /// 무쌍: the time survived and the level. Normal: the deaths and the clear time.
         /// </summary>
         public async void SubmitRun(string nickname)
         {
-            if (Submitting || (State != GameState.Dead && State != GameState.Victory) || !IsEndless) return;
+            if (Submitting || !CanSubmitRun) return;
             Submitting = true;
             nickname = OnlineBoard.Sanitize(nickname);
             if (nickname.Length > 0) OnlineBoard.SavedName = nickname;
             Sfx.Play("UI_Confirm");
-            var send = OnlineBoard.Submit(nickname, Director != null ? Director.Elapsed : RunTime, Director != null ? Director.Level : 1, Record.kills, Record.damageDealt);
+            System.Threading.Tasks.Task<bool> send;
+            if (IsEndless)
+            {
+                float survived = Director != null ? Director.Elapsed : RunTime;
+                int level = Director != null ? Director.Level : 1;
+                send = OnlineBoard.Musou.Submit(nickname, level, survived, new Dictionary<string, object>
+                    { { "level", level }, { "time", Mathf.FloorToInt(survived) }, { "kills", Record.kills }, { "damage", Mathf.RoundToInt(Record.damageDealt) } });
+            }
+            else
+            {
+                send = OnlineBoard.Normal.Submit(nickname, Deaths, RunTime, new Dictionary<string, object>
+                    { { "deaths", Deaths }, { "time", Mathf.RoundToInt(RunTime) }, { "kills", Record.kills }, { "damage", Mathf.RoundToInt(Record.damageDealt) } });
+            }
             await System.Threading.Tasks.Task.WhenAny(send, System.Threading.Tasks.Task.Delay(6000));
             if (this == null) return;   // the scene went away meanwhile
             Submitting = false;
@@ -700,7 +743,7 @@ namespace KingLastPiece
             UnityEngine.SceneManagement.SceneManager.LoadScene(gameObject.scene.name);
         }
 
-        /// <summary>Endless results → the title: the scene reloads (a fresh board, King and run).</summary>
+        /// <summary>Results → the title: the scene reloads (a fresh board, King and run).</summary>
         public void BackToTitle()
         {
             if (State != GameState.Dead && State != GameState.Victory) return;
@@ -715,7 +758,7 @@ namespace KingLastPiece
             StartWave(0);
         }
 
-        public void DebugStartWave(int index) => StartWave(IsEndless ? Mathf.Max(0, index) : Mathf.Clamp(index, 0, Waves.Length - 1));
+        public void DebugStartWave(int index) => StartWave(IsEndless ? Mathf.Max(0, index) : Mathf.Clamp(index, 0, ClassicRounds.Count - 1));
         public void DebugTogglePause() => TogglePause();
 
         void TogglePause()

@@ -33,4 +33,31 @@ namespace KingLastPiece
 
         public static string FormatTime(float seconds) => $"{Mathf.FloorToInt(seconds / 60f):00}:{Mathf.FloorToInt(seconds % 60f):00}";
     }
+
+    /// <summary>
+    /// The normal mode's best clear on this machine (PlayerPrefs): the fewest deaths, then the shorter time. Saved when the
+    /// ten rounds are won; shown on the title and flagged on the victory screen when beaten.
+    /// </summary>
+    public static class NormalRecord
+    {
+        const string Key = "KLP.Normal.Best.";
+
+        public static bool Exists => PlayerPrefs.GetInt(Key + "Cleared", 0) > 0;
+        public static int Deaths => PlayerPrefs.GetInt(Key + "Deaths", 0);
+        public static float Time => PlayerPrefs.GetFloat(Key + "Time", 0f);
+        public static string Date => PlayerPrefs.GetString(Key + "Date", "");
+
+        /// <summary>Records a clear; true when it is the new best.</summary>
+        public static bool Submit(int deaths, float time)
+        {
+            bool better = !Exists || deaths < Deaths || (deaths == Deaths && time < Time);
+            if (!better) return false;
+            PlayerPrefs.SetInt(Key + "Cleared", 1);
+            PlayerPrefs.SetInt(Key + "Deaths", deaths);
+            PlayerPrefs.SetFloat(Key + "Time", time);
+            PlayerPrefs.SetString(Key + "Date", System.DateTime.Now.ToString("yyyy.MM.dd"));
+            PlayerPrefs.Save();
+            return true;
+        }
+    }
 }
