@@ -8,9 +8,9 @@ using UnityEngine;
 namespace KingLastPiece
 {
     /// <summary>
-    /// Online ranking of the endless mode on Unity Gaming Services (anonymous sign-in + Leaderboards).
-    /// Ranked by round, then by the shorter time: both are packed into one score (higher is better),
-    /// <c>round × 100000 + (99999 − seconds)</c>. The leaderboard (id <see cref="LeaderboardId"/>) must exist in the
+    /// Online ranking of the 무쌍 mode on Unity Gaming Services (anonymous sign-in + Leaderboards).
+    /// Ranked by the time survived, then by the level reached: both are packed into one score (higher is better),
+    /// <c>seconds × 1000 + level</c>. The leaderboard (id <see cref="LeaderboardId"/>) must exist in the
     /// project's UGS dashboard, sorted high to low, keeping each player's best. Without a linked project or a
     /// connection everything here just reports itself unavailable — the game never waits on it.
     /// </summary>
@@ -25,7 +25,7 @@ namespace KingLastPiece
         {
             public int rank;        // 1-based
             public string name;
-            public int round;
+            public int level;
             public float time;
             public bool mine;
         }
@@ -43,9 +43,9 @@ namespace KingLastPiece
             set { PlayerPrefs.SetString(NameKey, value); PlayerPrefs.Save(); }
         }
 
-        public static long Pack(int round, float seconds) => round * 100000L + (99999L - Mathf.Clamp(Mathf.RoundToInt(seconds), 0, 99999));
-        public static int RoundOf(double score) => (int)(score / 100000d);
-        public static float TimeOf(double score) => 99999f - (float)(score % 100000d);
+        public static long Pack(float seconds, int level) => Mathf.Clamp(Mathf.FloorToInt(seconds), 0, 99999) * 1000L + Mathf.Clamp(level, 0, 999);
+        public static int LevelOf(double score) => (int)(score % 1000d);
+        public static float TimeOf(double score) => (float)System.Math.Floor(score / 1000d);
 
         /// <summary>UGS names come back as "name#1234": the tag is dropped for display.</summary>
         static string Clean(string playerName)
@@ -81,12 +81,12 @@ namespace KingLastPiece
                 string me = AuthenticationService.Instance.PlayerId;
                 Top.Clear();
                 foreach (var e in page.Results)
-                    Top.Add(new Entry { rank = e.Rank + 1, name = Clean(e.PlayerName), round = RoundOf(e.Score), time = TimeOf(e.Score), mine = e.PlayerId == me });
+                    Top.Add(new Entry { rank = e.Rank + 1, name = Clean(e.PlayerName), level = LevelOf(e.Score), time = TimeOf(e.Score), mine = e.PlayerId == me });
                 Mine = null;
                 try
                 {
                     var mine = await LeaderboardsService.Instance.GetPlayerScoreAsync(LeaderboardId);
-                    Mine = new Entry { rank = mine.Rank + 1, name = Clean(mine.PlayerName), round = RoundOf(mine.Score), time = TimeOf(mine.Score), mine = true };
+                    Mine = new Entry { rank = mine.Rank + 1, name = Clean(mine.PlayerName), level = LevelOf(mine.Score), time = TimeOf(mine.Score), mine = true };
                 }
                 catch (System.Exception) { /* no score yet */ }
                 loadedAt = Time.unscaledTime;
@@ -102,7 +102,7 @@ namespace KingLastPiece
         }
 
         /// <summary>Sends a finished run under <paramref name="nickname"/>; true when it reached the server.</summary>
-        public static async Task<bool> Submit(string nickname, int round, float seconds, int kills, float damage)
+        public static async Task<bool> Submit(string nickname, float seconds, int level, int kills, float damage)
         {
             try
             {
@@ -110,8 +110,8 @@ namespace KingLastPiece
                 nickname = Sanitize(nickname);
                 if (nickname.Length > 0 && Clean(AuthenticationService.Instance.PlayerName) != nickname)
                     await AuthenticationService.Instance.UpdatePlayerNameAsync(nickname);
-                await LeaderboardsService.Instance.AddPlayerScoreAsync(LeaderboardId, Pack(round, seconds),
-                    new AddPlayerScoreOptions { Metadata = new Dictionary<string, object> { { "round", round }, { "time", Mathf.RoundToInt(seconds) }, { "kills", kills }, { "damage", Mathf.RoundToInt(damage) } } });
+                await LeaderboardsService.Instance.AddPlayerScoreAsync(LeaderboardId, Pack(seconds, level),
+                    new AddPlayerScoreOptions { Metadata = new Dictionary<string, object> { { "level", level }, { "time", Mathf.FloorToInt(seconds) }, { "kills", kills }, { "damage", Mathf.RoundToInt(damage) } } });
                 loadedAt = -100f;   // the title reloads the ranking
                 return true;
             }

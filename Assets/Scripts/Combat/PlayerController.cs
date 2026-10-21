@@ -553,6 +553,12 @@ namespace KingLastPiece
             DodgeCharges = Mathf.Min(MaxDodges, DodgeCharges + Mathf.Max(0, MaxDodges - dodgesBefore));
             Stamina = MaxStamina > staminaBefore ? MaxStamina : Mathf.Min(Stamina, MaxStamina);
         }
+        /// <summary>무쌍 level-up: <paramref name="n"/> flasks back, and the once-a-round items (Stalemate, Gambit) ready again.</summary>
+        public void RefillFlasks(int n)
+        {
+            stalemateUsed = gambitUsed = false;
+            Flasks = Mathf.Min(MaxFlasks, Flasks + n);
+        }
 
         /// <summary>
         /// Between waves: one flask back and full stamina. No health back as such — but with every flask slot already

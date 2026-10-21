@@ -352,7 +352,9 @@ namespace KingLastPiece
         /// <summary>Worth offering: at least one of its gains still has room under its cap (a special item: not held yet).</summary>
         public static bool Useful(PlayerStats s, Item item, IList<Item> owned = null)
         {
-            if (item.IsSpecial) return owned == null || !owned.Contains(item);   // a special item only once
+            // Every item only once (each kind can be picked a single time in a run).
+            if (owned != null && owned.Contains(item)) return false;
+            if (item.IsSpecial) return true;
             foreach (var fx in item.effects)
                 if (fx.steps > 0 && Current(s, fx.kind) < Def(fx.kind).cap - 0.0001f) return true;
             return false;

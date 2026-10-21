@@ -20,7 +20,8 @@ namespace KingLastPiece.EditorTools
     public static class LookPass
     {
         // 2: the new models' embedded textures are extracted first, and their objects rebuilt with them.
-        const int Version = 2;
+        // 3: marble is not metal — the piece materials lose their metallic sheen (the King looked black).
+        const int Version = 3;
         static readonly string[] NewModels =
         {
             "Black_Gothic_Gem_Tower_v01_with VARCO", "Metal_Filing_Cabinet_v01_with VARCO",
@@ -100,6 +101,8 @@ namespace KingLastPiece.EditorTools
             m.SetTexture("_BaseMap", color);
             m.SetTexture("_MainTex", color);
             m.SetColor("_BaseColor", Color.white);
+            m.SetFloat("_Metallic", 0f);
+            m.SetFloat("_Smoothness", 0.55f);
             if (normal != null)
             {
                 m.SetTexture("_BumpMap", normal);

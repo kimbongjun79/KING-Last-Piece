@@ -40,7 +40,7 @@ namespace KingLastPiece
         public enum Mode { Game, Practice, Effects, Endless }
 
         /// <summary>Endless mode: the round number (1-based).</summary>
-        public int Round => WaveIndex + 1;
+        public int Round => IsEndless && Director != null ? 1 + Mathf.FloorToInt(Director.Minutes * 4f / 3f) : WaveIndex + 1;
         public bool IsEndless => CurrentMode == Mode.Endless;
         /// <summary>Round-end items on offer, and the one chosen this time (endless mode).</summary>
         public readonly List<Item> Offers = new List<Item>();
@@ -200,19 +200,17 @@ namespace KingLastPiece
             Enemies.Clear();
             BoardSlots.Clear();
 
+            if (IsEndless)
+            {
+                StartMusou();
+                return;
+            }
+
             bool keepPlayer = State == GameState.WaveClear || State == GameState.Upgrade;
-            // A new endless run starts the King from scratch (weak stats, no upgrades) on the small board.
-            if (IsEndless && index == 0 && !keepPlayer) Player.Stats = PlayerStats.EndlessStart();
             if (!keepPlayer)
             {
                 Player.ResetForWave(SquareToWorld("e1"), 0f);
                 Rig.Snap();
-            }
-
-            if (IsEndless)
-            {
-                StartEndlessRound(index + 1);
-                return;
             }
 
             foreach (var (type, square, tier) in Waves[index].pieces)
@@ -228,38 +226,53 @@ namespace KingLastPiece
 
         // ---------------------------------------------------------------- endless mode
 
-        void StartEndlessRound(int round)
+        /// <summary>무쌍 mode's spawn director (time, experience, bosses, spawn patterns) — the run in progress.</summary>
+        public MusouDirector Director { get; private set; }
+
+        /// <summary>
+        /// A new 무쌍 run: the King from scratch (weak stats, no items) in the middle of the 16×16 board, and the
+        /// director starts the clock.
+        /// </summary>
+        void StartMusou()
         {
-            // Every 20 rounds the board grows a ring of squares (and shrinks back for a new run).
-            int size = EndlessRounds.BoardSize(round);
-            bool grew = size > BoardSlots.Size;
-            if (size != BoardSlots.Size) board.Resize(size);
-
-            var army = EndlessRounds.Army(round);
-            var squares = EndlessRounds.SpawnSquares(BoardSlots.ToSquare(Player.FlatPos), army.Count);
-            for (int i = 0; i < army.Count && i < squares.Count; i++)
-                SpawnEmpowered(army[i].type, army[i].tier, BoardSlots.Center(squares[i]));
-
-            bool boss = EndlessRounds.IsBossRound(round);
-            string banner = EndlessRounds.Title(round);
-            if (grew) banner += "  ·  체스판이 넓어진다";
-            if (round % 40 == 0) banner += "  ·  흑색 군대가 더 강해진다";
-            ShowBanner(banner);
+            Player.Stats = PlayerStats.EndlessStart();
+            if (BoardSlots.Size != MusouDirector.BoardSize) board.Resize(MusouDirector.BoardSize);
+            Player.ResetForWave(BoardSlots.Center(new Vector2Int(BoardSlots.Size / 2, BoardSlots.Size / 2 - 3)), 0f);
+            Rig.Snap();
+            Director = new MusouDirector(this);
+            Director.Begin();
             Sfx.Play("GAME_RoundStart");
-            if (boss) Sfx.Play("GAME_FinalRound");
-            Sfx.Play(boss ? "BGM_Boss" : "BGM_Battle");
+            Sfx.Play("BGM_Battle");
             EnterState(GameState.Playing);
         }
 
+        /// <summary>무쌍: a level gained or a queen taken opens the item choice (the battle freezes meanwhile).</summary>
+        void CheckMusouRewards()
+        {
+            if (Director == null || State != GameState.Playing) return;
+            if (Director.PendingChest)
+            {
+                Director.PendingChest = false;
+                EnterUpgrade(boss: true);
+            }
+            else if (Director.PendingLevels > 0)
+            {
+                Director.PendingLevels--;
+                // Each level also refills one flask.
+                Player.RefillFlasks(1);
+                EnterUpgrade(boss: false);
+            }
+        }
+
         /// <summary>
-        /// Spawns a piece at the given empowered tier (0 = normal) with the endless mode's health scaling (every 40
-        /// rounds; queens are sturdier there too). In the other modes only the tier applies.
+        /// Spawns a piece at the given empowered tier (0 = normal); in 무쌍 mode with the army's strength of the time
+        /// (every ten minutes; queens are sturdier there too). In the other modes only the tier applies.
         /// </summary>
         public EnemyBase SpawnEmpowered(PieceType type, int tier, Vector3 pos)
         {
             var e = SpawnEnemy(type, pos);
-            float hp = IsEndless ? EndlessRounds.HealthMultiplier(Round) * (type == PieceType.Queen ? EndlessRounds.QueenHealthBoost : 1f) : 1f;
-            e.Empower(tier, hp, IsEndless ? EndlessRounds.StaggerMultiplier(Round) : 1f);
+            bool musou = IsEndless && Director != null;
+            e.Empower(tier, musou ? Director.HealthMult(type) : 1f, musou ? Director.StaggerMult : 1f);
             return e;
         }
 
@@ -319,10 +332,10 @@ namespace KingLastPiece
 
         float upgradeDoneAt = -1f;
 
-        void EnterUpgrade()
+        void EnterUpgrade(bool boss)
         {
             Offers.Clear();
-            bossPick = EndlessRounds.IsBossRound(Round);
+            bossPick = boss;
             Offers.AddRange(Upgrades.Roll(Player.Stats, Player.Items, Round, bossPick, bossPick ? Upgrades.BossOffered : Upgrades.Offered));
             Picked.Clear();
             OfferCursor = -1;
@@ -335,7 +348,12 @@ namespace KingLastPiece
             if (upgradeDoneAt >= 0f)
             {
                 // A short beat to see the upgrades land, then on to the next round.
-                if (StateTime - upgradeDoneAt > 0.5f) StartWave(WaveIndex + 1);
+                if (StateTime - upgradeDoneAt > 0.5f)
+                {
+                    // 무쌍: back into the fight (the next level, if any, comes up straight after).
+                    EnterState(GameState.Playing);
+                    ApplyTimeScale();
+                }
                 return;
             }
             int key = GameInput.NumberPressed;
@@ -430,6 +448,7 @@ namespace KingLastPiece
             {
                 Player.Restore(Player.Stats.lifeSteal);   // life steal: a fixed amount of health back for every capture
                 Player.OnCapture();
+                Director?.OnKill(e);
             }
         }
 
@@ -466,7 +485,7 @@ namespace KingLastPiece
             Sfx.Play("GAME_Defeat");
             ResetTime();
             // An endless run ends here: keep it if it's the best yet.
-            NewBest = IsEndless && BestRecord.Submit(Round, RunTime, Record.damageDealt, Record.kills);
+            NewBest = IsEndless && Director != null && BestRecord.Submit(Director.Elapsed, Director.Level, Record.damageDealt, Record.kills);
             EnterState(GameState.Dead);
         }
 
@@ -543,6 +562,22 @@ namespace KingLastPiece
                     if (Paused) break;
                     RunTime += Time.deltaTime;
                     ResolveCollisions();
+                    if (IsEndless && Director != null)
+                    {
+                        Director.Update(Time.deltaTime);
+                        if (Director.Cleared)
+                        {
+                            // 30 minutes survived: the run is won.
+                            NewBest = BestRecord.Submit(Director.Elapsed, Director.Level, Record.damageDealt, Record.kills);
+                            ClearEnemies();
+                            ResetTime();
+                            EnterState(GameState.Victory);
+                            Sfx.Play("GAME_Victory");
+                            break;
+                        }
+                        CheckMusouRewards();
+                        break;
+                    }
                     if (UsesRounds && AliveCount() == 0 && StateTime > 1f)
                     {
                         if (!IsEndless && WaveIndex >= Waves.Length - 1)
@@ -571,8 +606,8 @@ namespace KingLastPiece
                     }
                     if (StateTime > 3.4f)
                     {
-                        // Endless: pick two of five permanent upgrades before the next round.
-                        if (IsEndless) EnterUpgrade();
+                        // (무쌍 mode has no rounds: never here.)
+                        if (IsEndless) StartWave(0);
                         else StartWave(WaveIndex + 1);
                     }
                     break;
@@ -594,7 +629,8 @@ namespace KingLastPiece
 
                 case GameState.Victory:
                     // The run is won: back to the title.
-                    if (StateTime > 2.5f && GameInput.Confirm) BackToTitle();
+                    // The run is won: back to the title (무쌍: from its results screen, after the nickname).
+                    if (!IsEndless && StateTime > 2.5f && GameInput.Confirm) BackToTitle();
                     break;
             }
         }
@@ -639,12 +675,12 @@ namespace KingLastPiece
         /// </summary>
         public async void SubmitRun(string nickname)
         {
-            if (Submitting || State != GameState.Dead || !IsEndless) return;
+            if (Submitting || (State != GameState.Dead && State != GameState.Victory) || !IsEndless) return;
             Submitting = true;
             nickname = OnlineBoard.Sanitize(nickname);
             if (nickname.Length > 0) OnlineBoard.SavedName = nickname;
             Sfx.Play("UI_Confirm");
-            var send = OnlineBoard.Submit(nickname, Round, RunTime, Record.kills, Record.damageDealt);
+            var send = OnlineBoard.Submit(nickname, Director != null ? Director.Elapsed : RunTime, Director != null ? Director.Level : 1, Record.kills, Record.damageDealt);
             await System.Threading.Tasks.Task.WhenAny(send, System.Threading.Tasks.Task.Delay(6000));
             if (this == null) return;   // the scene went away meanwhile
             Submitting = false;
@@ -755,7 +791,8 @@ namespace KingLastPiece
 
         void ApplyTimeScale()
         {
-            if (Paused) { Time.timeScale = 0f; return; }
+            // Paused, or a 무쌍 level-up choice on screen: the battle stands still.
+            if (Paused || (State == GameState.Upgrade && IsEndless)) { Time.timeScale = 0f; return; }
             Time.timeScale = (hitStopTimer > 0f ? HitStopScale : 1f) * (slowTimer > 0f ? slowScale : 1f);
         }
 

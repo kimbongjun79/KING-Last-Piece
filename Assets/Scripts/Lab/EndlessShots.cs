@@ -31,13 +31,17 @@ namespace KingLastPiece
         {
             game = GameManager.Instance;
             Application.targetFrameRate = 60;
-            LogArmies();
             yield return Frames(90);   // the title fades in
             yield return Shot("19_Title.png");
             game.DebugStartGame();
             game.Player.GodMode = true;
             yield return Frames(60);
-
+            yield return MusouRun();
+            File.WriteAllText(Path.Combine(dir, "endless_stats.tsv"), stats.ToString());
+            Application.Quit();
+            yield break;
+#pragma warning disable CS0162   // the old round-mode captures, kept for reference
+            LogArmies();
             yield return ClassroomShots();
             yield return EliteTiers();
             yield return DarkWindup();
@@ -51,6 +55,60 @@ namespace KingLastPiece
 
             File.WriteAllText(Path.Combine(dir, "endless_stats.tsv"), stats.ToString());
             Application.Quit();
+        }
+
+        /// <summary>
+        /// 무쌍 check: jumps the clock to a series of times and plays ~20 s at each, taking pieces off now and then (and
+        /// picking the first card at every level-up) — logs the board (alive, by type, dark), the pattern, level and frame
+        /// rate, with a few captures.
+        /// </summary>
+        IEnumerator MusouRun()
+        {
+            var d = game.Director;
+            if (d == null) { stats.Append("NoDirector\n"); yield break; }
+            stats.Append("Musou\tmin\talive\tpawn\tknight\tbishop\trook\tqueen\tdark\tpattern\tlevel\tkills\tfps\n");
+            float[] marks = { 0f, 3f, 5f, 7.4f, 10f, 15f, 20f, 25f };
+            bool levelShot = false;
+            foreach (float mark in marks)
+            {
+                d.DebugAdvanceTo(mark * 60f);
+                float t = 0f, kill = 0f, log = 0f;
+                int frames = 0;
+                float fpsT = 0f;
+                while (t < 20f)
+                {
+                    yield return null;
+                    float dt = Time.unscaledDeltaTime;
+                    t += dt; kill += dt; log += dt; fpsT += dt; frames++;
+                    if (game.State == GameManager.GameState.Upgrade)
+                    {
+                        if (!levelShot && game.Offers.Count > 0) { levelShot = true; yield return new WaitForSecondsRealtime(0.6f); yield return Shot("51_Musou_LevelUp.png"); }
+                        for (int i = 0; i < game.PicksNeeded; i++) game.PickUpgrade(i);
+                        game.ConfirmUpgrades();
+                        continue;
+                    }
+                    if (kill > 0.5f)
+                    {
+                        kill = 0f;
+                        foreach (var e in game.Enemies.ToArray())
+                        {
+                            if (e == null || e.IsDead || Random.value < 0.6f) continue;
+                            e.TakeHit(99999f, 0f, game.Player.transform.position);
+                            break;
+                        }
+                    }
+                    if (log > 5f)
+                    {
+                        log = 0f;
+                        int Of(PieceType p) => d.Count(e => e.Type == p);
+                        stats.Append($"Musou\t{d.Minutes:0.0}\t{d.Alive}\t{Of(PieceType.Pawn)}\t{Of(PieceType.Knight)}\t{Of(PieceType.Bishop)}\t{Of(PieceType.Rook)}\t{Of(PieceType.Queen)}\t" +
+                                     $"{d.Count(e => e.EliteTier > 0)}\t{d.CurrentName ?? "-"}\t{d.Level}\t{game.Record.kills}\t{frames / Mathf.Max(0.01f, fpsT):0}\n");
+                        frames = 0; fpsT = 0f;
+                    }
+                }
+                if (mark == 3f || mark == 15f || mark == 25f) yield return Shot($"50_Musou_{mark:00}min.png");
+            }
+            stats.Append($"End\tstate={game.State}\tlevel={d.Level}\titems={game.Player.Items.Count}\tkills={game.Record.kills}\n");
         }
 
         static IEnumerator Frames(int n)
