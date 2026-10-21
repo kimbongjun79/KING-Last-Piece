@@ -42,19 +42,19 @@ namespace KingLastPiece
 
         public static PlayerStats Classic() => new PlayerStats();
 
-        /// <summary>The endless mode's starting King: much weaker in every way, one flask, one roll.</summary>
+        /// <summary>The 무쌍 mode's starting King: full health, stamina and attack power, but slower and shorter-reaching, one flask, two rolls.</summary>
         public static PlayerStats EndlessStart() => new PlayerStats
         {
-            maxHealth = 70f,
-            maxStamina = 70f,
-            attackPower = 0.7f,
+            maxHealth = 100f,
+            maxStamina = 100f,
+            attackPower = 1f,
             attackSpeed = 0.9f,
             attackRange = 0.7f,
             scalesMotion = true,
             defense = 0f,
             maxFlasks = 1,
             healAmount = 20f,
-            maxDodges = 1,
+            maxDodges = 2,
             dodgeRecharge = 0.45f,
         };
 
@@ -157,23 +157,23 @@ namespace KingLastPiece
         {
             { UpgradeKind.AttackPower,   new UpgradeDef { title = "공격력",        step = 0.05f, cap = Inf,   floor = 0.3f, percent = true, desc = "모든 공격의 기본 피해 배율. 1단계 +5% (더하기)." } },
             { UpgradeKind.Damage,        new UpgradeDef { title = "데미지",        step = 0.05f, cap = Inf,   floor = -0.5f, percent = true, desc = "공격력과 따로 곱해지는 최종 피해 증가. 1단계 +5%. 공격력이 높아도 효율이 줄지 않습니다. 단점으로 음수가 되면 피해가 줄어듭니다." } },
-            { UpgradeKind.AttackSpeed,   new UpgradeDef { title = "공격 속도",     step = 0.04f, cap = 1.5f,  floor = 0.6f, percent = true, desc = "공격 동작(준비·휘두르기·회복) 속도. 1단계 +4%. 빠를수록 빈틈도 짧아집니다." } },
-            { UpgradeKind.AttackRange,   new UpgradeDef { title = "공격 범위",     step = 0.07f, cap = 1.3f,  floor = 0.5f, percent = true, desc = "공격이 닿는 거리와 돌진 거리. 1단계 +7%." } },
+            { UpgradeKind.AttackSpeed,   new UpgradeDef { title = "공격 속도",     step = 0.04f, cap = Inf,    floor = 0.6f, percent = true, desc = "공격 동작(준비·휘두르기·회복) 속도. 1단계 +4%. 빠를수록 빈틈도 짧아집니다." } },
+            { UpgradeKind.AttackRange,   new UpgradeDef { title = "공격 범위",     step = 0.07f, cap = Inf,    floor = 0.5f, percent = true, desc = "공격이 닿는 거리와 돌진 거리. 1단계 +7%." } },
             { UpgradeKind.CritChance,    new UpgradeDef { title = "치명타 확률",   step = 0.06f, cap = Inf,   floor = 0f,   percent = true, desc = "공격이 치명타가 될 확률. 1단계 +6%. 상한 없음 (100%면 모든 공격이 치명타). 치명타는 경직 피해도 2배." } },
-            { UpgradeKind.CritDamage,    new UpgradeDef { title = "치명타 피해",   step = 0.25f, cap = 3f,    floor = 1.2f, percent = true, desc = "치명타의 피해 배율. 1단계 +25%." } },
-            { UpgradeKind.StaggerPower,  new UpgradeDef { title = "경직 피해",     step = 0.1f,  cap = 2f,    floor = 0.5f, percent = true, desc = "공격이 적의 경직도를 깎는 양. 1단계 +10%. 경직도가 다 깎인 적은 기절해 움직이지 못합니다." } },
+            { UpgradeKind.CritDamage,    new UpgradeDef { title = "치명타 피해",   step = 0.25f, cap = Inf,      floor = 1.2f, percent = true, desc = "치명타의 피해 배율. 1단계 +25%." } },
+            { UpgradeKind.StaggerPower,  new UpgradeDef { title = "경직 피해",     step = 0.1f,  cap = Inf,      floor = 0.5f, percent = true, desc = "공격이 적의 경직도를 깎는 양. 1단계 +10%. 경직도가 다 깎인 적은 기절해 움직이지 못합니다." } },
             { UpgradeKind.MaxHealth,     new UpgradeDef { title = "최대 체력",     step = 8f,    cap = Inf,   floor = 30f,  desc = "최대 체력. 1단계 +8. 늘어난 만큼 바로 회복됩니다." } },
             { UpgradeKind.Defense,       new UpgradeDef { title = "방어력",        step = 6f,    cap = Inf,   floor = -60f, desc = "받는 피해 = 피해 × 100 / (100 + 방어력). 1단계 +6. 단점으로 음수가 되면 받는 피해가 늘어납니다 (−30이면 약 1.4배)." } },
             { UpgradeKind.HealAmount,    new UpgradeDef { title = "회복약 회복량", step = 4f,    cap = Inf,   floor = 5f,   desc = "회복약 하나가 회복하는 체력. 1단계 +4." } },
-            { UpgradeKind.Flask,         new UpgradeDef { title = "회복약 개수",   step = 1f,    cap = 5f,    floor = 1f,   whole = true, desc = "가질 수 있는 회복약 수 (최대 5). 라운드를 마칠 때마다 1개 채워지고, 다 차 있으면 그만큼 체력이 회복됩니다." } },
-            { UpgradeKind.LifeSteal,     new UpgradeDef { title = "흡혈",          step = 1f,    cap = 20f,   floor = 0f,   desc = "기물을 잡을 때마다 흡혈 수치만큼 체력 회복 (흡혈 5면 처치마다 5). 1단계 +1." } },
-            { UpgradeKind.MoveSpeed,     new UpgradeDef { title = "이동 속도",     step = 0.06f, cap = 1.3f,  floor = 0.7f, percent = true, desc = "걷기·달리기 속도. 1단계 +6%." } },
-            { UpgradeKind.DodgeRecharge, new UpgradeDef { title = "회피 충전 속도", step = 0.15f, cap = 1.6f, floor = 0.3f, percent = true, desc = "회피 횟수가 다시 차는 속도. 1단계 +15%." } },
-            { UpgradeKind.MaxDodges,     new UpgradeDef { title = "회피 횟수",     step = 1f,    cap = 3f,    floor = 1f,   whole = true, desc = "연달아 쓸 수 있는 회피(무적 구르기) 수 (최대 3)." } },
+            { UpgradeKind.Flask,         new UpgradeDef { title = "회복약 개수",   step = 1f,    cap = Inf,      floor = 1f,   whole = true, desc = "가질 수 있는 회복약 수. 무쌍 모드에서는 레벨이 오를 때마다 1개 채워집니다." } },
+            { UpgradeKind.LifeSteal,     new UpgradeDef { title = "흡혈",          step = 1f,    cap = Inf,     floor = 0f,   desc = "기물을 잡을 때마다 흡혈 수치만큼 체력 회복 (흡혈 5면 처치마다 5). 1단계 +1." } },
+            { UpgradeKind.MoveSpeed,     new UpgradeDef { title = "이동 속도",     step = 0.06f, cap = Inf,    floor = 0.7f, percent = true, desc = "걷기·달리기 속도. 1단계 +6%." } },
+            { UpgradeKind.DodgeRecharge, new UpgradeDef { title = "회피 충전 속도", step = 0.15f, cap = Inf,   floor = 0.3f, percent = true, desc = "회피 횟수가 다시 차는 속도. 1단계 +15%." } },
+            { UpgradeKind.MaxDodges,     new UpgradeDef { title = "회피 횟수",     step = 1f,    cap = Inf,      floor = 1f,   whole = true, desc = "연달아 쓸 수 있는 회피(무적 구르기) 수." } },
             { UpgradeKind.MaxStamina,    new UpgradeDef { title = "최대 기력",     step = 15f,   cap = Inf,   floor = 30f,  desc = "최대 기력. 공격·강공격·달리기에 쓰입니다. 1단계 +15." } },
-            { UpgradeKind.StaminaRegen,  new UpgradeDef { title = "기력 회복 속도", step = 0.2f, cap = 2f,    floor = 0.5f, percent = true, desc = "기력이 다시 차는 속도. 1단계 +20%." } },
-            { UpgradeKind.LightCost,     new UpgradeDef { title = "일반공격 기력 절약", step = 0.08f, cap = 0.6f, floor = 0f, percent = true, desc = "일반공격의 기력 소모 감소. 1단계 8%." } },
-            { UpgradeKind.HeavyCost,     new UpgradeDef { title = "강공격 기력 절약", step = 0.08f, cap = 0.5f, floor = 0f, percent = true, desc = "강공격의 기력 소모 감소. 1단계 8%. 강공격은 필요한 기력이 다 있어야 나갑니다." } },
+            { UpgradeKind.StaminaRegen,  new UpgradeDef { title = "기력 회복 속도", step = 0.2f, cap = Inf,      floor = 0.5f, percent = true, desc = "기력이 다시 차는 속도. 1단계 +20%." } },
+            { UpgradeKind.LightCost,     new UpgradeDef { title = "일반공격 기력 절약", step = 0.08f, cap = Inf,   floor = 0f, percent = true, desc = "일반공격의 기력 소모 감소. 1단계 8%." } },
+            { UpgradeKind.HeavyCost,     new UpgradeDef { title = "강공격 기력 절약", step = 0.08f, cap = Inf,   floor = 0f, percent = true, desc = "강공격의 기력 소모 감소. 1단계 8%. 강공격은 필요한 기력이 다 있어야 나갑니다." } },
         };
 
         public static UpgradeDef Def(UpgradeKind k) => defs[k];

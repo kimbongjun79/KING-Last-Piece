@@ -25,6 +25,8 @@ namespace KingLastPiece
         public float topY = -0.4f;
         [Tooltip("Board half-width the clock's placement is for (it follows the board's edge from there).")]
         public float clockBoardHalf = 8f;
+        [Tooltip("How much further out than its placement the clock stands from the board's edge.")]
+        public float clockMargin = 2.5f;
 
         Vector3 modelScale;
         bool measured;
@@ -61,13 +63,15 @@ namespace KingLastPiece
             }
             // The clock stays where it was placed (by hand in the scene); it only moves out with the board's edge when
             // the endless board grows, and back when it shrinks.
-            if (clock != null && !Mathf.Approximately(board, clockBoardHalf))
+            // clockMargin keeps it a little further out than where it was first placed.
+            float clockAt = board + clockMargin;
+            if (clock != null && !Mathf.Approximately(clockAt, clockBoardHalf))
             {
                 var p = clock.localPosition;
                 var away = new Vector3(p.x, 0f, p.z);
                 away = away.sqrMagnitude > 0.01f ? away.normalized : Vector3.right;
-                clock.localPosition = p + away * (board - clockBoardHalf);
-                clockBoardHalf = board;
+                clock.localPosition = p + away * (clockAt - clockBoardHalf);
+                clockBoardHalf = clockAt;
             }
             // Other things lying on the table beside the board (the score sheet) move out with its edge the same way.
             for (int i = 0; i < followers.Count && i < followerHalf.Count; i++)

@@ -4,7 +4,7 @@ using UnityEngine;
 namespace KingLastPiece
 {
     /// <summary>
-    /// 무쌍 모드 (scene EndlessMode): survive 30 minutes on a 16×16 board while the black army keeps coming — a
+    /// 무쌍 모드 (scene EndlessMode): survive 30 minutes on a 12×12 board while the black army keeps coming — a
     /// Vampire-Survivors-style spawn director.
     /// <list type="bullet">
     /// <item>A floor of pieces on the board that rises with time (a few at first, ~60 by the end), topped up a piece at
@@ -12,7 +12,8 @@ namespace KingLastPiece
     /// <item>Spawn patterns (<see cref="MusouPattern"/>), one at a time: each sets pieces down and waits for a kill
     /// condition (all of them taken, a key piece taken, every 5 pawns…), then the next is chosen by the time and by what
     /// is still standing on the board.</item>
-    /// <item>Every 10 minutes the army grows stronger for good (health, stagger resistance, more dark pieces).</item>
+    /// <item>Every 2 minutes the army's strength is refreshed from logarithmic curves (health, attack); every fifth refresh
+    /// the pieces grow a size step. More dark pieces as time goes on.</item>
     /// <item>Bosses on a schedule: a queen at 7:30, a dark I queen at 15:00, a dark II queen at 22:30. Each one taken
     /// opens a boss chest (five items, keep two).</item>
     /// <item>Captures give experience; every level is an item choice (three, keep one).</item>
@@ -21,7 +22,7 @@ namespace KingLastPiece
     public class MusouDirector
     {
         public const float Duration = 30f * 60f, EraLength = 10f * 60f;
-        public const int BoardSize = 16, MaxAlive = 90;
+        public const int BoardSize = 12, MaxAlive = 70;
         static readonly (float at, int tier)[] BossTimes = { (450f, 0), (900f, 1), (1350f, 2) };
 
         readonly GameManager game;
@@ -69,9 +70,25 @@ namespace KingLastPiece
 
         // ---------------------------------------------------------------- strength
 
-        /// <summary>Health of a newly set piece: +60% for each ten minutes (queens are sturdier, as in the old endless mode).</summary>
-        public float HealthMult(PieceType t) => (1f + 0.6f * Era) * (t == PieceType.Queen ? EndlessRounds.QueenHealthBoost : 1f);
-        public float StaggerMult => 1f + 0.3f * Era;
+        // The army's strength is refreshed every two minutes ("strength level" k = 0…15) from logarithmic curves, so it
+        // climbs fast early and levels off: health ×(1 + 0.9·ln(1 + 0.6k)) — ×2.25 at 10 min, ×3.07 at 30 — and
+        // attack ×(1 + 0.45·ln(1 + 0.6k)) — ×1.62 at 10 min, ×2.04 at 30. Every five refreshes (10, 20 min) the pieces
+        // also grow a size step (+10%). Pieces keep the strength they were set down with.
+        public const float StrengthInterval = 120f;
+        public const int SizeEvery = 5;
+
+        /// <summary>Strength level: 0 at the start, +1 every two minutes.</summary>
+        public int StrengthLevel => Mathf.FloorToInt(Elapsed / StrengthInterval);
+        static float Curve(int k, float scale) => 1f + scale * Mathf.Log(1f + 0.6f * k);
+        public float HealthBoost => Curve(StrengthLevel, 0.9f);
+        public float DamageBoost => Curve(StrengthLevel, 0.45f);
+        public int SizeSteps => StrengthLevel / SizeEvery;
+        public float SizeMult => 1f + 0.1f * SizeSteps;
+        public float NextStrengthIn => StrengthInterval - Elapsed % StrengthInterval;
+
+        /// <summary>Health of a newly set piece at the current strength (queens are sturdier, as in the old endless mode).</summary>
+        public float HealthMult(PieceType t) => HealthBoost * (t == PieceType.Queen ? EndlessRounds.QueenHealthBoost : 1f);
+        public float StaggerMult => 1f + 0.3f * SizeSteps;
 
         /// <summary>How likely a common piece is dark: none for the first three minutes, rising to 60% by the end.</summary>
         float DarkChance => Mathf.Clamp((Minutes - 3f) / 27f * 0.6f + 0.12f * Era, 0f, 0.7f);
@@ -235,14 +252,14 @@ namespace KingLastPiece
 
         // ---------------------------------------------------------------- flow
 
-        /// <summary>Pieces always on the board: a few at first, about 60 at the end.</summary>
-        public int MinAlive => Mathf.Min(60, Mathf.RoundToInt(3f + 1.9f * Minutes));
+        /// <summary>Pieces always on the board: a few at first, about 48 at the end (on the 12×12 board).</summary>
+        public int MinAlive => Mathf.Min(48, Mathf.RoundToInt(3f + 1.5f * Minutes));
         /// <summary>Seconds between extra pieces dripping in on top of the floor (4 s at first, 0.8 s at the end).</summary>
         float DripInterval => Mathf.Lerp(4f, 0.8f, Elapsed / Duration);
 
         public MusouPattern Current { get; private set; }
         public string CurrentName => Current?.name;
-        int nextBoss, lastEra;
+        int nextBoss, lastStrength;
         float gap = 2.5f, fillTimer, dripTimer = 3f;
         string lastPattern;
         readonly List<EnemyBase> bosses = new List<EnemyBase>();
@@ -260,11 +277,14 @@ namespace KingLastPiece
         public void Update(float dt)
         {
             Elapsed += dt;
-            if (Era != lastEra)
+            if (StrengthLevel != lastStrength)
             {
-                lastEra = Era;
-                game.ShowBanner($"{Era * 10}분  ·  흑색 군대가 더 강해진다");
-                Sfx.Play("GAME_FinalRound");
+                // Every two minutes: the strength refreshes (every fifth time the pieces grow too).
+                lastStrength = StrengthLevel;
+                bool grow = StrengthLevel % SizeEvery == 0;
+                game.ShowBanner($"흑색 군대 강화 {StrengthLevel}단계  ·  체력 ×{HealthBoost:0.00}  공격 ×{DamageBoost:0.00}" +
+                                (grow ? "  ·  기물이 커진다" : ""));
+                Sfx.Play(grow ? "GAME_FinalRound" : "GAME_RoundStart");
             }
             if (nextBoss < BossTimes.Length && Elapsed >= BossTimes[nextBoss].at) SpawnBoss(BossTimes[nextBoss++].tier);
 
@@ -280,7 +300,7 @@ namespace KingLastPiece
             if (dripTimer <= 0f)
             {
                 dripTimer = DripInterval;
-                if (alive < MaxAlive - 10) SpawnNear(RollType(), RollTier(), 4, 9);
+                if (alive < MaxAlive - 8) SpawnNear(RollType(), RollTier(), 4, 9);
             }
 
             // One pattern at a time; a short breath between them (shorter as time goes on).

@@ -226,22 +226,23 @@ namespace KingLastPiece
         float auraOpacity = 1f;
 
         /// <summary>
-        /// Makes this piece an empowered piece of the given tier (0 leaves it normal) and scales its health by
-        /// <paramref name="healthMult"/> on top (the endless mode's every-40-rounds boost). Call right after spawning.
+        /// Makes this piece an empowered piece of the given tier (0 leaves it normal), with the 무쌍 mode's strength of
+        /// the time on top: <paramref name="healthMult"/>, <paramref name="damageMult"/> and <paramref name="sizeMult"/>
+        /// (the size steps up only every few strength updates). Call right after spawning.
         /// </summary>
-        public void Empower(int tier, float healthMult = 1f, float staggerMult = 1f)
+        public void Empower(int tier, float healthMult = 1f, float staggerMult = 1f, float damageMult = 1f, float sizeMult = 1f)
         {
             int t = Mathf.Clamp(tier, 0, MaxEliteTier);
             EliteTier = t;
             MaxHealth *= EliteHealth[t] * healthMult;
             Health = MaxHealth;
-            damageMult = EliteDamage[t];
+            this.damageMult = EliteDamage[t] * damageMult;
             tempo = EliteTempo[t];
-            // Tougher pieces are bigger and faster: both grow with the whole health boost (tier × the endless mode's
-            // every-40-rounds bonus), e.g. Dark II ≈ 22% bigger and 13% faster.
-            float boost = EliteHealth[t] * healthMult - 1f;
+            // Dark pieces are bigger and faster by their tier (Dark II ≈ 22% bigger, 13% faster); the 무쌍 mode's
+            // size steps come on top.
+            float boost = EliteHealth[t] - 1f;
             moveSpeed *= Mathf.Min(1.4f, 1f + 0.07f * boost);
-            Grow(Mathf.Min(1.4f, 1f + 0.12f * boost));
+            Grow(Mathf.Min(1.6f, (1f + 0.12f * boost) * sizeMult));
             float st = EliteStagger[t] * staggerMult;
             maxPoise *= st;
             poise = maxPoise;

@@ -230,7 +230,7 @@ namespace KingLastPiece
         public MusouDirector Director { get; private set; }
 
         /// <summary>
-        /// A new 무쌍 run: the King from scratch (weak stats, no items) in the middle of the 16×16 board, and the
+        /// A new 무쌍 run: the King from scratch (weak stats, no items) in the middle of the 12×12 board, and the
         /// director starts the clock.
         /// </summary>
         void StartMusou()
@@ -272,7 +272,8 @@ namespace KingLastPiece
         {
             var e = SpawnEnemy(type, pos);
             bool musou = IsEndless && Director != null;
-            e.Empower(tier, musou ? Director.HealthMult(type) : 1f, musou ? Director.StaggerMult : 1f);
+            if (musou) e.Empower(tier, Director.HealthMult(type), Director.StaggerMult, Director.DamageBoost, Director.SizeMult);
+            else e.Empower(tier);
             return e;
         }
 

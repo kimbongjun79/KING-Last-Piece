@@ -356,7 +356,7 @@ namespace KingLastPiece
                 new GUIStyle(mid) { fontSize = Mathf.RoundToInt(40 * scale) }, new Color(1f, 0.95f, 0.85f));
             string next = d.NextBossIn >= 0f ? $"{d.NextBossName}까지 {BestRecord.FormatTime(d.NextBossIn)}"
                 : $"생존까지 {BestRecord.FormatTime(d.Remaining)}";
-            string era = d.Era == 0 ? "" : $"   ·   흑색 군대 강화 {d.Era}단계";
+            string era = $"   ·   강화 {d.StrengthLevel}단계 (체력 ×{d.HealthBoost:0.00}  공격 ×{d.DamageBoost:0.00})  다음 {BestRecord.FormatTime(d.NextStrengthIn)}";
             Text(new Rect(0, bh + 52 * scale, W, 26 * scale), next + era,
                 new GUIStyle(small) { fontSize = Mathf.RoundToInt(18 * scale) }, new Color(Gold.r, Gold.g, Gold.b, 0.9f));
         }
@@ -899,20 +899,20 @@ namespace KingLastPiece
             {
                 ("공격력", $"{Mathf.RoundToInt(s.attackPower * 100f)}%", D(UpgradeKind.AttackPower)),
                 ("데미지", $"{(s.damage >= 0f ? "+" : "−")}{Mathf.RoundToInt(Mathf.Abs(s.damage) * 100f)}%   (최종 피해 ×{s.DamageMultiplier:0.00})", D(UpgradeKind.Damage)),
-                ("공격 속도", $"{Mathf.RoundToInt(s.attackSpeed * 100f)}%   (최대 150%)", D(UpgradeKind.AttackSpeed)),
-                ("공격 범위", $"{Mathf.RoundToInt(s.attackRange * 100f)}%   (최대 130%)", D(UpgradeKind.AttackRange)),
-                ("치명타", $"확률 {Mathf.RoundToInt(s.critChance * 100f)}%   ·   피해 {Mathf.RoundToInt(s.critDamage * 100f)}% (최대 300%)",
+                ("공격 속도", $"{Mathf.RoundToInt(s.attackSpeed * 100f)}%", D(UpgradeKind.AttackSpeed)),
+                ("공격 범위", $"{Mathf.RoundToInt(s.attackRange * 100f)}%", D(UpgradeKind.AttackRange)),
+                ("치명타", $"확률 {Mathf.RoundToInt(s.critChance * 100f)}%   ·   피해 {Mathf.RoundToInt(s.critDamage * 100f)}%",
                     D(UpgradeKind.CritChance) + "\n" + D(UpgradeKind.CritDamage)),
                 ("최대 체력", $"{Mathf.RoundToInt(p.MaxHealth)}", D(UpgradeKind.MaxHealth)),
                 ("방어력", $"{Mathf.RoundToInt(s.defense)}   (받는 피해 {(dmgCut >= 0f ? "−" : "+")}{Mathf.RoundToInt(Mathf.Abs(dmgCut) * 100f)}%)", D(UpgradeKind.Defense)),
-                ("회복약", $"{p.MaxFlasks}개 (최대 5)   ·   회복량 {Mathf.RoundToInt(s.healAmount)}", D(UpgradeKind.Flask) + "\n" + D(UpgradeKind.HealAmount)),
-                ("흡혈", $"처치마다 {Mathf.RoundToInt(s.lifeSteal)} 회복   (최대 20)", D(UpgradeKind.LifeSteal)),
-                ("기력", $"최대 {Mathf.RoundToInt(p.MaxStamina)}   ·   회복 속도 {Mathf.RoundToInt(s.staminaRegen * 100f)}% (최대 200%)",
+                ("회복약", $"{p.MaxFlasks}개   ·   회복량 {Mathf.RoundToInt(s.healAmount)}", D(UpgradeKind.Flask) + "\n" + D(UpgradeKind.HealAmount)),
+                ("흡혈", $"처치마다 {Mathf.RoundToInt(s.lifeSteal)} 회복", D(UpgradeKind.LifeSteal)),
+                ("기력", $"최대 {Mathf.RoundToInt(p.MaxStamina)}   ·   회복 속도 {Mathf.RoundToInt(s.staminaRegen * 100f)}%",
                     D(UpgradeKind.MaxStamina) + "\n" + D(UpgradeKind.StaminaRegen)),
                 ("공격당 기력 소모", $"일반공격 {p.LightAttackCost:0.#} (−{Mathf.RoundToInt(s.lightCostCut * 100f)}%)   ·   강공격 {p.HeavyAttackCost:0.#} (−{Mathf.RoundToInt(s.heavyCostCut * 100f)}%)",
                     D(UpgradeKind.LightCost) + "\n" + D(UpgradeKind.HeavyCost)),
-                ("이동 속도", $"{Mathf.RoundToInt(s.moveSpeed * 100f)}%   (최대 130%)", D(UpgradeKind.MoveSpeed)),
-                ("회피", $"{p.MaxDodges}회 (최대 3)   ·   1회 충전 {p.DodgeRechargeTime:0.00}초", D(UpgradeKind.MaxDodges) + "\n" + D(UpgradeKind.DodgeRecharge)),
+                ("이동 속도", $"{Mathf.RoundToInt(s.moveSpeed * 100f)}%", D(UpgradeKind.MoveSpeed)),
+                ("회피", $"{p.MaxDodges}회   ·   1회 충전 {p.DodgeRechargeTime:0.00}초", D(UpgradeKind.MaxDodges) + "\n" + D(UpgradeKind.DodgeRecharge)),
                 ("보유 아이템", p.Items.Count == 0 ? "없음" : $"{p.Items.Count}개   (마우스를 올려 보기)", ItemsTooltip),
             }, area.width * 0.36f);
         }

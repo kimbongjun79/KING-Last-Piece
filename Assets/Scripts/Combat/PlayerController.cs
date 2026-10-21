@@ -184,8 +184,8 @@ namespace KingLastPiece
         }
 
         /// <summary>Stamina a light combo hit / the heavy attack costs (for the stats screen).</summary>
-        public float LightAttackCost => (Style ?? AttackStyles.Default).lights[0].cost * LightCostScale * (1f - Stats.lightCostCut);
-        public float HeavyAttackCost => (Style ?? AttackStyles.Default).heavy.cost * (1f - Stats.heavyCostCut);
+        public float LightAttackCost => (Style ?? AttackStyles.Default).lights[0].cost * LightCostScale * Mathf.Max(0f, 1f - Stats.lightCostCut);
+        public float HeavyAttackCost => (Style ?? AttackStyles.Default).heavy.cost * Mathf.Max(0f, 1f - Stats.heavyCostCut);
         bool HeavyAffordable => InfiniteStamina || Stamina >= HeavyAttackCost;
 
         /// <summary>Rolls a critical hit: true with <see cref="PlayerStats.critChance"/>; <paramref name="mult"/> is the damage factor.</summary>
@@ -908,8 +908,8 @@ namespace KingLastPiece
             atkRangeMul = atkWhirl ? WhirlRange : 1f;
             atkDamageMul = atkWhirl ? WhirlDamage : 1f;
             atkComboHit = heavy ? -1 : comboIndex;
-            Consume(heavy ? atk.cost * (1f - Stats.heavyCostCut) * (danceFinisher ? 0.5f : 1f)
-                          : atk.cost * LightCostScale * (1f - Stats.lightCostCut) * (atkWhirl ? WhirlCost : 1f));
+            Consume(heavy ? atk.cost * Mathf.Max(0f, 1f - Stats.heavyCostCut) * (danceFinisher ? 0.5f : 1f)
+                          : atk.cost * LightCostScale * Mathf.Max(0f, 1f - Stats.lightCostCut) * (atkWhirl ? WhirlCost : 1f));
             atkUsesSlashFx = FxLibrary.Instance != null && System.Array.Exists(atk.hits, h => h.fx != SlashFxKind.None);
             hitStopUsed = false;
 

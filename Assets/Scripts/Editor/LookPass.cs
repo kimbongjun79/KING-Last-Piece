@@ -21,7 +21,8 @@ namespace KingLastPiece.EditorTools
     {
         // 2: the new models' embedded textures are extracted first, and their objects rebuilt with them.
         // 3: marble is not metal — the piece materials lose their metallic sheen (the King looked black).
-        const int Version = 3;
+        // 4: the chess clock moves a little further out from the board.
+        const int Version = 4;
         static readonly string[] NewModels =
         {
             "Black_Gothic_Gem_Tower_v01_with VARCO", "Metal_Filing_Cabinet_v01_with VARCO",
@@ -80,7 +81,12 @@ namespace KingLastPiece.EditorTools
                 foreach (var go in stale) if (go != null) Object.DestroyImmediate(go);
                 if (path.EndsWith("NormalMode.unity")) WorldBuilder.GemTowers(board.transform);
                 var classroom = board.transform.Find(ClassroomBlockout.RootName);
-                if (classroom != null) ClassroomBlockout.Dress(classroom);
+                if (classroom != null)
+                {
+                    ClassroomBlockout.Dress(classroom);
+                    var fit = classroom.GetComponentInChildren<ChessTableFit>(true);
+                    if (fit != null) { fit.Fit(); EditorUtility.SetDirty(fit); }
+                }
                 SaveMeshes();
                 WorldBake.SaveMaterials(board.gameObject, Dir);
                 EditorSceneManager.MarkSceneDirty(scene);

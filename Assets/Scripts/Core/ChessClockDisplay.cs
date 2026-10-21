@@ -12,6 +12,8 @@ namespace KingLastPiece
         public Transform leftFace, rightFace;
         [Tooltip("Digit height in the anchors' local units.")]
         public float digitHeight = 1f;
+        [Tooltip("Show the time on the right face (and the round on the left) instead of the other way round.")]
+        public bool timeOnRight = true;
         public Color lit = new Color(1f, 0.32f, 0.12f);
         public float litIntensity = 3.5f;
         public Color unlit = new Color(0.12f, 0.03f, 0.02f);
@@ -40,8 +42,9 @@ namespace KingLastPiece
         {
             on = MaterialLib.Emissive(lit, litIntensity);
             off = MaterialLib.Get(unlit, 0.6f);
-            left = BuildFace(leftFace, true);
-            right = BuildFace(rightFace, false);
+            // The time sits on the face toward the player (the right one as the clock stands on the table).
+            left = BuildFace(timeOnRight ? rightFace : leftFace, true);
+            right = BuildFace(timeOnRight ? leftFace : rightFace, false);
         }
 
         /// <summary>Four digits; with a colon between the pairs on the time face.</summary>
