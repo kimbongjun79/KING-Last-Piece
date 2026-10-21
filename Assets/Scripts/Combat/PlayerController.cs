@@ -556,10 +556,12 @@ namespace KingLastPiece
             foreach (var fx in item.effects)
                 if (fx.kind == UpgradeKind.Flask && fx.steps > 0) Flasks = Mathf.Min(MaxFlasks, Flasks + fx.steps);
         }
-        /// <summary>무쌍 level-up: the once-a-round items (Stalemate, Gambit) are ready again.</summary>
+        /// <summary>무쌍 level-up: a fifth of the maximum health back, stamina full, and the once-a-round items (Stalemate, Gambit) ready again.</summary>
         public void OnLevelUp()
         {
             stalemateUsed = gambitUsed = false;
+            Restore(MaxHealth * 0.2f);
+            Stamina = MaxStamina;
         }
 
         /// <summary>
