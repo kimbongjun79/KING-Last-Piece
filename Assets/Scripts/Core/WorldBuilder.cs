@@ -73,6 +73,25 @@ namespace KingLastPiece
         }
 
         const string GemTowerModel = "Models/Black_Gothic_Gem_Tower_v01_with VARCO";
+        /// <summary>The tower's red gems only (cut from its base colour), used as its emission map.</summary>
+        const string GemEmission = "Models/Textures/Black_Gothic_Gem_Tower_Emission";
+        const float GemGlow = 6f;
+
+        /// <summary>The tower's gems glow red (an emission map of the gems alone, strong enough to bloom).</summary>
+        static void GlowGems(Transform tower)
+        {
+            var map = Resources.Load<Texture2D>(GemEmission);
+            if (map == null) return;
+            foreach (var r in tower.GetComponentsInChildren<Renderer>())
+                foreach (var m in r.sharedMaterials)
+                {
+                    if (m == null) continue;
+                    m.EnableKeyword("_EMISSION");
+                    m.SetTexture("_EmissionMap", map);
+                    m.SetColor("_EmissionColor", Color.white * GemGlow);
+                    m.globalIlluminationFlags = MaterialGlobalIlluminationFlags.None;
+                }
+        }
         const float GemTowerHeight = 8f, HallFloorTop = -0.7f;
 
         /// <summary>
@@ -94,6 +113,7 @@ namespace KingLastPiece
                 if (tower == null) return;   // the model is missing: keep the pillars
                 tower.name = "Gem Tower";
                 tower.position += at;
+                GlowGems(tower);
                 foreach (Transform part in pillar)
                     if (part.name == "Column" || part.name == "Capital" || part.name == "Brazier Fire") part.gameObject.SetActive(false);
             }

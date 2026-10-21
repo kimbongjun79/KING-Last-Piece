@@ -24,7 +24,8 @@ namespace KingLastPiece.EditorTools
         // 4: the chess clock moves a little further out from the board.
         // 5: placed against the 8×8 board (a play session can leave the static board size at 12), props rebuilt there.
         // 6: the dark hall's light in NormalMode (HallAmbience + its post-processing profile).
-        const int Version = 6;
+        // 7: the gem towers rebuilt with glowing gems (emission map), no crown lights.
+        const int Version = 7;
         static readonly string[] NewModels =
         {
             "Black_Gothic_Gem_Tower_v01_with VARCO", "Metal_Filing_Cabinet_v01_with VARCO",

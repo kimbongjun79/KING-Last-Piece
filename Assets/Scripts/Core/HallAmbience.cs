@@ -18,7 +18,7 @@ namespace KingLastPiece
     {
         [Header("Moonlight (main light, soft shadows)")]
         public Color moonColor = new Color(0.55f, 0.63f, 0.95f);
-        public float moonIntensity = 0.55f;
+        public float moonIntensity = 0.25f;
         public Vector3 moonAngles = new Vector3(62f, -28f, 0f);
         [Range(0f, 1f)] public float moonShadowStrength = 0.55f;
 
@@ -31,9 +31,6 @@ namespace KingLastPiece
         public Color rimColor = new Color(0.62f, 0.72f, 1f);
         public float rimIntensity = 240f;
 
-        [Header("Gem towers")]
-        public Color gemColor = new Color(0.62f, 0.42f, 1f);
-        public float gemIntensity = 40f, gemRange = 16f;
 
         [Header("King's light")]
         public Color kingColor = new Color(1f, 0.86f, 0.62f);
@@ -137,35 +134,17 @@ namespace KingLastPiece
             Look();
         }
 
-        /// <summary>A violet glow at the crown of every gem tower.</summary>
+        /// <summary>The gems themselves glow now (emission on the tower material): the old point lights at the crowns go.</summary>
         void GemLights()
         {
             var pillars = transform.Find("Pillars");
             if (pillars == null) return;
             foreach (Transform pillar in pillars)
             {
-                var tower = pillar.Find("Gem Tower");
-                if (tower == null) continue;
-                var light = pillar.Find("Gem Light")?.GetComponent<Light>();
-                if (light == null)
-                {
-                    light = new GameObject("Gem Light").AddComponent<Light>();
-                    light.transform.SetParent(pillar, false);
-                }
-                var rs = tower.GetComponentsInChildren<Renderer>();
-                Vector3 top = tower.position + Vector3.up * 7f;
-                if (rs.Length > 0)
-                {
-                    var b = rs[0].bounds;
-                    foreach (var r in rs) b.Encapsulate(r.bounds);
-                    top = new Vector3(b.center.x, b.max.y - b.size.y * 0.12f, b.center.z);
-                }
-                light.transform.position = top;
-                light.type = LightType.Point;
-                light.color = gemColor;
-                light.intensity = gemIntensity;
-                light.range = gemRange;
-                light.shadows = LightShadows.None;
+                var old = pillar.Find("Gem Light");
+                if (old == null) continue;
+                if (Application.isPlaying) Destroy(old.gameObject);
+                else DestroyImmediate(old.gameObject);
             }
         }
 

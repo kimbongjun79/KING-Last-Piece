@@ -782,7 +782,7 @@ namespace KingLastPiece
             if (telegraph != null) telegraph.SetProgress(p);
 
             // Ramp a red glow, then a bright "glint" right before release.
-            SetGlow(p > 0.82f ? WindupGlow * 1.8f : WindupGlow * (p * 0.7f));
+            SetGlow(p > 0.82f ? WindupGlow * 0.9f : WindupGlow * (p * 0.6f));
 
             switch (plan.kind)
             {

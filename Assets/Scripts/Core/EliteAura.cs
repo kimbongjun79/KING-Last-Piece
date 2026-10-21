@@ -15,14 +15,14 @@ namespace KingLastPiece
 
         /// <summary>
         /// Wraps <paramref name="model"/> in the tier's aura (null when the pack isn't there). Two tiers: Dark I wears the
-        /// pack's "Dark Lvl 1" at 0.6× size, Dark II its "Dark Lvl 3" at full size.
+        /// pack's "Dark Lvl 1" at 0.6× size, Dark II its "Dark Lvl 3" at 0.85× size.
         /// </summary>
         public static GameObject Attach(Transform model, PieceType type, int tier)
         {
             var lib = FxLibrary.Instance;
             if (lib == null || lib.eliteAura == null || tier < 1 || lib.eliteAura.Length == 0) return null;
             int index = Mathf.Min(tier >= 2 ? 2 : 0, lib.eliteAura.Length - 1);
-            float size = tier >= 2 ? 1f : 0.6f;
+            float size = tier >= 2 ? 0.85f : 0.6f;
             var prefab = lib.eliteAura[index];
             if (prefab == null) return null;
 

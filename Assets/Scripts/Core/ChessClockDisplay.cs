@@ -95,7 +95,8 @@ namespace KingLastPiece
             float time = g != null ? g.RunTime : 0f;
             int secs = Mathf.FloorToInt(time);
             string l = secs < 3600 ? $"{secs / 60:00}{secs % 60:00}" : $"{secs / 3600,2}{secs / 60 % 60:00}";
-            string r = g != null && g.UsesRounds ? $"{Mathf.Min(9999, g.IsEndless ? g.Round : g.WaveIndex + 1),4}" : "    ";
+            // The right face: captures in 무쌍 mode, the round otherwise.
+            string r = g != null && g.UsesRounds ? $"{Mathf.Min(9999, g.IsEndless ? g.Record.kills : g.WaveIndex + 1),4}" : "    ";
             if (l != shownLeft) { Show(left, l); shownLeft = l; }
             if (r != shownRight) { Show(right, r); shownRight = r; }
         }
