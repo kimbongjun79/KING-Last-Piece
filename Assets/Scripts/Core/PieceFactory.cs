@@ -3,7 +3,8 @@ using UnityEngine;
 
 namespace KingLastPiece
 {
-    public enum PieceType { Pawn, Knight, Bishop, Rook, Queen, King }
+    /// <summary>Megatron: the 체스메가트론 boss (built of pawns; its model type is the pawn).</summary>
+    public enum PieceType { Pawn, Knight, Bishop, Rook, Queen, King, Megatron }
 
     /// <summary>Builds chess piece models out of primitives. Model origin is at the base of the piece.</summary>
     public static class PieceFactory

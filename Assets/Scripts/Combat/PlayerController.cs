@@ -56,7 +56,10 @@ namespace KingLastPiece
         public EnemyBase LockTarget { get; private set; }
         public AttackStyle Style { get; set; } = AttackStyles.Default;
         public bool IsInvulnerable =>
-            (state == State.Dodge && stateTime >= IFrameStart && stateTime <= IFrameEnd) || state == State.Counter || stalemateTimer > 0f;
+            (state == State.Dodge && stateTime >= IFrameStart && stateTime <= IFrameEnd) || state == State.Counter || stalemateTimer > 0f ||
+            perfectGuard > 0f;
+        /// <summary>Seconds of invincibility left from a perfect dodge (its whole slow motion).</summary>
+        float perfectGuard;
         public int DodgeCharges { get; private set; }
         public float DodgeRechargeProgress => DodgeCharges >= MaxDodges ? 1f : Mathf.Clamp01(dodgeRecharge / DodgeRechargeTime);
         public int JustDodgeCount { get; private set; }
@@ -644,6 +647,8 @@ namespace KingLastPiece
         {
             float dt = Time.deltaTime;
             if (stalemateTimer > 0f) stalemateTimer -= dt;
+            // The perfect dodge's guard runs on the King's own clock (slow motion doesn't stretch it).
+            if (perfectGuard > 0f) perfectGuard -= Game != null ? Game.PlayerDeltaTime : dt;
             if (state == State.Dead)
             {
                 stateTime += dt;
@@ -1368,6 +1373,13 @@ namespace KingLastPiece
             return TakeHit(damage, poiseDamage, attacker.transform.position);
         }
 
+        /// <summary>Lab: a perfect dodge as if <paramref name="attacker"/>'s blow had just been rolled through.</summary>
+        public void DebugPerfectDodge(EnemyBase attacker)
+        {
+            justThisDodge = false;
+            TriggerJustDodge(attacker);
+        }
+
         /// <summary>An enemy attack narrowly missed the King.</summary>
         public void NotifyNearMiss(EnemyBase attacker)
         {
@@ -1384,6 +1396,8 @@ namespace KingLastPiece
             Stamina = Mathf.Min(MaxStamina, Stamina + MaxStamina * 0.5f);
             Sfx.Play("PL_PerfectDodge");
             DodgeCharges = Mathf.Min(MaxDodges, DodgeCharges + 1);
+            // Invincible for the whole slow motion: nothing that follows the dodged blow can land in the meantime.
+            perfectGuard = SlowDuration;
             Game.SlowMo(SlowScale, SlowDuration);
             Game.Rig.Kick(0.45f);
             // No burst effects (wind ring, shockwave, sparks): slow motion, the screen tint and a cool flash on the King
