@@ -217,8 +217,10 @@ namespace KingLastPiece.EditorTools
                     AssetDatabase.AddObjectToAsset(c, profile);
                 }
             EditorUtility.SetDirty(profile);
+            // A fresh component each pass: the values saved in the scene would otherwise hide the current defaults.
             var hall = board.GetComponent<HallAmbience>();
-            if (hall == null) hall = board.gameObject.AddComponent<HallAmbience>();
+            if (hall != null) Object.DestroyImmediate(hall);
+            hall = board.gameObject.AddComponent<HallAmbience>();
             hall.profile = profile;
             hall.Apply();
             EditorUtility.SetDirty(hall);

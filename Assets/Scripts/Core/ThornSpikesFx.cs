@@ -35,6 +35,18 @@ namespace KingLastPiece
             }
         }
 
+        /// <summary>The King's body material (the first mesh renderer under him; trails and particles skipped).</summary>
+        static Material KingMaterial(Transform king)
+        {
+            if (king == null) return null;
+            foreach (var r in king.GetComponentsInChildren<Renderer>())
+            {
+                if (r is TrailRenderer || r is ParticleSystemRenderer || r is LineRenderer) continue;
+                if (r.sharedMaterial != null && r.sharedMaterial.GetTexture("_BaseMap") != null) return r.sharedMaterial;
+            }
+            return null;
+        }
+
         void Place()
         {
             if (follow != null) transform.position = new Vector3(follow.position.x, 0.9f, follow.position.z);
@@ -44,7 +56,8 @@ namespace KingLastPiece
         {
             cone ??= BuildCone(10);
             ring ??= BuildRing(64);
-            steel ??= MaterialLib.Get(new Color(0.78f, 0.79f, 0.82f), 0.85f, 0.9f, new Color(0.35f, 0.35f, 0.38f));
+            // The spikes are cut from the King's own marble (his body material).
+            if (steel == null) steel = KingMaterial(follow) ?? MaterialLib.Get(new Color(0.78f, 0.79f, 0.82f), 0.85f, 0.9f, new Color(0.35f, 0.35f, 0.38f));
             ringBase ??= RingMaterial();
             // The ring: an outline (not a filled disc) lying on the board under the King.
             ringT = new GameObject("Ring").transform;
@@ -166,7 +179,10 @@ namespace KingLastPiece
                 tris[i * 6 + 3] = sides + n; tris[i * 6 + 4] = bottom; tris[i * 6 + 5] = sides + i;
             }
             // Clockwise seen from outside (Unity's front faces).
-            var m = new Mesh { name = "Thorn Cone", vertices = verts, triangles = tris };
+            // Planar UVs from the vertex position, so the King's marble texture reads on the spikes.
+            var uv = new Vector2[verts.Length];
+            for (int i = 0; i < uv.Length; i++) uv[i] = new Vector2(verts[i].x * 0.5f + 0.5f, verts[i].y * 0.5f + verts[i].z * 0.25f + 0.25f);
+            var m = new Mesh { name = "Thorn Cone", vertices = verts, triangles = tris, uv = uv };
             m.RecalculateNormals();
             m.RecalculateBounds();
             return m;
