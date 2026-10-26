@@ -18,18 +18,18 @@ namespace KingLastPiece
     {
         [Header("Moonlight (main light, soft shadows)")]
         public Color moonColor = new Color(0.55f, 0.63f, 0.95f);
-        public float moonIntensity = 0.6f;
+        public float moonIntensity = 1f;
         public Vector3 moonAngles = new Vector3(62f, -28f, 0f);
         [Range(0f, 1f)] public float moonShadowStrength = 0.55f;
 
         [Header("Stage light over the board")]
         public Color stageColor = new Color(1f, 0.9f, 0.74f);
-        public float stageIntensity = 380f, stageHeight = 16f, stageAngle = 84f;
+        public float stageIntensity = 450f, stageHeight = 16f, stageAngle = 84f;
         [Range(0f, 1f)] public float stageShadowStrength = 0.8f;
 
         [Header("Rim light behind the black army (cold, no shadows)")]
         public Color rimColor = new Color(0.62f, 0.72f, 1f);
-        public float rimIntensity = 290f;
+        public float rimIntensity = 340f;
 
 
         [Header("King's light")]
@@ -37,7 +37,7 @@ namespace KingLastPiece
         public float kingIntensity = 7f, kingRange = 7f, kingHeight = 3.2f;
 
         [Header("Hall")]
-        public Color ambient = new Color(0.2f, 0.2f, 0.26f);
+        public Color ambient = new Color(0.32f, 0.32f, 0.4f);
         public Color fog = new Color(0.012f, 0.012f, 0.025f);
         public float fogStart = 40f, fogEnd = 95f;
         [Tooltip("Post-processing look of the hall (made by the look pass; built in memory if missing).")]

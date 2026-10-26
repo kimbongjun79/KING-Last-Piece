@@ -430,21 +430,21 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::KingLastPiece.HallAmbience
   moonColor: {r: 0.55, g: 0.63, b: 0.95, a: 1}
-  moonIntensity: 0.6
+  moonIntensity: 1
   moonAngles: {x: 62, y: -28, z: 0}
   moonShadowStrength: 0.55
   stageColor: {r: 1, g: 0.9, b: 0.74, a: 1}
-  stageIntensity: 380
+  stageIntensity: 450
   stageHeight: 16
   stageAngle: 84
   stageShadowStrength: 0.8
   rimColor: {r: 0.62, g: 0.72, b: 1, a: 1}
-  rimIntensity: 290
+  rimIntensity: 340
   kingColor: {r: 1, g: 0.86, b: 0.62, a: 1}
   kingIntensity: 7
   kingRange: 7
   kingHeight: 3.2
-  ambient: {r: 0.2, g: 0.2, b: 0.26, a: 1}
+  ambient: {r: 0.32, g: 0.32, b: 0.4, a: 1}
   fog: {r: 0.012, g: 0.012, b: 0.025, a: 1}
   fogStart: 40
   fogEnd: 95
