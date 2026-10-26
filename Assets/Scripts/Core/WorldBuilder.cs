@@ -88,8 +88,10 @@ namespace KingLastPiece
                     if (m == null) continue;
                     m.EnableKeyword("_EMISSION");
                     m.SetTexture("_EmissionMap", map);
-                    m.SetColor("_EmissionColor", Color.white * GemGlow);
-                    m.globalIlluminationFlags = MaterialGlobalIlluminationFlags.None;
+                    m.SetColor("_EmissionColor", new Color(GemGlow, GemGlow, GemGlow, 1f));
+                    // Realtime-emissive, not None: with None Unity's material validation counts the emission as off
+                    // and strips _EMISSION from the saved asset (the gems went dark).
+                    m.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
                 }
         }
         const float GemTowerHeight = 8f, HallFloorTop = -0.7f;
@@ -104,7 +106,8 @@ namespace KingLastPiece
             if (pillars == null) return;
             foreach (Transform pillar in pillars)
             {
-                if (pillar.Find("Gem Tower") != null) continue;
+                var built = pillar.Find("Gem Tower");
+                if (built != null) { GlowGems(built); continue; }   // baked into the scene: make sure its gems glow
                 var column = pillar.Find("Column");
                 if (column == null) continue;
                 Vector3 at = new Vector3(column.position.x, HallFloorTop, column.position.z);
