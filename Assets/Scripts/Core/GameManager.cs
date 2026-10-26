@@ -705,7 +705,7 @@ namespace KingLastPiece
         /// <summary>
         /// Results confirm (the 무쌍 mode's end, the normal mode's victory): sends the run to its mode's online ranking under
         /// <paramref name="nickname"/> (at most a few seconds — offline just skips it), then back to the title.
-        /// 무쌍: the time survived and the level. Normal: the deaths and the clear time.
+        /// 무쌍: the time survived and the pieces taken. Normal: the deaths and the clear time.
         /// </summary>
         public async void SubmitRun(string nickname)
         {
@@ -719,7 +719,7 @@ namespace KingLastPiece
             {
                 float survived = Director != null ? Director.Elapsed : RunTime;
                 int level = Director != null ? Director.Level : 1;
-                send = OnlineBoard.Musou.Submit(nickname, level, survived, new Dictionary<string, object>
+                send = OnlineBoard.Musou.Submit(nickname, Record.kills, survived, new Dictionary<string, object>
                     { { "level", level }, { "time", Mathf.FloorToInt(survived) }, { "kills", Record.kills }, { "damage", Mathf.RoundToInt(Record.damageDealt) } });
             }
             else

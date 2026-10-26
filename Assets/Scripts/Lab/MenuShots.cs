@@ -48,7 +48,7 @@ namespace KingLastPiece
                     yield return null;
                 yield return Frames(30);
                 log.Append($"Board\tstate={OnlineBoard.Musou.State}\terror={OnlineBoard.Musou.Error}\tentries={OnlineBoard.Musou.Top.Count}\tmine={(OnlineBoard.Musou.Mine.HasValue ? OnlineBoard.Musou.Mine.Value.rank.ToString() : "-")}\n");
-                foreach (var e in OnlineBoard.Musou.Top) log.Append($"Entry\t{e.rank}\t{e.name}\tLv{e.value}\t{BestRecord.FormatTime(e.time)}\n");
+                foreach (var e in OnlineBoard.Musou.Top) log.Append($"Entry\t{e.rank}\t{e.name}\tkills={e.value}\t{BestRecord.FormatTime(e.time)}\n");
                 yield return Shot("46_Title_Online_Board.png");
                 File.WriteAllText(Path.Combine(dir, "board.tsv"), log.ToString());
                 Application.Quit();

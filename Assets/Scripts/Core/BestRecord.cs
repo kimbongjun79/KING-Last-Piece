@@ -20,7 +20,8 @@ namespace KingLastPiece
         /// <summary>Records a finished run; true when it is the new best.</summary>
         public static bool Submit(float survived, int level, float damage, int kills)
         {
-            bool better = !Exists || survived > Time + 0.5f || (Mathf.Abs(survived - Time) <= 0.5f && level > Level);
+            // Longer survived, then more pieces taken (as the online ranking).
+            bool better = !Exists || survived > Time + 0.5f || (Mathf.Abs(survived - Time) <= 0.5f && kills > Kills);
             if (!better) return false;
             PlayerPrefs.SetFloat(Key + "Time", survived);
             PlayerPrefs.SetInt(Key + "Level", level);

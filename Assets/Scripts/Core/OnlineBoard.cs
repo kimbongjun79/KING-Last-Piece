@@ -10,8 +10,8 @@ namespace KingLastPiece
     /// <summary>
     /// Online rankings on Unity Gaming Services (anonymous sign-in + Leaderboards), one per game mode:
     /// <list type="bullet">
-    /// <item><see cref="Musou"/> ("endless_best"): ranked by the time survived, then by the level reached —
-    /// <c>seconds × 1000 + level</c>.</item>
+    /// <item><see cref="Musou"/> ("endless_best"): ranked by the time survived, then by the pieces taken —
+    /// <c>10^11 + seconds × 100000 + kills</c>.</item>
     /// <item><see cref="Normal"/> ("normal_best"): ranked by the fewest deaths, then by the shorter clear time —
     /// <c>(999 − deaths) × 100000 + (99999 − seconds)</c>.</item>
     /// </list>
@@ -22,8 +22,15 @@ namespace KingLastPiece
     public class OnlineBoard
     {
         public static readonly OnlineBoard Musou = new OnlineBoard("endless_best",
-            (level, seconds) => Mathf.Clamp(Mathf.FloorToInt(seconds), 0, 99999) * 1000L + Mathf.Clamp(level, 0, 999),
-            score => (int)(score % 1000d), score => (float)System.Math.Floor(score / 1000d));
+            (kills, seconds) => MusouBase + Mathf.Clamp(Mathf.FloorToInt(seconds), 0, 99999) * 100000L + Mathf.Clamp(kills, 0, 99999),
+            score => score >= MusouBase ? (int)((score - MusouBase) % 100000d) : -1,
+            score => score >= MusouBase ? (float)System.Math.Floor((score - MusouBase) / 100000d) : (float)System.Math.Floor(score / 1000d));
+
+        /// <summary>
+        /// 무쌍 scores carry this offset (time × 100000 + kills on top of it), so they rank above every score of the old
+        /// time × 1000 + level packing still on the board; those still read their time, their kills unknown (−1).
+        /// </summary>
+        const long MusouBase = 100000000000L;
 
         public static readonly OnlineBoard Normal = new OnlineBoard("normal_best",
             (deaths, seconds) => (999L - Mathf.Clamp(deaths, 0, 999)) * 100000L + (99999L - Mathf.Clamp(Mathf.RoundToInt(seconds), 0, 99999)),
@@ -40,7 +47,7 @@ namespace KingLastPiece
         {
             public int rank;        // 1-based
             public string name;
-            /// <summary>Level reached (무쌍) or deaths (normal).</summary>
+            /// <summary>Pieces taken (무쌍; −1 for a score from before kills were ranked) or deaths (normal).</summary>
             public int value;
             public float time;
             public bool mine;

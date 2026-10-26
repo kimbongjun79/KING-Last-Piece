@@ -789,7 +789,7 @@ namespace KingLastPiece
         void DrawOnlineRanking(OnlineBoard board, bool musou, Rect area, float fade)
         {
             if (board.State == OnlineBoard.Status.Idle) board.Refresh();
-            string Score(OnlineBoard.Entry en) => musou ? $"{BestRecord.FormatTime(en.time)}  Lv {en.value}" : $"사망 {en.value}  {BestRecord.FormatTime(en.time)}";
+            string Score(OnlineBoard.Entry en) => musou ? $"{BestRecord.FormatTime(en.time)}  포획 {(en.value >= 0 ? en.value.ToString() : "-")}" : $"사망 {en.value}  {BestRecord.FormatTime(en.time)}";
             float line = 30 * scale;
             int rows = Mathf.Max(1, board.Top.Count);
             var r = new Rect(area.x, area.y, area.width, 58 * scale + rows * line + 54 * scale);
