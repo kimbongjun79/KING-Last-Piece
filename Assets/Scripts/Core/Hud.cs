@@ -176,6 +176,92 @@ namespace KingLastPiece
                 Fill(new Rect(r.x + r.width * i / 10f, r.y, Mathf.Max(1f, scale), r.height), new Color(0f, 0f, 0f, 0.28f));
         }
 
+        /// <summary>
+        /// Title mode card: a soft gold glow behind the chosen one, a dark panel shading down to black (warmed with gold
+        /// from below when chosen), a gold hairline with a fainter inner line, gold corner brackets and a diamond on each
+        /// side of the frame.
+        /// </summary>
+        void ModeCard(Rect b, bool on, float blink, float fade)
+        {
+            float s = scale, th = Mathf.Max(1f, s);
+            Color GoldA(float a) => new Color(Gold.r, Gold.g, Gold.b, a * fade);
+            if (on)
+            {
+                var prev = GUI.color;
+                GUI.color = GoldA(0.22f + 0.1f * blink);
+                GUI.DrawTexture(new Rect(b.x - 60 * s, b.y - 46 * s, b.width + 120 * s, b.height + 92 * s), Glow, ScaleMode.StretchToFill, true);
+                GUI.color = prev;
+            }
+            Fill(b, new Color(0.035f, 0.03f, 0.028f, (on ? 0.92f : 0.78f) * fade));
+            var p = GUI.color;
+            GUI.color = on ? GoldA(0.16f) : new Color(1f, 1f, 1f, 0.035f * fade);
+            GUI.DrawTexture(b, ShadeUp, ScaleMode.StretchToFill, true);
+            GUI.color = p;
+
+            Frame(b, th, GoldA(on ? 0.75f + 0.25f * blink : 0.32f));
+            var inner = new Rect(b.x + 5 * s, b.y + 5 * s, b.width - 10 * s, b.height - 10 * s);
+            Frame(inner, th, GoldA(on ? 0.3f : 0.1f));
+
+            // Corner brackets, just outside the frame.
+            float len = 18 * s, w = 2.5f * s, o = 3 * s;
+            var c = GoldA(on ? 1f : 0.5f);
+            var k = new Rect(b.x - o, b.y - o, b.width + 2 * o, b.height + 2 * o);
+            Fill(new Rect(k.xMin, k.yMin, len, w), c);       Fill(new Rect(k.xMin, k.yMin, w, len), c);
+            Fill(new Rect(k.xMax - len, k.yMin, len, w), c); Fill(new Rect(k.xMax - w, k.yMin, w, len), c);
+            Fill(new Rect(k.xMin, k.yMax - w, len, w), c);   Fill(new Rect(k.xMin, k.yMax - len, w, len), c);
+            Fill(new Rect(k.xMax - len, k.yMax - w, len, w), c); Fill(new Rect(k.xMax - w, k.yMax - len, w, len), c);
+            Diamond(new Vector2(b.xMin, b.center.y), (on ? 5f : 3.5f) * s, c);
+            Diamond(new Vector2(b.xMax, b.center.y), (on ? 5f : 3.5f) * s, c);
+        }
+
+        static void Frame(Rect r, float t, Color c)
+        {
+            Fill(new Rect(r.x, r.y, r.width, t), c);
+            Fill(new Rect(r.x, r.yMax - t, r.width, t), c);
+            Fill(new Rect(r.x, r.y + t, t, r.height - 2 * t), c);
+            Fill(new Rect(r.xMax - t, r.y + t, t, r.height - 2 * t), c);
+        }
+
+        static Texture2D glow, shadeUp;
+
+        /// <summary>Soft radial glow: opaque in the middle, clear at the edges.</summary>
+        static Texture2D Glow
+        {
+            get
+            {
+                if (glow != null) return glow;
+                const int N = 64;
+                glow = new Texture2D(N, N, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp, name = "Glow" };
+                var px = new Color32[N * N];
+                for (int y = 0; y < N; y++)
+                for (int x = 0; x < N; x++)
+                {
+                    float dx = (x + 0.5f) / N * 2f - 1f, dy = (y + 0.5f) / N * 2f - 1f;
+                    float a = 1f - Mathf.SmoothStep(0f, 1f, Mathf.Sqrt(dx * dx + dy * dy));
+                    px[y * N + x] = new Color32(255, 255, 255, (byte)(a * a * 255f));
+                }
+                glow.SetPixels32(px);
+                glow.Apply();
+                return glow;
+            }
+        }
+
+        /// <summary>Vertical ramp: opaque at the bottom, clear at the top.</summary>
+        static Texture2D ShadeUp
+        {
+            get
+            {
+                if (shadeUp != null) return shadeUp;
+                const int N = 64;
+                shadeUp = new Texture2D(1, N, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp, name = "ShadeUp" };
+                var px = new Color32[N];
+                for (int y = 0; y < N; y++) px[y] = new Color32(255, 255, 255, (byte)(Mathf.Pow(1f - (y + 0.5f) / N, 1.6f) * 255f));
+                shadeUp.SetPixels32(px);
+                shadeUp.Apply();
+                return shadeUp;
+            }
+        }
+
         static void Diamond(Vector2 center, float half, Color c)
         {
             if (half <= 0.5f) return;
@@ -577,18 +663,17 @@ namespace KingLastPiece
                 if (mouseMoved && b.Contains(e.mousePosition)) g.TitleChoice = i;
                 if (e.type == EventType.MouseDown && b.Contains(e.mousePosition)) { g.TitleChoice = i; g.ChooseMode(i); e.Use(); }
                 bool on = g.TitleChoice == i;
-                if (on) b.y -= 6 * scale;
-                Fill(new Rect(b.x - 2 * scale, b.y - 2 * scale, b.width + 4 * scale, b.height + 4 * scale),
-                    on ? new Color(Gold.r, Gold.g, Gold.b, (0.6f + 0.4f * blink) * fade) : new Color(Gold.r, Gold.g, Gold.b, 0.25f * fade));
-                Fill(b, on ? new Color(0.16f, 0.12f, 0.06f, 0.85f * fade) : new Color(0f, 0f, 0f, 0.6f * fade));
-                // Chess-tile strip along the top of the card.
-                for (int k = 0; k < 10; k++)
-                    Fill(new Rect(b.x + k * b.width / 10f, b.y, b.width / 10f, 6 * scale),
-                        k % 2 == 0 ? new Color(0.9f, 0.87f, 0.78f, (on ? 0.8f : 0.3f) * fade) : new Color(0.1f, 0.08f, 0.08f, (on ? 0.8f : 0.3f) * fade));
-                Text(new Rect(b.x, b.y + 16 * scale, b.width, 44 * scale), modes[i].name, new GUIStyle(mid) { fontSize = Mathf.RoundToInt(30 * scale) },
-                    on ? new Color(1f, 0.95f, 0.85f, fade) : new Color(0.75f, 0.72f, 0.66f, fade));
-                Text(new Rect(b.x, b.y + 62 * scale, b.width, 28 * scale), modes[i].line, new GUIStyle(small) { fontSize = Mathf.RoundToInt(16 * scale) },
-                    on ? new Color(Gold.r, Gold.g, Gold.b, fade) : new Color(0.6f, 0.58f, 0.54f, fade));
+                if (on) b.y -= 4 * scale;
+                ModeCard(b, on, blink, fade);
+                // Name, a short gold rule under it (full when chosen), the line.
+                Text(new Rect(b.x, b.y + 14 * scale, b.width, 44 * scale), modes[i].name, new GUIStyle(mid) { fontSize = Mathf.RoundToInt(30 * scale) },
+                    on ? new Color(1f, 0.95f, 0.85f, fade) : new Color(0.72f, 0.69f, 0.63f, fade));
+                float ruleW = (on ? 120f : 44f) * scale;
+                Fill(new Rect(b.center.x - ruleW / 2f, b.y + 60 * scale, ruleW, Mathf.Max(1f, 1.2f * scale)),
+                    new Color(Gold.r, Gold.g, Gold.b, (on ? 0.85f : 0.3f) * fade));
+                Diamond(new Vector2(b.center.x, b.y + 60.6f * scale), 3.2f * scale, new Color(Gold.r, Gold.g, Gold.b, (on ? 1f : 0.4f) * fade));
+                Text(new Rect(b.x, b.y + 68 * scale, b.width, 28 * scale), modes[i].line, new GUIStyle(small) { fontSize = Mathf.RoundToInt(16 * scale) },
+                    on ? new Color(Gold.r, Gold.g, Gold.b, fade) : new Color(0.58f, 0.56f, 0.52f, fade));
             }
             Text(new Rect(0, by + bh + 22 * scale, W, 30 * scale), "← →  모드 선택      ENTER / START  시작", new GUIStyle(small) { fontSize = Mathf.RoundToInt(19 * scale) },
                 new Color(1f, 1f, 1f, (0.45f + 0.35f * blink) * fade));
