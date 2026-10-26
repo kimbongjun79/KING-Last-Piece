@@ -228,16 +228,86 @@ namespace KingLastPiece
                         var tower = WorldBuilder.GemTower(group, c, a.Center);
                         if (tower != null) tower.name = "Gem Tower";
                     }
-                if (a.combat) continue;
-                // Torches: a warm light in each passage.
-                var light = new GameObject("Torch").AddComponent<Light>();
-                light.transform.SetParent(group, false);
-                light.transform.position = a.Center + Vector3.up * 3.2f;
-                light.type = LightType.Point;
-                light.color = new Color(1f, 0.6f, 0.3f);
-                light.intensity = 9f;
-                light.range = 10f;
-                light.shadows = LightShadows.None;
+            }
+            WindowsAndTorches(group);
+        }
+
+        // ---------------------------------------------------------------- windows and torches
+
+        static readonly Color MoonBlue = new Color(0.45f, 0.6f, 1f);
+        static readonly Color TorchFire = new Color(1f, 0.55f, 0.22f);
+
+        /// <summary>
+        /// Along the walls: tall arched windows high in the combat areas' walls, letting a cold blue moonlight fall in
+        /// (a glowing pane, a faint shaft of light down to the floor, and a blue spotlight on the squares below); and
+        /// torches in iron brackets every few tiles everywhere else, flickering warm.
+        /// </summary>
+        void WindowsAndTorches(Transform group)
+        {
+            var frame = MaterialLib.Get(new Color(0.03f, 0.03f, 0.035f), 0.4f, 0.5f);
+            var pane = MaterialLib.Emissive(MoonBlue, 2.2f);
+            var shaft = MaterialLib.Transparent(new Color(MoonBlue.r, MoonBlue.g, MoonBlue.b, 0.06f));
+            var iron = MaterialLib.Get(new Color(0.05f, 0.045f, 0.04f), 0.5f, 0.6f);
+            var flame = MaterialLib.Emissive(TorchFire, 4f);
+            int i = 0;
+            foreach (var (a, b, inward) in Edges(floor))
+            {
+                i++;
+                Vector2 mid2 = (a + b) * 0.5f;
+                var tile = new Vector2Int(Mathf.FloorToInt(mid2.x / Tile + inward.x * 0.5f), Mathf.FloorToInt(mid2.y / Tile + inward.y * 0.5f));
+                var area = AreaAt(TileCenter(tile));
+                bool alongX = Mathf.Abs(a.y - b.y) < 0.01f;
+                Vector3 face = new Vector3(mid2.x, 0f, mid2.y);           // the wall's inner face
+                Vector3 inw = new Vector3(inward.x, 0f, inward.y);
+                Quaternion facing = Quaternion.LookRotation(inw);
+
+                if (area != null && area.combat && i % 5 == 2)
+                {
+                    // A window: dark frame, glowing blue pane (with a pointed top), a faint shaft and the moon's spotlight.
+                    var w = new GameObject("Moon Window").transform;
+                    w.SetParent(group, false);
+                    w.SetPositionAndRotation(face + inw * 0.02f, facing);
+                    PieceFactory.Part(PrimitiveType.Cube, w, new Vector3(0f, 3.6f, 0f), new Vector3(1.5f, 2.6f, 0.12f), frame).name = "Frame";
+                    PieceFactory.Part(PrimitiveType.Cube, w, new Vector3(0f, 3.5f, 0.05f), new Vector3(1.1f, 2.2f, 0.05f), pane).name = "Pane";
+                    PieceFactory.Part(PrimitiveType.Cube, w, new Vector3(0f, 4.75f, 0.05f), new Vector3(0.78f, 0.78f, 0.05f), pane, new Vector3(0f, 0f, 45f)).name = "Pane Arch";
+                    PieceFactory.Part(PrimitiveType.Cube, w, new Vector3(0f, 3.5f, 0.08f), new Vector3(0.08f, 2.2f, 0.06f), frame).name = "Mullion";
+                    // The shaft: a long faint box from the window down and in to the floor.
+                    var s = PieceFactory.Part(PrimitiveType.Cube, w, new Vector3(0f, 1.9f, 1.9f), new Vector3(1.1f, 0.05f, 5.2f), shaft, new Vector3(48f, 0f, 0f));
+                    s.name = "Moon Shaft";
+                    s.GetComponent<Renderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                    var l = new GameObject("Moonlight").AddComponent<Light>();
+                    l.transform.SetParent(w, false);
+                    l.transform.localPosition = new Vector3(0f, 4.2f, 0.3f);
+                    l.transform.localRotation = Quaternion.Euler(52f, 0f, 0f);
+                    l.type = LightType.Spot;
+                    l.color = MoonBlue;
+                    l.intensity = 38f;
+                    l.range = 14f;
+                    l.spotAngle = 48f;
+                    l.innerSpotAngle = 22f;
+                    l.shadows = LightShadows.None;
+                }
+                else if (i % 4 == 0)
+                {
+                    // A torch in an iron bracket on the wall.
+                    var t = new GameObject("Torch").transform;
+                    t.SetParent(group, false);
+                    t.SetPositionAndRotation(face, facing);
+                    PieceFactory.Part(PrimitiveType.Cube, t, new Vector3(0f, 2.6f, 0.15f), new Vector3(0.18f, 0.5f, 0.3f), iron).name = "Bracket";
+                    PieceFactory.Part(PrimitiveType.Cylinder, t, new Vector3(0f, 2.95f, 0.32f), new Vector3(0.14f, 0.28f, 0.14f), iron, new Vector3(18f, 0f, 0f)).name = "Handle";
+                    var f = PieceFactory.Part(PrimitiveType.Sphere, t, new Vector3(0f, 3.3f, 0.42f), new Vector3(0.24f, 0.36f, 0.24f), flame);
+                    f.name = "Flame";
+                    f.GetComponent<Renderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                    var l = new GameObject("Torch Light").AddComponent<Light>();
+                    l.transform.SetParent(t, false);
+                    l.transform.localPosition = new Vector3(0f, 3.3f, 0.7f);
+                    l.type = LightType.Point;
+                    l.color = TorchFire;
+                    l.intensity = 6f;
+                    l.range = 8f;
+                    l.shadows = LightShadows.None;
+                    t.gameObject.AddComponent<TorchFlicker>().Init(l, f);
+                }
             }
         }
 
