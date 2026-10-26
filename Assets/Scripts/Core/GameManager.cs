@@ -15,9 +15,7 @@ namespace KingLastPiece
         public const float TileSize = 2f;
         /// <summary>Half the board's width (8 m for the 8×8 board; the endless board grows a ring every 20 rounds).</summary>
         public static float BoardHalf => BoardSlots.Size * TileSize * 0.5f;
-        public static float PlayableHalf => BoardHalf - EdgeInset;
-        /// <summary>How far in from the area's edges the pieces and the King keep.</summary>
-        public const float EdgeInset = 0.7f;
+        public static float PlayableHalf => BoardHalf - 0.7f;
         public static readonly Color LightSquare = new Color(0.74f, 0.7f, 0.62f);
         public static readonly Color DarkSquare = new Color(0.26f, 0.12f, 0.1f);
 
@@ -51,8 +49,6 @@ namespace KingLastPiece
         /// <summary>Item card under the cursor / selected with the keys or pad (−1: none).</summary>
         public int OfferCursor { get; set; } = -1;
         ArenaBoard board;
-        /// <summary>Normal mode: the stage being explored (areas, passages, gates, checkpoint).</summary>
-        public StageRun Stage { get; private set; }
 
         [Tooltip("Mode this scene boots into (set by the world bake).")]
         [SerializeField] Mode sceneMode = Mode.Game;
@@ -123,14 +119,6 @@ namespace KingLastPiece
             Rig.Init(cam, Player);
             // Normal mode: the dark hall's light (moon, stage light over the board, glowing gem towers, the King's light).
             if (CurrentMode == Mode.Game) HallAmbience.Ensure(board.transform);
-            // Normal mode is a stage to explore: the castle's areas and passages are built over the hall, the King at its start.
-            if (CurrentMode == Mode.Game)
-            {
-                Stage = gameObject.AddComponent<StageRun>();
-                Stage.Build(this, board);
-                Player.ResetForWave(Stage.StartPosition, 0f);
-                Rig.Snap();
-            }
 
             if (GetComponent<Hud>() == null) gameObject.AddComponent<Hud>();
             EnterState(UsesRounds ? GameState.Title : GameState.Playing);
@@ -181,14 +169,6 @@ namespace KingLastPiece
             if (IsEndless)
             {
                 StartMusou();
-                return;
-            }
-            if (Stage != null)
-            {
-                // A new run of the stage: every area fresh, the King at the ruined court.
-                Stage.Begin();
-                Sfx.Play("BGM_Battle");
-                EnterState(GameState.Playing);
                 return;
             }
 
@@ -627,18 +607,6 @@ namespace KingLastPiece
                         CheckMusouRewards();
                         break;
                     }
-                    if (Stage != null)
-                    {
-                        Stage.Tick();
-                        if (Stage.Won && AliveCount() == 0)
-                        {
-                            // The colossus fallen: the stage is won (fewest deaths, then fastest, is the best clear).
-                            NewBest = NormalRecord.Submit(Deaths, RunTime);
-                            EnterState(GameState.Victory);
-                            Sfx.Play("GAME_Victory");
-                        }
-                        break;
-                    }
                     if (CurrentMode == Mode.Game) LandReinforcements();
                     if (UsesRounds && AliveCount() == 0 && StateTime > 1f)
                     {
@@ -688,18 +656,6 @@ namespace KingLastPiece
                     }
                     // Endless: the run ends — the results screen's confirm goes back to the title. Classic: retry the round.
                     // (The endless results screen takes the nickname and its own confirm — see SubmitRun.)
-                    if (Stage != null)
-                    {
-                        // The stage: back at the checkpoint before the area, restored.
-                        if (StateTime > 1.8f && GameInput.Confirm)
-                        {
-                            Paused = false;
-                            ResetTime();
-                            Stage.Respawn();
-                            EnterState(GameState.Playing);
-                        }
-                        break;
-                    }
                     if (!IsEndless && StateTime > 1.8f && GameInput.Confirm) StartWave(WaveIndex);
                     break;
 
@@ -802,17 +758,7 @@ namespace KingLastPiece
             StartWave(0);
         }
 
-        public void DebugStartWave(int index)
-        {
-            if (Stage != null)
-            {
-                // The stage: a fresh run with the King set before combat area <index>.
-                if (State != GameState.Playing) StartWave(0);
-                Stage.DebugJump(Mathf.Max(0, index));
-                return;
-            }
-            StartWave(IsEndless ? Mathf.Max(0, index) : Mathf.Clamp(index, 0, ClassicRounds.Count - 1));
-        }
+        public void DebugStartWave(int index) => StartWave(IsEndless ? Mathf.Max(0, index) : Mathf.Clamp(index, 0, ClassicRounds.Count - 1));
         public void DebugTogglePause() => TogglePause();
 
         void TogglePause()

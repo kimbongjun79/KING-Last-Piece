@@ -78,9 +78,6 @@ namespace KingLastPiece
             focus = Vector3.Lerp(focus, player.transform.position + Vector3.up * 1.5f, 1f - Mathf.Exp(-12f * dt));
             Quaternion rot = Quaternion.Euler(pitch, yaw, 0f);
             Vector3 pos = focus - rot * Vector3.forward * Distance;
-            // On the stage the camera stays on the King's side of the castle walls (drawn in toward him).
-            var stage = StageRun.Instance;
-            if (stage != null && stage.Running) pos = stage.CameraClamp(focus, pos);
 
             if (lockT != null)
             {

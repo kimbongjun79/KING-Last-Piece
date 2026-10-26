@@ -14,60 +14,16 @@ namespace KingLastPiece
     /// </summary>
     public static class BoardSlots
     {
-        // The grid of the fight in progress: a rectangle of Width × Height squares centred on Origin. The modes on one
-        // board use a square at the world origin (SetSize); the stage mode moves it to each combat area (SetArea).
+        /// <summary>Squares per side: 8, plus one ring (2 squares) per expansion of the endless board.</summary>
+        public static int Size { get; private set; } = 8;
 
-        /// <summary>Squares across (x) and deep (z) of the current fight's area.</summary>
-        public static int Width { get; private set; } = 8;
-        public static int Height { get; private set; } = 8;
-        /// <summary>World centre of the area (y = 0).</summary>
-        public static Vector3 Origin { get; private set; }
-
-        /// <summary>Squares per side of a square board: 8, plus one ring (2 squares) per expansion of the endless board.</summary>
-        public static int Size => Mathf.Max(Width, Height);
-
-        /// <summary>Resizes the square board at the origin (the original 8×8 stays centred, so its square names keep their places).</summary>
-        public static void SetSize(int size) => SetArea(Vector3.zero, size, size);
-
-        /// <summary>The fight moves to an area of <paramref name="width"/> × <paramref name="height"/> squares centred on <paramref name="origin"/>.</summary>
-        public static void SetArea(Vector3 origin, int width, int height)
+        /// <summary>Resizes the board grid (the original 8×8 stays centred, so its square names keep their places).</summary>
+        public static void SetSize(int size)
         {
-            origin.y = 0f;
-            if (width == Width && height == Height && origin == Origin) return;
-            Width = width;
-            Height = height;
-            Origin = origin;
+            if (size == Size) return;
+            Size = size;
             Clear();
         }
-
-        /// <summary>Half the area's extent in world units, along x and z.</summary>
-        public static float HalfX => Width * Tile * 0.5f;
-        public static float HalfZ => Height * Tile * 0.5f;
-
-        /// <summary><paramref name="p"/> kept inside the area, <paramref name="inset"/> in from its edges (y untouched).</summary>
-        public static Vector3 ClampInside(Vector3 p, float inset)
-        {
-            p.x = Mathf.Clamp(p.x, Origin.x - HalfX + inset, Origin.x + HalfX - inset);
-            p.z = Mathf.Clamp(p.z, Origin.z - HalfZ + inset, Origin.z + HalfZ - inset);
-            return p;
-        }
-
-        /// <summary>Whether <paramref name="p"/> is inside the area, <paramref name="inset"/> in from its edges.</summary>
-        public static bool Inside(Vector3 p, float inset) =>
-            Mathf.Abs(p.x - Origin.x) <= HalfX - inset && Mathf.Abs(p.z - Origin.z) <= HalfZ - inset;
-
-        /// <summary>Distance from <paramref name="from"/> along <paramref name="dir"/> (flat, normalised) to the area's edge, <paramref name="inset"/> in.</summary>
-        public static float DistanceToEdge(Vector3 from, Vector3 dir, float inset)
-        {
-            float hx = HalfX - inset, hz = HalfZ - inset, t = float.MaxValue;
-            float x = from.x - Origin.x, z = from.z - Origin.z;
-            if (dir.x > 0.0001f) t = Mathf.Min(t, (hx - x) / dir.x);
-            else if (dir.x < -0.0001f) t = Mathf.Min(t, (-hx - x) / dir.x);
-            if (dir.z > 0.0001f) t = Mathf.Min(t, (hz - z) / dir.z);
-            else if (dir.z < -0.0001f) t = Mathf.Min(t, (-hz - z) / dir.z);
-            return Mathf.Max(0f, t);
-        }
-
         static float Tile => GameManager.TileSize;
 
         static readonly Dictionary<Vector2Int, EnemyBase> owners = new Dictionary<Vector2Int, EnemyBase>();
@@ -85,16 +41,12 @@ namespace KingLastPiece
         // ---------------------------------------------------------------- squares
 
         public static Vector2Int ToSquare(Vector3 p) => new Vector2Int(
-            Mathf.Clamp(Mathf.FloorToInt((p.x - Origin.x) / Tile + Width * 0.5f), 0, Width - 1),
-            Mathf.Clamp(Mathf.FloorToInt((p.z - Origin.z) / Tile + Height * 0.5f), 0, Height - 1));
+            Mathf.Clamp(Mathf.FloorToInt(p.x / Tile + Size * 0.5f), 0, Size - 1),
+            Mathf.Clamp(Mathf.FloorToInt(p.z / Tile + Size * 0.5f), 0, Size - 1));
 
-        public static Vector3 Center(Vector2Int s) =>
-            Origin + new Vector3((s.x - (Width - 1) * 0.5f) * Tile, 0f, (s.y - (Height - 1) * 0.5f) * Tile);
+        public static Vector3 Center(Vector2Int s) => new Vector3((s.x - (Size - 1) * 0.5f) * Tile, 0f, (s.y - (Size - 1) * 0.5f) * Tile);
 
-        public static bool OnBoard(Vector2Int s) => s.x >= 0 && s.y >= 0 && s.x < Width && s.y < Height;
-
-        /// <summary>The area's middle square (the nearest to its centre; ties go toward the start).</summary>
-        public static Vector2Int Middle => new Vector2Int((Width - 1) / 2, (Height - 1) / 2);
+        public static bool OnBoard(Vector2Int s) => s.x >= 0 && s.y >= 0 && s.x < Size && s.y < Size;
 
         public static int Chebyshev(Vector2Int a, Vector2Int b) => Mathf.Max(Mathf.Abs(a.x - b.x), Mathf.Abs(a.y - b.y));
 

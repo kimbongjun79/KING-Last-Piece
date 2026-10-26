@@ -163,20 +163,19 @@ namespace KingLastPiece
             purgeTimer = 16f;
             OffBoard = true;
             purgeFrom = FlatPos;
-            // Out past the nearer pair of the area's edges (relative to its centre).
-            float hx = BoardSlots.HalfX - GameManager.EdgeInset, hz = BoardSlots.HalfZ - GameManager.EdgeInset;
-            Vector3 o = BoardSlots.Origin, p = FlatPos - o;
-            purgeTo = o + (Mathf.Abs(p.x) / Mathf.Max(0.01f, hx) >= Mathf.Abs(p.z) / Mathf.Max(0.01f, hz)
-                ? new Vector3((p.x < 0f ? -1f : 1f) * (BoardSlots.HalfX + 1.8f), 0f, Mathf.Clamp(p.z, -hz, hz))
-                : new Vector3(Mathf.Clamp(p.x, -hx, hx), 0f, (p.z < 0f ? -1f : 1f) * (BoardSlots.HalfZ + 1.8f)));
+            float outside = GameManager.BoardHalf + 1.8f, h = GameManager.PlayableHalf;
+            Vector3 p = FlatPos;
+            purgeTo = Mathf.Abs(p.x) >= Mathf.Abs(p.z)
+                ? new Vector3((p.x < 0f ? -1f : 1f) * outside, 0f, Mathf.Clamp(p.z, -h, h))
+                : new Vector3(Mathf.Clamp(p.x, -h, h), 0f, (p.z < 0f ? -1f : 1f) * outside);
 
             var king = KingSquare;
             var safe = new List<Vector2Int>();
             void PickSafe(int minRing, int maxRing)
             {
                 var options = new List<Vector2Int>();
-                for (int x = 0; x < BoardSlots.Width; x++)
-                for (int y = 0; y < BoardSlots.Height; y++)
+                for (int x = 0; x < BoardSlots.Size; x++)
+                for (int y = 0; y < BoardSlots.Size; y++)
                 {
                     var s = new Vector2Int(x, y);
                     int ring = BoardSlots.Chebyshev(s, king);
@@ -188,8 +187,8 @@ namespace KingLastPiece
             PickSafe(3, 4);
             PickSafe(2, 99);
             var strikes = new List<Vector2Int>();
-            for (int x = 0; x < BoardSlots.Width; x++)
-            for (int y = 0; y < BoardSlots.Height; y++)
+            for (int x = 0; x < BoardSlots.Size; x++)
+            for (int y = 0; y < BoardSlots.Size; y++)
             {
                 var s = new Vector2Int(x, y);
                 if (!safe.Contains(s)) strikes.Add(s);

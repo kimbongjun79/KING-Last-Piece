@@ -44,16 +44,6 @@ namespace KingLastPiece
         public VolumeProfile profile;
 
         Light king;
-        Vector3 focusCenter;
-        Vector2 focusSize = new Vector2(16f, 16f);
-
-        /// <summary>The stage light and the rim light move over an area of the stage (centre, width × depth in metres).</summary>
-        public void Focus(Vector3 center, float width, float depth)
-        {
-            focusCenter = new Vector3(center.x, 0f, center.z);
-            focusSize = new Vector2(width, depth);
-            Apply();
-        }
 
         /// <summary>The hall's light on the arena (added if the scene has none yet).</summary>
         public static HallAmbience Ensure(Transform arena)
@@ -95,13 +85,10 @@ namespace KingLastPiece
             }
 
             var stage = Child("Stage Light", LightType.Spot);
-            stage.transform.position = focusCenter + new Vector3(0f, stageHeight, 0f);
+            stage.transform.position = new Vector3(0f, stageHeight, 0f);
             stage.transform.rotation = Quaternion.LookRotation(new Vector3(0f, -stageHeight, 3f));
-            // Wide enough to light the whole area (at least the authored angle).
-            float span = Mathf.Max(focusSize.x, focusSize.y);
-            float needed = 2f * Mathf.Atan(span * 0.55f / stageHeight) * Mathf.Rad2Deg;
-            stage.spotAngle = Mathf.Clamp(Mathf.Max(stageAngle, needed), 30f, 150f);
-            stage.innerSpotAngle = stage.spotAngle * 0.55f;
+            stage.spotAngle = stageAngle;
+            stage.innerSpotAngle = stageAngle * 0.55f;
             stage.range = stageHeight * 2.5f;
             stage.color = stageColor;
             stage.intensity = stageIntensity;
@@ -112,8 +99,8 @@ namespace KingLastPiece
 
             // From behind the far ranks, low: outlines the black pieces against the dark.
             var rim = Child("Rim Light", LightType.Spot);
-            rim.transform.position = focusCenter + new Vector3(0f, 7f, focusSize.y * 0.5f + 1f);
-            rim.transform.rotation = Quaternion.LookRotation(focusCenter + new Vector3(0f, 1.2f, 0f) - rim.transform.position);
+            rim.transform.position = new Vector3(0f, 7f, 17f);
+            rim.transform.rotation = Quaternion.LookRotation(new Vector3(0f, 1.2f, 0f) - rim.transform.position);
             rim.spotAngle = 95f;
             rim.innerSpotAngle = 50f;
             rim.range = 40f;

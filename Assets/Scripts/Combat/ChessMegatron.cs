@@ -176,7 +176,7 @@ namespace KingLastPiece
 
         /// <summary>A square the whole 3×3 body fits around.</summary>
         static Vector2Int ClampCenter(Vector2Int s) =>
-            new Vector2Int(Mathf.Clamp(s.x, 1, BoardSlots.Width - 2), Mathf.Clamp(s.y, 1, BoardSlots.Height - 2));
+            new Vector2Int(Mathf.Clamp(s.x, 1, BoardSlots.Size - 2), Mathf.Clamp(s.y, 1, BoardSlots.Size - 2));
 
         /// <summary>Sets the attack frame facing the King: centre square, forward toward him, right; and his offset.</summary>
         void FrameToKing(out Vector2Int rel)
@@ -228,7 +228,7 @@ namespace KingLastPiece
         static List<Vector2Int> Plus(Vector2Int c) =>
             new List<Vector2Int> { c, c + Vector2Int.up, c + Vector2Int.down, c + Vector2Int.left, c + Vector2Int.right };
 
-        bool FitsAt(Vector2Int c) => c.x >= 1 && c.y >= 1 && c.x <= BoardSlots.Width - 2 && c.y <= BoardSlots.Height - 2;
+        bool FitsAt(Vector2Int c) => c.x >= 1 && c.y >= 1 && c.x <= BoardSlots.Size - 2 && c.y <= BoardSlots.Size - 2;
 
         // ---------------------------------------------------------------- patterns
 
@@ -365,8 +365,8 @@ namespace KingLastPiece
                     FrameAlongBody();
                     raiseTime = 1.2f * wf;
                     var all = new List<Vector2Int>();
-                    for (int x = 0; x < BoardSlots.Width; x++)
-                    for (int y = 0; y < BoardSlots.Height; y++)
+                    for (int x = 0; x < BoardSlots.Size; x++)
+                    for (int y = 0; y < BoardSlots.Size; y++)
                     {
                         var sq = new Vector2Int(x, y);
                         if (BoardSlots.Chebyshev(sq, center) >= 2) all.Add(sq);
@@ -506,10 +506,10 @@ namespace KingLastPiece
         /// <summary>The middle of the board for the 3×3 body: the nearest of the four central squares.</summary>
         Vector2Int MiddleSquare()
         {
-            int lx = BoardSlots.Width / 2 - 1, hx = BoardSlots.Width / 2, ly = BoardSlots.Height / 2 - 1, hy = BoardSlots.Height / 2;
-            Vector2Int best = new Vector2Int(lx, ly);
+            int lo = BoardSlots.Size / 2 - 1, hi = BoardSlots.Size / 2;
+            Vector2Int best = new Vector2Int(lo, lo);
             float bestD = float.MaxValue;
-            foreach (var c in new[] { new Vector2Int(lx, ly), new Vector2Int(lx, hy), new Vector2Int(hx, ly), new Vector2Int(hx, hy) })
+            foreach (var c in new[] { new Vector2Int(lo, lo), new Vector2Int(lo, hi), new Vector2Int(hi, lo), new Vector2Int(hi, hi) })
             {
                 float d = (BoardSlots.Center(c) - FlatPos).sqrMagnitude;
                 if (d < bestD) { bestD = d; best = c; }
