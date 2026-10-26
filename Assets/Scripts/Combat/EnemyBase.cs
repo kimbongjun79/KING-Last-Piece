@@ -446,17 +446,14 @@ namespace KingLastPiece
 
         protected static float DistanceToEdge(Vector3 from, Vector3 dir)
         {
-            float h = GameManager.PlayableHalf;
-            float t = 100f;
-            if (Mathf.Abs(dir.x) > 1e-4f) t = Mathf.Min(t, ((dir.x > 0f ? h : -h) - from.x) / dir.x);
-            if (Mathf.Abs(dir.z) > 1e-4f) t = Mathf.Min(t, ((dir.z > 0f ? h : -h) - from.z) / dir.z);
-            return Mathf.Max(0f, t);
+            return Mathf.Min(100f, BoardSlots.DistanceToEdge(from, dir, GameManager.EdgeInset));
         }
 
         protected static Vector3 ClampPoint(Vector3 p)
         {
-            float h = GameManager.PlayableHalf;
-            return new Vector3(Mathf.Clamp(p.x, -h, h), 0f, Mathf.Clamp(p.z, -h, h));
+            p = BoardSlots.ClampInside(p, GameManager.EdgeInset);
+            p.y = 0f;
+            return p;
         }
 
         // ---------------------------------------------------------------- board slots (see BoardSlots)
@@ -513,8 +510,8 @@ namespace KingLastPiece
             }
 
             // Every attack square is taken: wait close by (2–3 squares out), as near to where we are as possible.
-            for (int x = 0; x < BoardSlots.Size; x++)
-            for (int y = 0; y < BoardSlots.Size; y++)
+            for (int x = 0; x < BoardSlots.Width; x++)
+            for (int y = 0; y < BoardSlots.Height; y++)
             {
                 var s = new Vector2Int(x, y);
                 int ring = BoardSlots.Chebyshev(s, king);
@@ -742,8 +739,8 @@ namespace KingLastPiece
             var hit = new System.Collections.Generic.HashSet<Vector2Int>(squares);
             Vector3 best = Vector3.zero;
             float bestD = float.MaxValue;
-            for (int x = 0; x < BoardSlots.Size; x++)
-            for (int y = 0; y < BoardSlots.Size; y++)
+            for (int x = 0; x < BoardSlots.Width; x++)
+            for (int y = 0; y < BoardSlots.Height; y++)
             {
                 var s = new Vector2Int(x, y);
                 if (hit.Contains(s)) continue;
@@ -989,8 +986,7 @@ namespace KingLastPiece
         void UpdateLaunched(float dt)
         {
             Vector3 p = transform.position + launchVelocity * dt;
-            float h = GameManager.PlayableHalf;
-            if (!wallHit && (Mathf.Abs(p.x) > h || Mathf.Abs(p.z) > h))
+            if (!wallHit && !BoardSlots.Inside(p, GameManager.EdgeInset))
             {
                 // Slam into the board's edge.
                 wallHit = true;

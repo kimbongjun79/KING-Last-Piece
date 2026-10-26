@@ -327,7 +327,7 @@ namespace KingLastPiece
         {
             if (g.IsEndless && g.Director != null) { DrawMusouTop(g.Director); return; }
             var r = new Rect(0, 18 * scale, Screen.width, 30 * scale);
-            string round = g.IsEndless ? $"{g.Round} 라운드     체스판 {BoardSlots.Size}×{BoardSlots.Size}" : $"{g.WaveIndex + 1} / {g.WaveCount} 라운드";
+            string round = g.IsEndless ? $"{g.Round} 라운드     체스판 {BoardSlots.Size}×{BoardSlots.Size}" : g.Stage != null ? g.Stage.CurrentName : $"{g.WaveIndex + 1} / {g.WaveCount} 라운드";
             Text(r, round, small, new Color(0.9f, 0.85f, 0.7f, 0.85f));
         }
 
@@ -562,7 +562,7 @@ namespace KingLastPiece
             // Mode select: two framed cards; ←/→ (or the mouse) to choose, Enter / click to start.
             (string name, string line)[] modes =
             {
-                ("일반 모드", "10 라운드  ·  흑색 군대와 체스메가트론을 무너뜨려라"),
+                ("일반 모드", "검은 성채 탐험  ·  거신병의 제단까지 돌파하라"),
                 ("무쌍 모드", "30분 생존  ·  끝없는 흑색 군대  ·  레벨업 강화"),
             };
             var e = Event.current;
@@ -826,7 +826,7 @@ namespace KingLastPiece
         void DrawPauseGame(GameManager g, Rect area)
         {
             string where = g.IsEndless ? $"무쌍 모드  ·  {BestRecord.FormatTime(g.Director != null ? g.Director.Elapsed : 0f)}  ·  레벨 {(g.Director != null ? g.Director.Level : 1)}"
-                : g.UsesRounds ? $"{g.WaveIndex + 1} / {g.WaveCount} 라운드" : "연습장";
+                : g.Stage != null ? $"성채 탐험  ·  {g.Stage.CurrentName}" : g.UsesRounds ? $"{g.WaveIndex + 1} / {g.WaveCount} 라운드" : "연습장";
             Text(new Rect(0, area.y + 60 * scale, Screen.width, 40 * scale), where, small, new Color(Gold.r, Gold.g, Gold.b));
             int m = Mathf.FloorToInt(g.RunTime / 60f), s = Mathf.FloorToInt(g.RunTime % 60f);
             if (g.UsesRounds)

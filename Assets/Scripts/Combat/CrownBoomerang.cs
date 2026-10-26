@@ -67,8 +67,7 @@ namespace KingLastPiece
                 float p = PoseTrack.Curve(Ease.Out, Mathf.Clamp01(t));
                 pos = start + dir * (range * p) + Vector3.up * Height;
                 // Turn back at the end of the throw, or early at the board's edge.
-                float h = GameManager.PlayableHalf + 0.5f;
-                if (t >= 1f || Mathf.Abs(pos.x) > h || Mathf.Abs(pos.z) > h) returning = true;
+                if (t >= 1f || !BoardSlots.Inside(pos, GameManager.EdgeInset - 0.5f)) returning = true;
                 Strike(pos, hitOut);
             }
             else

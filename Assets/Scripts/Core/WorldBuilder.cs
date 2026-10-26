@@ -119,6 +119,19 @@ namespace KingLastPiece
             }
         }
 
+        /// <summary>A gem tower (glowing gems) standing at <paramref name="at"/> on the floor, turned toward <paramref name="lookAt"/>.</summary>
+        public static Transform GemTower(Transform parent, Vector3 at, Vector3 lookAt)
+        {
+            Vector3 to = lookAt - at;
+            to.y = 0f;
+            float yaw = to.sqrMagnitude > 0.01f ? Quaternion.LookRotation(to).eulerAngles.y : 0f;
+            var tower = PieceFactory.LoadModel(GemTowerModel, parent, GemTowerHeight, yaw, standUp: false);
+            if (tower == null) return null;
+            tower.position += new Vector3(at.x, 0f, at.z);
+            GlowGems(tower);
+            return tower;
+        }
+
         /// <summary>
         /// Runtime board setup: static colliders for physics rubble (board top at y = 0, frame rails, hall floor — pieces
         /// and the King never use colliders) and the decal layer on the squares. Idempotent, so older baked scenes get it.

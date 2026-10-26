@@ -1278,8 +1278,11 @@ namespace KingLastPiece
             return escape;
         }
 
-        static bool InsideBoard(Vector3 p) =>
-            Mathf.Abs(p.x) <= GameManager.PlayableHalf && Mathf.Abs(p.z) <= GameManager.PlayableHalf;
+        static bool InsideBoard(Vector3 p)
+        {
+            var stage = StageRun.Instance;
+            return stage != null && stage.Running ? stage.IsWalkable(p) : BoardSlots.Inside(p, GameManager.EdgeInset);
+        }
 
         void UpdateDodge(float dt)
         {

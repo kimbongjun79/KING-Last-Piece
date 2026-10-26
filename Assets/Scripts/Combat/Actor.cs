@@ -93,11 +93,11 @@ namespace KingLastPiece
 
         protected void ClampToBoard()
         {
-            var p = transform.position;
-            float h = GameManager.PlayableHalf;
-            p.x = Mathf.Clamp(p.x, -h, h);
-            p.z = Mathf.Clamp(p.z, -h, h);
-            transform.position = p;
+            // The King walking the stage keeps to its floors (rooms and corridors); a fight keeps to its area.
+            var stage = StageRun.Instance;
+            transform.position = this is PlayerController && stage != null && stage.Running
+                ? stage.ClampWalkable(transform.position)
+                : BoardSlots.ClampInside(transform.position, GameManager.EdgeInset);
         }
     }
 }

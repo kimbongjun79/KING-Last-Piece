@@ -363,9 +363,10 @@ namespace KingLastPiece
         /// <summary>Color of the board square under a point (light / dark), used for debris.</summary>
         public static Color SquareColor(Vector3 p)
         {
-            int f = Mathf.FloorToInt(p.x / GameManager.TileSize + 4f);
-            int r = Mathf.FloorToInt(p.z / GameManager.TileSize + 4f);
-            return (f + r) % 2 == 0 ? GameManager.DarkSquare : GameManager.LightSquare;
+            // World-grid parity (a1 of the board at the origin is dark; the stage's floors share the grid).
+            int f = Mathf.FloorToInt(p.x / GameManager.TileSize);
+            int r = Mathf.FloorToInt(p.z / GameManager.TileSize);
+            return ((f + r) % 2 + 2) % 2 == 0 ? GameManager.DarkSquare : GameManager.LightSquare;
         }
 
         // ---------------------------------------------------------------- particles
@@ -602,7 +603,7 @@ namespace KingLastPiece
             instance.basePos = new Vector3[squares.GetLength(0), squares.GetLength(1)];
             for (int f = 0; f < squares.GetLength(0); f++)
             for (int r = 0; r < squares.GetLength(1); r++)
-                instance.basePos[f, r] = squares[f, r].localPosition;
+                if (squares[f, r] != null) instance.basePos[f, r] = squares[f, r].localPosition;
         }
 
         public static void Ripple(Vector3 center, float radius, float strength)
@@ -633,6 +634,7 @@ namespace KingLastPiece
             for (int r = 0; r < tiles.GetLength(1); r++)
             {
                 var tile = tiles[f, r];
+                if (tile == null) continue;   // a gap in the grid (the stage's notched corners)
                 Vector3 bp = basePos[f, r];
                 float lift = 0f;
                 Vector3 tiltAxis = Vector3.zero;

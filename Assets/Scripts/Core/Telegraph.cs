@@ -295,7 +295,7 @@ namespace KingLastPiece
             for (float t = 0.4f; t <= length; t += 0.25f)
             {
                 Vector3 p = start + dir * t;
-                if (Mathf.Abs(p.x) >= GameManager.BoardHalf || Mathf.Abs(p.z) >= GameManager.BoardHalf) break;
+                if (!BoardSlots.Inside(p, 0f)) break;
                 var s = BoardSlots.ToSquare(p);
                 if (s != from && !list.Contains(s)) list.Add(s);
             }
@@ -307,8 +307,8 @@ namespace KingLastPiece
         {
             list.Clear();
             float h = Tile * 0.5f, reach = radius * 0.85f;
-            for (int x = 0; x < BoardSlots.Size; x++)
-            for (int y = 0; y < BoardSlots.Size; y++)
+            for (int x = 0; x < BoardSlots.Width; x++)
+            for (int y = 0; y < BoardSlots.Height; y++)
             {
                 var s = new Vector2Int(x, y);
                 Vector3 c = BoardSlots.Center(s);
