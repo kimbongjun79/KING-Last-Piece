@@ -221,7 +221,7 @@ namespace KingLastPiece
         EnemyBase counterTarget;
         Vector3 dir;
         float reach, size = 1f, travelled, sparkTimer, slashTimer = SlashEvery;
-        bool namu, bossCounterWave;
+        bool namu, bossCounterWave, closeCounterScatter;
         Material coreMat, glowMat;
         readonly HashSet<EnemyBase> struck = new HashSet<EnemyBase>();
 
@@ -239,6 +239,17 @@ namespace KingLastPiece
             wave.counterTarget = target;
             wave.bossCounterWave = true;
             wave.name = "Boss Counter Wave";
+        }
+
+        /// <summary>Scatter a wave away from the boss as the King orbits it; the boss takes only the final counter blow.</summary>
+        public static void SpawnCloseCounter(PlayerController owner, EnemyBase boss, Vector3 from, Vector3 dir)
+        {
+            if (owner == null || boss == null || dir.sqrMagnitude < 0.01f) return;
+            var wave = Create(owner, from, dir, GameManager.BoardHalf * 1.4f, 0.85f);
+            wave.counterTarget = boss;
+            wave.transform.position = new Vector3(from.x, Mathf.Max(0.9f, from.y), from.z);
+            wave.closeCounterScatter = true;
+            wave.name = "Close Counter Scatter";
         }
 
         static SwordWaveFx Create(PlayerController owner, Vector3 from, Vector3 dir, float reach, float size)
@@ -333,6 +344,7 @@ namespace KingLastPiece
 
             float width = HalfWidth * size * Mathf.Lerp(0.8f, 1.2f, p);
             Vector3 flat = new Vector3(transform.position.x, 0f, transform.position.z);
+            Vector3 right = Vector3.Cross(Vector3.up, dir);
             if (bossCounterWave)
             {
                 if ((counterTarget.FlatPos - flat).magnitude <= counterTarget.Radius + 0.6f)
@@ -342,20 +354,37 @@ namespace KingLastPiece
                     return;
                 }
             }
+            else if (closeCounterScatter)
+            {
+                var enemies = GameManager.Instance.Enemies;
+                for (int i = enemies.Count - 1; i >= 0; i--)
+                {
+                    var e = enemies[i];
+                    if (e == null || e == counterTarget || e.IsDead || !e.Targetable || struck.Contains(e)) continue;
+                    if (!Crosses(e, flat, right, width)) continue;
+                    struck.Add(e);
+                    owner.BossCloseScatterStrike(e, transform.position);
+                }
+            }
             else
             {
                 foreach (var e in GameManager.Instance.Enemies.ToArray())
                 {
                     if (e == null || e.IsDead || !e.Targetable || struck.Contains(e)) continue;
-                    Vector3 to = e.FlatPos - flat;
-                    float ahead = Vector3.Dot(to, dir);
-                    if (ahead < -0.6f - e.Radius || ahead > 0.6f + e.Radius) continue;
-                    if (Mathf.Abs(Vector3.Dot(to, Vector3.Cross(Vector3.up, dir))) > width + e.Radius) continue;
+                    if (!Crosses(e, flat, right, width)) continue;
                     struck.Add(e);
                     owner.SwordWaveStrike(e, transform.position);
                 }
             }
             if (travelled >= reach) Destroy(gameObject);
+        }
+
+        bool Crosses(EnemyBase e, Vector3 flat, Vector3 right, float width)
+        {
+            Vector3 to = e.FlatPos - flat;
+            float ahead = Vector3.Dot(to, dir);
+            if (ahead < -0.6f - e.Radius || ahead > 0.6f + e.Radius) return false;
+            return Mathf.Abs(Vector3.Dot(to, right)) <= width + e.Radius;
         }
 
         void OnDestroy()

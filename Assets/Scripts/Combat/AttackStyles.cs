@@ -271,6 +271,38 @@ namespace KingLastPiece
         public PoseTrack pose;
     }
 
+    public enum BossCloseOrbit { Sweep, Spiral, Reversal, Dive }
+
+    /// <summary>A boss counter travelling around its body to the side opposite its snapshotted attack facing.</summary>
+    public sealed class BossCloseCounterMotion
+    {
+        public string name, koName;
+        public float orbitStart, orbitEnd, duration;
+        public int extraTurns;
+        public BossCloseOrbit orbit;
+        public SlashFxKind slash;
+        public float[] waveTimes;
+        public PoseTrack pose;
+
+        /// <summary>Offset from the moving boss. The starting angle is measured from the attack's opposite side.</summary>
+        public Vector3 OrbitOffset(Vector3 back, float startAngle, float radius, float progress)
+        {
+            float u = Mathf.Clamp01(progress);
+            float direction = startAngle < 0f ? -1f : 1f;
+            float toBack = (direction > 0f ? 360f : -360f) - startAngle;
+            float turn = orbit == BossCloseOrbit.Spiral || orbit == BossCloseOrbit.Reversal
+                ? u : PoseTrack.Curve(orbit == BossCloseOrbit.Dive ? Ease.Out : Ease.InOut, u);
+            float angle = startAngle + (toBack + direction * extraTurns * 360f) * turn;
+            float wobble = orbit == BossCloseOrbit.Reversal ? Mathf.Sin(u * Mathf.PI * 2f) : 0f;
+            if (orbit == BossCloseOrbit.Reversal) angle += direction * 150f * wobble;
+            float r = orbit == BossCloseOrbit.Reversal ? radius * (1f - 0.23f * wobble * wobble)
+                : orbit == BossCloseOrbit.Dive ? radius * (1f - 0.18f * Mathf.Sin(u * Mathf.PI)) : radius;
+            float a = angle * Mathf.Deg2Rad;
+            float c = Mathf.Cos(a), s = Mathf.Sin(a);
+            return new Vector3((back.x * c + back.z * s) * r, 0f, (back.z * c - back.x * s) * r);
+        }
+    }
+
     /// <summary>The candidate body-attack styles evaluated in the Attack Lab.</summary>
     public static class AttackStyles
     {
@@ -283,6 +315,7 @@ namespace KingLastPiece
         public static readonly AttackStyle[] All = Build();
         public static AttackStyle Default => All[DefaultIndex];
         public static readonly BossCounterMotion[] RangedCounters = BuildRangedCounters();
+        public static readonly BossCloseCounterMotion[] CloseCounters = BuildCloseCounters();
 
         static AttackStyle[] Build()
         {
@@ -667,6 +700,50 @@ namespace KingLastPiece
                     .Key(0.38f, P(tilt: 76f, spin: -180f, lift: 0.17f), Ease.In)
                     .Key(0.60f, P(tilt: 35f, spin: -280f), Ease.Out)
                     .Key(0.90f, P(spin: -360f), Ease.Out),
+            },
+        };
+        static BossCloseCounterMotion[] BuildCloseCounters() => new[]
+        {
+            new BossCloseCounterMotion
+            {
+                name = "Crescent Ride", koName = "반월 저공 선회", orbit = BossCloseOrbit.Sweep,
+                orbitStart = 0.12f, orbitEnd = 0.94f, duration = 1.16f, extraTurns = 1,
+                slash = SlashFxKind.SlashB, waveTimes = new[] { 0.31f, 0.54f, 0.77f },
+                pose = new PoseTrack().Key(0f, P()).Key(0.12f, P(tilt: 24f, squash: -0.12f), Ease.Out)
+                    .Key(0.50f, P(tilt: 35f, heading: 90f, spin: 240f, lift: 0.25f), Ease.Linear)
+                    .Key(0.94f, P(tilt: 65f, spin: 540f), Ease.In)
+                    .Key(1.16f, P(spin: 720f), Ease.Out),
+            },
+            new BossCloseCounterMotion
+            {
+                name = "Climbing Spiral", koName = "고공 나선 등반", orbit = BossCloseOrbit.Spiral,
+                orbitStart = 0.15f, orbitEnd = 1.18f, duration = 1.42f, extraTurns = 2,
+                slash = SlashFxKind.AoeA, waveTimes = new[] { 0.37f, 0.60f, 0.82f, 1.05f },
+                pose = new PoseTrack().Key(0f, P()).Key(0.15f, P(tilt: 20f, lift: 0.2f), Ease.Out)
+                    .Key(0.69f, P(tilt: 32f, spin: 480f, lift: 1.7f), Ease.InOut)
+                    .Key(1.18f, P(tilt: 64f, spin: 900f, lift: 0.15f), Ease.In)
+                    .Key(1.42f, P(spin: 1080f), Ease.Out),
+            },
+            new BossCloseCounterMotion
+            {
+                name = "Reversing Eight", koName = "팔자 역주행", orbit = BossCloseOrbit.Reversal,
+                orbitStart = 0.13f, orbitEnd = 1.02f, duration = 1.28f, extraTurns = 1,
+                slash = SlashFxKind.Ink, waveTimes = new[] { 0.30f, 0.48f, 0.73f, 0.92f },
+                pose = new PoseTrack().Key(0f, P()).Key(0.13f, P(tilt: -24f, squash: -0.12f), Ease.Out)
+                    .Key(0.46f, P(tilt: 40f, heading: -90f, spin: -210f, lift: 0.45f), Ease.Linear)
+                    .Key(0.72f, P(tilt: -36f, heading: 90f, spin: 90f, lift: 0.45f), Ease.InOut)
+                    .Key(1.02f, P(tilt: 62f, spin: 360f), Ease.In)
+                    .Key(1.28f, P(spin: 360f), Ease.Out),
+            },
+            new BossCloseCounterMotion
+            {
+                name = "Meteor Orbit", koName = "급강하 고속 선회", orbit = BossCloseOrbit.Dive,
+                orbitStart = 0.08f, orbitEnd = 0.79f, duration = 1.03f, extraTurns = 3,
+                slash = SlashFxKind.SlashBVertical, waveTimes = new[] { 0.18f, 0.31f, 0.44f, 0.57f, 0.71f },
+                pose = new PoseTrack().Key(0f, P()).Key(0.08f, P(tilt: -32f, lift: 0.45f), Ease.Out)
+                    .Key(0.33f, P(tilt: 35f, flip: 170f, lift: 1.25f), Ease.In)
+                    .Key(0.79f, P(tilt: 100f, flip: 360f, squash: -0.22f), Ease.In)
+                    .Key(1.03f, P(flip: 360f), Ease.Out),
             },
         };
     }

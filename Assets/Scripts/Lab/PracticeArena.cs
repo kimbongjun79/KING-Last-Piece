@@ -40,10 +40,11 @@ namespace KingLastPiece
         GameManager game;
         bool automated;
         Coroutine bossCounterPreview;
-        public int BossCounterPreviewIndex { get; private set; } = -1;
+        public int BossRangedPreviewIndex { get; private set; } = 1;
+        public int BossClosePreviewIndex { get; private set; } = -1;
 
         static readonly Key[] DigitKeys = { Key.Digit1, Key.Digit2, Key.Digit3, Key.Digit4, Key.Digit5, Key.Digit6, Key.Digit7, Key.Digit8, Key.Digit9 };
-        static readonly Key[] BossCounterKeys = { Key.F1, Key.F2, Key.F3, Key.F4 };
+        static readonly Key[] BossCounterKeys = { Key.F1, Key.F2, Key.F3, Key.F4, Key.F5, Key.F6, Key.F7, Key.F8 };
 
         void Awake()
         {
@@ -126,6 +127,7 @@ namespace KingLastPiece
         {
             game.ClearEnemies();
             game.Player.ResetForWave(PlayerStart, 0f);
+            RestoreBossCounterDefaults();
             game.Rig.Snap();
             for (int i = 0; i < DummySlots.Length; i++) SpawnDummy(i);
         }
@@ -146,10 +148,17 @@ namespace KingLastPiece
         /// <summary>The pattern 7 started last (shown in the key list).</summary>
         public string MegatronPatternName => megatronPattern < 0 ? "-" : ChessMegatron.AllPatterns[megatronPattern].ToString();
 
+        void RestoreBossCounterDefaults()
+        {
+            game.Player.BossRangedCounterVariant = 1;
+            game.Player.BossCloseCounterVariant = 0;
+        }
+
         /// <summary>6: clears the board (dummies too) and drops the colossus on e6, facing the King.</summary>
         void SpawnMegatron()
         {
             game.ClearEnemies();
+            RestoreBossCounterDefaults();
             for (int i = 0; i < dummies.Length; i++) dummies[i] = null;
             Megatron = game.SpawnCustom<ChessMegatron>(PieceType.Pawn, GameManager.SquareToWorld("e6"));
             megatronPattern = -1;
@@ -163,22 +172,27 @@ namespace KingLastPiece
             Megatron.DebugPattern(ChessMegatron.AllPatterns[megatronPattern]);
         }
 
-        /// <summary>F1–F4: isolate one ranged counter against a stationary boss without requiring a timed near miss.</summary>
-        void PreviewBossRangedCounter(int variant)
+        /// <summary>F1–F4: ranged; F5–F8: close. Repeat a perfect dodge against a stationary boss.</summary>
+        void PreviewBossCounter(int variant, bool close)
         {
             if (bossCounterPreview != null) StopCoroutine(bossCounterPreview);
-            BossCounterPreviewIndex = variant;
-            bossCounterPreview = StartCoroutine(PreviewBossRangedCounterRoutine(variant));
+            if (close) BossClosePreviewIndex = variant;
+            else BossRangedPreviewIndex = variant;
+            bossCounterPreview = StartCoroutine(PreviewBossCounterRoutine(variant, close));
         }
 
-        IEnumerator PreviewBossRangedCounterRoutine(int variant)
+        IEnumerator PreviewBossCounterRoutine(int variant, bool close)
         {
             SpawnMegatron();
             var boss = Megatron;
             boss.DebugHold = true;
             var player = game.Player;
-            player.BossRangedCounterVariant = variant;
-            player.ResetForWave(boss.FlatPos - Vector3.forward * (boss.Radius + 4f), 0f);
+            if (close) player.BossCloseCounterVariant = variant;
+            else player.BossRangedCounterVariant = variant;
+            Vector3 front = boss.transform.forward;
+            front.y = 0f;
+            front.Normalize();
+            player.ResetForWave(boss.FlatPos + front * (boss.Radius + (close ? 0.75f : 4f)), 0f);
             game.Rig.Snap();
             for (int frame = 0; frame < 180 && boss != null && !boss.CanBeGrabbed; frame++) yield return null;
             if (boss != null && boss.CanBeGrabbed)
@@ -218,7 +232,7 @@ namespace KingLastPiece
                 if (kb.digit7Key.wasPressedThisFrame) NextMegatronPattern();
                 if (kb.digit8Key.wasPressedThisFrame && Megatron != null) Megatron.DebugPhase2();
                 for (int i = 0; i < BossCounterKeys.Length; i++)
-                    if (kb[BossCounterKeys[i]].wasPressedThisFrame) PreviewBossRangedCounter(i);
+                    if (kb[BossCounterKeys[i]].wasPressedThisFrame) PreviewBossCounter(i % 4, i >= 4);
                 if (kb.xKey.wasPressedThisFrame) ClearPieces();
                 if (kb.cKey.wasPressedThisFrame) ResetLab();
                 if (kb.hKey.wasPressedThisFrame) game.HitStopEnabled = !game.HitStopEnabled;

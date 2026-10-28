@@ -57,8 +57,10 @@ namespace KingLastPiece
         public AttackStyle Style { get; set; } = AttackStyles.Default;
         /// <summary>Effects Lab only: a heavy motion trial, without changing the shared attack style.</summary>
         public AttackDef HeavyMotionTrial { get; set; }
-        /// <summary>Practice Arena's ranged boss-counter motion choice (0–3); gameplay defaults to the first.</summary>
-        public int BossRangedCounterVariant { get; set; }
+        /// <summary>Practice Arena's ranged boss-counter motion choice (0–3); gameplay uses the chosen second motion.</summary>
+        public int BossRangedCounterVariant { get; set; } = 1;
+        /// <summary>Practice Arena's close boss-counter choice (0–3); defaults to the first trial.</summary>
+        public int BossCloseCounterVariant { get; set; }
         public bool IsInvulnerable =>
             (state == State.Dodge && stateTime >= IFrameStart && stateTime <= IFrameEnd) || state == State.Counter || stalemateTimer > 0f ||
             perfectGuard > 0f;
@@ -110,6 +112,7 @@ namespace KingLastPiece
         bool sprintExhausted;
         bool justThisDodge;
         EnemyBase justTarget, counterTarget;
+        Vector3 justBossBack;
         readonly List<EnemyBase> assistNearby = new List<EnemyBase>();
         readonly List<Vector3> assistCandidates = new List<Vector3>();
         Vector3 counterFrom, counterTo;
@@ -1397,6 +1400,9 @@ namespace KingLastPiece
             if (justThisDodge || IsDead) return;
             justThisDodge = true;
             justTarget = attacker;
+            justBossBack = attacker.IsBoss ? -attacker.transform.forward : Vector3.zero;
+            justBossBack.y = 0f;
+            if (justBossBack.sqrMagnitude > 0.01f) justBossBack.Normalize();
             JustDodgeCount++;
             // Reward: half the stamina bar back.
             Stamina = Mathf.Min(MaxStamina, Stamina + MaxStamina * 0.5f);
@@ -1413,13 +1419,17 @@ namespace KingLastPiece
 
         // ---------------------------------------------------------------- royal throw (counter)
 
-        // Bosses cannot be grabbed: a close perfect-dodge counter keeps its leap, while a distant one sends a sword wave.
-        const float LeapCounterRise = 0.3f, LeapCounterEnd = 0.62f, LeapCounterDamage = 55f, StaggerLeapCounter = 60f;
+        // Bosses cannot be grabbed: a distant perfect dodge sends one wave, a close dodge orbits their attack's opposite side.
+        const float BossCounterDamage = 55f, StaggerBossCounter = 60f;
         const float BossRangedCounterGap = 2.5f;
         public static bool BossCounterIsRanged(float distance, float bossRadius, float kingRadius) =>
             distance > bossRadius + kingRadius + BossRangedCounterGap;
-        bool bossCounter, bossRangedCounter, bossWaveReleased, leapStruck;
+        bool bossCounter, bossRangedCounter, bossWaveReleased, closeStruck;
+        int closeWaveIndex;
+        float closeStartAngle, closeRadius;
+        Vector3 closeBack, closeCenter;
         BossCounterMotion rangedCounterMotion;
+        BossCloseCounterMotion closeCounterMotion;
 
         void StartCounter()
         {
@@ -1429,7 +1439,8 @@ namespace KingLastPiece
             bossCounter = counterTarget.IsBoss;
             if (bossCounter)
             {
-                leapStruck = false;
+                closeStruck = false;
+                closeWaveIndex = 0;
                 bossWaveReleased = false;
                 LockTarget = counterTarget;
                 Vector3 toQ = counterTarget.FlatPos - FlatPos;
@@ -1440,7 +1451,22 @@ namespace KingLastPiece
                     : null;
                 counterFrom = FlatPos;
                 if (!bossRangedCounter)
-                    counterTo = counterTarget.FlatPos - toQ.normalized * (counterTarget.Radius + Radius + 0.35f);
+                {
+                    closeCounterMotion = AttackStyles.CloseCounters[Mathf.Clamp(BossCloseCounterVariant, 0, AttackStyles.CloseCounters.Length - 1)];
+                    closeBack = justBossBack;
+                    if (closeBack.sqrMagnitude < 0.01f)
+                    {
+                        closeBack = -counterTarget.transform.forward;
+                        closeBack.y = 0f;
+                        if (closeBack.sqrMagnitude < 0.01f) closeBack = -toQ.normalized;
+                        else closeBack.Normalize();
+                    }
+                    Vector3 fromBoss = counterFrom - counterTarget.FlatPos;
+                    if (fromBoss.sqrMagnitude < 0.01f) fromBoss = -closeBack;
+                    closeStartAngle = Vector3.SignedAngle(closeBack, fromBoss, Vector3.up);
+                    closeRadius = counterTarget.Radius + Radius + 0.14f;
+                    closeCenter = counterTarget.FlatPos;
+                }
                 transform.rotation = Quaternion.LookRotation(toQ);
                 Sfx.Play(bossRangedCounter ? "ATK_Stomp_Charge" : "PL_Dodge", FlatPos);
                 Enter(State.Counter);
@@ -1507,8 +1533,8 @@ namespace KingLastPiece
         {
             if (boss == null || boss.IsDead) return;
             bool crit = RollCrit(out float mult);
-            float damage = LeapCounterDamage * DamageMult * mult;
-            if (!boss.TakeHit(damage, StaggerLeapCounter * StaggerScale(crit), transform.position)) return;
+            float damage = BossCounterDamage * DamageMult * mult;
+            if (!boss.TakeHit(damage, StaggerBossCounter * StaggerScale(crit), at)) return;
             Game.ReportDamage(boss, damage, crit);
             Vector3 from = (boss.FlatPos - FlatPos).normalized;
             Vfx.Hit(boss.Visual.position + Vector3.up * 1.4f - from * (boss.Radius * 0.3f), from, true, boss.Visual);
@@ -1517,52 +1543,77 @@ namespace KingLastPiece
             Game.Rig.Shake(0.4f);
         }
 
-        /// <summary>The leap at the queen: rise and come down just in front of her, strike on landing, recover.</summary>
-        void UpdateLeapCounter()
+        /// <summary>The waves thrown off the boss's body hit only nearby bystanders, not the dodged boss.</summary>
+        public void BossCloseScatterStrike(EnemyBase enemy, Vector3 at)
         {
-            float t = stateTime;
-            if (t < LeapCounterRise)
+            if (enemy == null || enemy.IsDead) return;
+            bool crit = RollCrit(out float mult);
+            float damage = 12f * DamageMult * mult;
+            if (!enemy.TakeHit(damage, 15f * StaggerScale(crit), at)) return;
+            Game.ReportDamage(enemy, damage, crit);
+            Vector3 toward = (enemy.FlatPos - FlatPos).normalized;
+            Vfx.Hit(enemy.Visual.position, toward, false, enemy.Visual);
+        }
+
+        /// <summary>Climb and circle the boss, scatter radial sword waves, then land one counter on its back.</summary>
+        void UpdateBossCloseCounter()
+        {
+            if (!closeStruck && (counterTarget == null || counterTarget.IsDead || !counterTarget.Targetable))
             {
-                float p = t / LeapCounterRise;
-                transform.position = Vector3.Lerp(counterFrom, counterTo, PoseTrack.Curve(Ease.Out, p));
-                if (counterTarget != null) FaceTowards(counterTarget.FlatPos - FlatPos, 900f);
-                ApplyPose(BodyPose.P(tilt: Mathf.Lerp(-10f, 24f, p), lift: Mathf.Sin(p * Mathf.PI) * 1.3f, squash: -0.08f * (1f - p)));
-                crownTrail.emitting = true;
-                return;
-            }
-            if (!leapStruck)
-            {
-                leapStruck = true;
                 Game.EndSlowMo();
-                if (counterTarget != null && !counterTarget.IsDead)
-                {
-                    bool crit = RollCrit(out float mult);
-                    float damage = LeapCounterDamage * DamageMult * mult;
-                    Vector3 toQ = (counterTarget.FlatPos - FlatPos).normalized;
-                    if (counterTarget.TakeHit(damage, StaggerLeapCounter * StaggerScale(crit), transform.position))
-                    {
-                        Game.ReportDamage(counterTarget, damage, crit);
-                        Vfx.Hit(counterTarget.Visual.position + Vector3.up * 1.4f - toQ * (counterTarget.Radius * 0.3f), toQ, true, counterTarget.Visual);
-                        Vfx.Slash(SlashFxKind.Ink, FlatPos + Vector3.up * 1.2f, Quaternion.LookRotation(toQ), 1.3f, null);
-                        Sfx.Play("HIT_Boss", counterTarget.transform.position + Vector3.up);
-                    }
-                }
-                Vfx.GroundImpact(FlatPos, 1.6f, 0.8f);
-                Game.HitStop(0.1f);
-                Game.Rig.Kick(0.8f);
-                Game.Rig.Shake(0.4f);
-                LockTarget = null;
-            }
-            float r = Mathf.Clamp01((t - LeapCounterRise) / (LeapCounterEnd - LeapCounterRise));
-            ApplyPose(BodyPose.Lerp(BodyPose.P(tilt: 30f, squash: -0.15f), default, PoseTrack.Curve(Ease.OutBack, r)));
-            crownTrail.emitting = false;
-            if (t >= LeapCounterEnd)
-            {
-                counterTarget = null;
+                LockTarget = counterTarget = null;
                 bossCounter = false;
+                closeCounterMotion = null;
+                crownTrail.emitting = false;
                 ApplyPose(default);
                 Enter(State.Normal);
+                return;
             }
+
+            float t = stateTime;
+            var motion = closeCounterMotion;
+            Vector3 center = counterTarget != null ? counterTarget.FlatPos : closeCenter;
+            closeCenter = center;
+            if (t < motion.orbitStart)
+            {
+                Vector3 start = center + motion.OrbitOffset(closeBack, closeStartAngle, closeRadius, 0f);
+                transform.position = Vector3.Lerp(counterFrom, start, PoseTrack.Curve(Ease.Out, t / motion.orbitStart));
+            }
+            else
+            {
+                float orbitProgress = (t - motion.orbitStart) / (motion.orbitEnd - motion.orbitStart);
+                transform.position = center + motion.OrbitOffset(closeBack, closeStartAngle, closeRadius, orbitProgress);
+            }
+            Vector3 toward = center - FlatPos;
+            if (toward.sqrMagnitude > 0.01f) FaceTowards(toward, 1200f);
+            ApplyPose(motion.pose.Eval(t));
+            crownTrail.emitting = t < motion.orbitEnd;
+
+            while (closeWaveIndex < motion.waveTimes.Length && t >= motion.waveTimes[closeWaveIndex])
+            {
+                closeWaveIndex++;
+                Vector3 outward = FlatPos - center;
+                if (outward.sqrMagnitude < 0.01f) outward = -closeBack;
+                outward.Normalize();
+                Vfx.Slash(motion.slash, crownTrail.transform.position, Quaternion.LookRotation(outward), 1.2f, Vfx.Accent);
+                SwordWaveFx.SpawnCloseCounter(this, counterTarget, crownTrail.transform.position + outward * 0.35f, outward);
+                Sfx.Play("THR_Release", FlatPos);
+            }
+            if (!closeStruck && t >= motion.orbitEnd)
+            {
+                closeStruck = true;
+                Game.EndSlowMo();
+                BossCounterStrike(counterTarget, transform.position);
+                Vfx.GroundImpact(FlatPos, 1.6f, 0.8f);
+                Game.Rig.Kick(0.8f);
+            }
+            if (t < motion.duration) return;
+            LockTarget = counterTarget = null;
+            bossCounter = false;
+            closeCounterMotion = null;
+            crownTrail.emitting = false;
+            ApplyPose(default);
+            Enter(State.Normal);
         }
 
         void UpdateCounter(float dt)
@@ -1571,7 +1622,7 @@ namespace KingLastPiece
             if (bossCounter)
             {
                 if (bossRangedCounter) UpdateBossRangedCounter();
-                else UpdateLeapCounter();
+                else UpdateBossCloseCounter();
                 return;
             }
             if (counterTarget == null || (counterTarget.IsDead && !counterReleased))
