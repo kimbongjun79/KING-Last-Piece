@@ -3,28 +3,12 @@ using UnityEngine;
 
 namespace KingLastPiece
 {
-    /// <summary>Selectable effect looks, compared side by side in Scenes/EffectsLab.unity.</summary>
-    public enum VfxStyle { Classic, CrackedBoard, BoardRipple }
-
     /// <summary>Authored slash prefabs (NamuFX Simple Stylized Slash vol2) registered in <see cref="FxLibrary"/>.</summary>
     public enum SlashFxKind { None, SlashA, SlashB, SlashC, SlashD, Ink, Water, AoeA, SlashBVertical }
 
-    /// <summary>
-    /// Gameplay-facing effect events. Gameplay calls these (never raw sparks/shockwaves for hits and slams),
-    /// so a style can be swapped globally — or picked per call, which is how the Effects Lab shows all styles at once.
-    /// </summary>
+    /// <summary>Gameplay effect events. All scenes use the board-ripple look.</summary>
     public static class Vfx
     {
-        // Chosen in the Effects Lab: C. Board Ripple.
-        public static VfxStyle Style = VfxStyle.BoardRipple;
-
-        public static readonly string[] Names = { "A. Classic", "B. Cracked Board", "C. Board Ripple" };
-        public static readonly string[] Descriptions =
-        {
-            "Current effects: gold cube sparks, flat glowing shockwave disc.",
-            "Hits chip off black & ivory marble. Slams crack the board (decal cracks), with debris in the struck square's color and heaved shards.",
-            "Hits burst into black & white square confetti. Slams make the real board squares ripple outward, with a square shockwave and a small center crack.",
-        };
 
         /// <summary>The King's attack-effect color (white, slightly warm).</summary>
         public static readonly Color Accent = new Color(1f, 0.97f, 0.92f);
@@ -41,7 +25,7 @@ namespace KingLastPiece
         public static void Hit(Vector3 pos, Vector3 dir, bool heavy, Transform follow = null)
         {
             followTarget = follow;
-            try { Hit(Style, pos, dir, heavy); }
+            try { HitCore(pos, dir, heavy); }
             finally { followTarget = null; }
         }
 
@@ -51,28 +35,14 @@ namespace KingLastPiece
             if (followTarget != null) FollowTarget.Attach(go, followTarget);
         }
 
-        public static void Hit(VfxStyle style, Vector3 pos, Vector3 dir, bool heavy)
+        static void HitCore(Vector3 pos, Vector3 dir, bool heavy)
         {
             dir.y = 0f;
             dir = dir.sqrMagnitude > 0.001f ? dir.normalized : Vector3.forward;
-            switch (style)
-            {
-                case VfxStyle.CrackedBoard:
-                    HitFlashFx.Spawn(pos, Accent, heavy ? 0.9f : 0.6f);
-                    Burst(SlashFxKind.SlashC, pos, Quaternion.LookRotation(dir), heavy ? 0.9f : 0.6f, Accent, "flare", "spark");
-                    Chips(pos, dir, heavy ? 18 : 11, heavy ? 6.5f : 5f, Ivory, Onyx, heavy ? 0.16f : 0.13f);
-                    Effects.Sparks(pos, Accent, heavy ? 8 : 4, heavy ? 6f : 4f);
-                    break;
-                case VfxStyle.BoardRipple:
-                    HitFlashFx.Spawn(pos, Ivory, heavy ? 0.9f : 0.6f);
-                    Burst(SlashFxKind.SlashC, pos, Quaternion.LookRotation(dir), heavy ? 0.9f : 0.6f, Ivory, "flare", "spark");
-                    Confetti(pos, dir, heavy ? 22 : 14, heavy ? 6.5f : 5f);
-                    Effects.Sparks(pos, Accent, heavy ? 6 : 3, 4f);
-                    break;
-                default:
-                    Effects.Sparks(pos, Accent, heavy ? 16 : 10, heavy ? 7f : 5f);
-                    break;
-            }
+            HitFlashFx.Spawn(pos, Ivory, heavy ? 0.9f : 0.6f);
+            Burst(SlashFxKind.SlashC, pos, Quaternion.LookRotation(dir), heavy ? 0.9f : 0.6f, Ivory, "flare", "spark");
+            Confetti(pos, dir, heavy ? 22 : 14, heavy ? 6.5f : 5f);
+            Effects.Sparks(pos, Accent, heavy ? 6 : 3, 4f);
         }
 
         // ---------------------------------------------------------------- authored slashes
@@ -328,36 +298,17 @@ namespace KingLastPiece
         // ---------------------------------------------------------------- ground impact (slams / landings)
 
         /// <param name="strength">~0.6 small landing, 1 normal slam, 1.3+ big finisher.</param>
-        public static void GroundImpact(Vector3 center, float radius, float strength, bool hostile = false) =>
-            GroundImpact(Style, center, radius, strength, hostile);
-
-        /// <param name="hostile">Enemy slams use an ember-red accent instead of the King's gold.</param>
-        public static void GroundImpact(VfxStyle style, Vector3 center, float radius, float strength, bool hostile = false)
+        public static void GroundImpact(Vector3 center, float radius, float strength, bool hostile = false)
         {
             center.y = 0f;
             Sfx.Play("IMP_GroundCrack", center);
-            if (style == VfxStyle.BoardRipple) Sfx.Play("IMP_BoardRipple", center);
+            Sfx.Play("IMP_BoardRipple", center);
             Color accent = hostile ? Ember : Accent;
-            switch (style)
-            {
-                case VfxStyle.CrackedBoard:
-                    CrackDecalFx.Spawn(center, radius * 4.75f, strength);
-                    Chips(center + Vector3.up * 0.05f, Vector3.zero, Mathf.RoundToInt(10 * strength), 4.5f * strength,
-                        SquareColor(center), SquareColor(center) * 0.7f, 0.13f);
-                    Effects.Sparks(center + Vector3.up * 0.1f, accent, Mathf.RoundToInt(6 * strength), 4f);
-                    break;
-                case VfxStyle.BoardRipple:
-                    BoardFx.Ripple(center, radius, strength);
-                    SquareRingFx.Spawn(center, radius, accent, 0.5f, 0f);   // square (the diamond marks a launched piece)
-                    // Deep projector: the squares lift up to ~0.4 while rippling and must keep showing the cracks.
-                    CrackDecalFx.Spawn(center, Mathf.Min(6f, radius * 2f), strength * 0.8f, 1.1f);
-                    Confetti(center + Vector3.up * 0.1f, Vector3.zero, Mathf.RoundToInt(10 * strength), 4f * strength);
-                    break;
-                default:
-                    Effects.Shockwave(center, radius, accent, 0.45f);
-                    Effects.Sparks(center + Vector3.up * 0.1f, new Color(0.75f, 0.7f, 0.6f), 14, 5f);
-                    break;
-            }
+            BoardFx.Ripple(center, radius, strength);
+            SquareRingFx.Spawn(center, radius, accent, 0.5f, 0f);
+            // The squares lift while rippling; the deep projector keeps the cracks visible.
+            CrackDecalFx.Spawn(center, Mathf.Min(6f, radius * 2f), strength * 0.8f, 1.1f);
+            Confetti(center + Vector3.up * 0.1f, Vector3.zero, Mathf.RoundToInt(10 * strength), 4f * strength);
         }
 
         /// <summary>Color of the board square under a point (light / dark), used for debris.</summary>
@@ -370,24 +321,6 @@ namespace KingLastPiece
 
         // ---------------------------------------------------------------- particles
 
-        /// <summary>Flat stone chips in two alternating colors (marble / board debris).</summary>
-        static void Chips(Vector3 pos, Vector3 dir, int count, float speed, Color a, Color b, float size)
-        {
-            var ma = MaterialLib.Get(a, 0.85f, 0.1f);
-            var mb = MaterialLib.Get(b, 0.85f, 0.1f);
-            for (int i = 0; i < count; i++)
-            {
-                float s = size * Random.Range(0.6f, 1.3f);
-                var t = PieceFactory.Part(PrimitiveType.Cube, null, pos + Random.insideUnitSphere * 0.1f,
-                    new Vector3(s, s * 0.3f, s * Random.Range(0.6f, 1.2f)), i % 2 == 0 ? ma : mb, Random.rotation.eulerAngles);
-                Track(t.gameObject);
-                var p = t.gameObject.AddComponent<SparkParticle>();
-                Vector3 v = Random.onUnitSphere;
-                v.y = Mathf.Abs(v.y) + 0.5f;
-                p.velocity = (v.normalized + dir * 0.8f).normalized * speed * Random.Range(0.5f, 1.1f);
-                p.life = p.maxLife = Random.Range(0.3f, 0.55f);   // chips vanish quickly
-            }
-        }
 
         /// <summary>Thin black & white squares that flutter down like confetti.</summary>
         static void Confetti(Vector3 pos, Vector3 dir, int count, float speed)

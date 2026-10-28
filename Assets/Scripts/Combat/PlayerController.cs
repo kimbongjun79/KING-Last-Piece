@@ -55,6 +55,8 @@ namespace KingLastPiece
         public int Flasks { get; private set; }
         public EnemyBase LockTarget { get; private set; }
         public AttackStyle Style { get; set; } = AttackStyles.Default;
+        /// <summary>Effects Lab only: a heavy motion trial, without changing the shared attack style.</summary>
+        public AttackDef HeavyMotionTrial { get; set; }
         public bool IsInvulnerable =>
             (state == State.Dodge && stateTime >= IFrameStart && stateTime <= IFrameEnd) || state == State.Counter || stalemateTimer > 0f ||
             perfectGuard > 0f;
@@ -899,7 +901,7 @@ namespace KingLastPiece
             if (danceFinisher) heavy = true;
             EnemyBase gapTarget = null;
             atkIsGapCloser = false;
-            if (heavy) atk = style.heavy;
+            if (heavy) atk = HeavyMotionTrial ?? style.heavy;
             else if (!chain && style.gapCloser != null && TryFindGapTarget(style, out gapTarget, out float gap))
             {
                 // Mid range: dash in first; the combo continues with hit 1 (index -1 + 1 = 0).

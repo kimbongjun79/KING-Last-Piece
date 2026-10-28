@@ -293,8 +293,8 @@ namespace KingLastPiece
                 new AttackStyle
                 {
                     name = "Royal Ensemble", koName = "왕의 연무",
-                    description = "Ram in from mid range, whip R→L, whip L→R, 360° cyclone, air somersault slam; heavy is a wide flipping stomp.",
-                    lights = new[] { EnsembleSwing(1f), EnsembleSwing(-1f), EnsembleCyclone(), EnsembleMeteor() }, heavy = EnsembleStomp(),
+                    description = "Ram in from mid range, whip R→L, whip L→R, 360° cyclone, air somersault slam; heavy is a double slash.",
+                    lights = new[] { EnsembleSwing(1f), EnsembleSwing(-1f), EnsembleCyclone(), EnsembleMeteor() }, heavy = DoubleSlash(0),
                     gapCloser = EnsembleDash, gapCloserMaxRange = 8f,
                 },
             };
@@ -399,27 +399,48 @@ namespace KingLastPiece
             moves = new[] { new MoveSeg(0.12f, 0.34f, Mathf.Clamp(distance, 1.5f, 7.5f)) },
         };
 
-        /// <summary>RMB heavy: Royal Stomp's flipping meteor with a wider landing blast (costs about half the stamina bar).</summary>
-        static AttackDef EnsembleStomp() => new AttackDef
+        /// <summary>Two opposing sweeps with identical reach, damage and cost across the three motion trials.</summary>
+        public static AttackDef DoubleSlash(int variant)
         {
-            name = "Meteor Stomp", duration = 1.3f, cancelAt = 1.05f, cost = 48f, heavy = true, sfx = "ATK_Stomp_Charge", lockFacing = true,
-            pose = new PoseTrack()
-                .Key(0f, P())
-                .Key(0.42f, P(squash: -0.25f), Ease.Out)
-                .Key(0.62f, P(flip: 180f, lift: 2.8f, squash: 0.1f), Ease.Out)
-                .Key(0.82f, P(flip: 360f), Ease.In)
-                .Key(0.92f, P(flip: 360f, squash: -0.3f), Ease.Out)
-                .Key(1.3f, P(flip: 360f), Ease.OutBack),
-            hits = new[]
+            // 0: crossed whips; 1: low-to-high rebound; 2: turning double cut.
+            float first = variant == 1 ? 0.37f : variant == 2 ? 0.32f : 0.38f;
+            float second = variant == 1 ? 0.78f : variant == 2 ? 0.75f : 0.73f;
+            var pose = new PoseTrack().Key(0f, P());
+            if (variant == 1)
+                pose.Key(0.22f, P(tilt: 38f, heading: 115f, squash: -0.22f), Ease.Out)
+                    .Key(0.44f, P(tilt: 64f, heading: -115f, spin: -85f, lift: 0.3f), Ease.Out)
+                    .Key(0.62f, P(tilt: 28f, heading: -115f, spin: -110f, squash: -0.18f), Ease.In)
+                    .Key(0.85f, P(tilt: 68f, heading: 115f, spin: 95f, lift: 0.65f), Ease.Out);
+            else if (variant == 2)
+                pose.Key(0.18f, P(tilt: 36f, heading: 115f, spin: -60f, squash: -0.18f), Ease.Out)
+                    .Key(0.42f, P(tilt: 62f, heading: -120f, spin: 180f, lift: 0.35f), Ease.Linear)
+                    .Key(0.58f, P(tilt: 42f, heading: -115f, spin: 230f, squash: -0.12f), Ease.Out)
+                    .Key(0.84f, P(tilt: 66f, heading: 115f, spin: 450f, lift: 0.3f), Ease.Linear);
+            else
+                pose.Key(0.22f, P(tilt: 35f, heading: 120f, spin: 55f, squash: -0.2f), Ease.Out)
+                    .Key(0.47f, P(tilt: 68f, heading: -120f, spin: -90f, lift: 0.25f), Ease.Out)
+                    .Key(0.61f, P(tilt: 28f, heading: -115f, spin: -70f, squash: -0.16f), Ease.In)
+                    .Key(0.83f, P(tilt: 70f, heading: 115f, spin: 90f, lift: 0.2f), Ease.Out);
+            pose.Key(1.3f, P(spin: variant == 2 ? 360f : 0f), Ease.OutBack);
+            return new AttackDef
             {
-                new HitWindow { start = 0.82f, end = 0.9f, shape = HitShape.Circle, range = 4.3f, damage = 46f, poise = 65f,
-                    hitStop = 0.12f, shake = 0.65f, impact = true, kick = 1f,
-                    dust = true, launch = true, sparkRing = 70, sfx = "ATK_Stomp_Slam" },
-            },
-            moves = new[] { new MoveSeg(0.42f, 0.82f, 3.0f, Ease.InOut) },
-            // Top-to-bottom slash while the King somersaults down onto the board.
-            cues = new[] { new FxCue { time = 0.42f, sfx = "ATK_Stomp_Jump" }, new FxCue { time = 0.64f, kind = SlashFxKind.SlashBVertical, scale = 2.0f, height = 1.8f, roll = 180f, gold = true } },
-        };
+                name = "Double Slash", duration = 1.3f, cancelAt = 1.05f, cost = 48f, heavy = true,
+                sfx = "ATK_Stomp_Charge",
+                pose = pose,
+                hits = new[]
+                {
+                    new HitWindow { start = first, end = first + 0.16f, range = 4.3f, arc = 220f, damage = 23f, poise = 32.5f,
+                        hitStop = 0.06f, shake = 0.35f, kick = 0.45f, sweep = true, sweepFrom = 110f, sweepTo = -110f,
+                        slash = true, fx = SlashFxKind.SlashB, fxScale = 2.1f, fxHeight = 1.2f, fxFlip = true, fxYaw = 180f,
+                        fxGold = true, sfx = "ATK_Whip_1" },
+                    new HitWindow { start = second, end = second + 0.16f, range = 4.3f, arc = 220f, damage = 23f, poise = 32.5f,
+                        hitStop = 0.12f, shake = 0.65f, kick = 1f, sweep = true, sweepFrom = -110f, sweepTo = 110f,
+                        slash = true, impact = true, dust = true, launch = true, sparkRing = 35,
+                        fx = SlashFxKind.SlashB, fxScale = 2.1f, fxHeight = 1.2f, fxGold = true, sfx = "ATK_Whip_2" },
+                },
+                moves = new[] { new MoveSeg(0.22f, second + 0.12f, 3f, Ease.InOut) },
+            };
+        }
 
         // ---------------------------------------------------------------- spin
 
