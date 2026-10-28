@@ -8,16 +8,16 @@ namespace KingLastPiece
     {
         static readonly float[] StationX = { -5.5f, 0f, 5.5f };
         static readonly Key[] Keys = { Key.Digit1, Key.Digit2, Key.Digit3 };
-        static readonly string[] Names = { "1. 짧은 도약 X베기", "2. 깊은 도약 X베기", "3. 비틀어 도약 X베기" };
+        static readonly string[] Names = { "1. 탄력형", "2. 균형형 (게임 기본)", "3. 무게형" };
         static readonly string[] Details =
         {
-            "길게 압축 → 짧고 빠르게 튀어 올라 양쪽 대각선 동시 내려베기",
-            "길게 웅크림 → 높이 빠르게 뛰어든 뒤 양쪽 대각선 동시 내려베기",
-            "길게 힘을 모음 → 몸을 비틀며 빠르게 뛰어들어 양쪽 대각선 동시 내려베기",
+            "준비 0.68 · 높이 2.15 · X 0.92 · 착지 0.96 · 복귀 1.44",
+            "준비 0.72 · 높이 2.40 · X 0.96 · 착지 1.00 · 복귀 1.50",
+            "준비 0.75 · 높이 2.60 · X 1.01 · 착지 1.05 · 복귀 1.56",
         };
         static readonly AttackDef[] Trials =
         {
-            AttackStyles.Default.heavy, AttackStyles.HeavyCut(1), AttackStyles.HeavyCut(2),
+            AttackStyles.HeavyCut(0), AttackStyles.Default.heavy, AttackStyles.HeavyCut(2),
         };
 
         GameManager game;
@@ -37,7 +37,7 @@ namespace KingLastPiece
             game.Player.GodMode = true;
             game.Player.InfiniteStamina = true;
             for (int i = 0; i < dummies.Length; i++) SpawnDummy(i);
-            Select(0);
+            Select(1);
         }
 
         static Vector3 Station(int i) => new Vector3(StationX[i], 0f, 0.5f);
@@ -89,7 +89,7 @@ namespace KingLastPiece
             var attack = game.Player.CurrentAttack;
             string active = attack == Trials[selected] ? $"실행 중: {attack.name}" : "우클릭/K로 모션 확인";
             GUI.Label(new Rect(pr.x + 12 * scale, pr.y + 8 * scale, pr.width - 24 * scale, pr.height - 16 * scale),
-                $"동시 X자 내려베기 3안 — 1·2·3: 모션 선택   우클릭/K: 강공격\n{Names[selected]}: {Details[selected]}\n{active} / 슬래시 2개 동시·타격 1회, Board Ripple 공통", panelStyle);
+                $"2안 기반 착지 X베기 — 1·2·3: 모션 선택   우클릭/K: 강공격\n{Names[selected]}: {Details[selected]}\n{active} / 슬래시 직후 발밑 파동·타격 1회", panelStyle);
         }
     }
 }

@@ -924,7 +924,9 @@ namespace KingLastPiece
             atkComboHit = heavy ? -1 : comboIndex;
             Consume(heavy ? atk.cost * Mathf.Max(0f, 1f - Stats.attackCostCut) * (danceFinisher ? 0.5f : 1f)
                           : atk.cost * LightCostScale * Mathf.Max(0f, 1f - Stats.attackCostCut) * (atkWhirl ? WhirlCost : 1f));
-            atkUsesSlashFx = FxLibrary.Instance != null && System.Array.Exists(atk.hits, h => h.fx != SlashFxKind.None);
+            atkUsesSlashFx = FxLibrary.Instance != null &&
+                (System.Array.Exists(atk.hits, h => h.fx != SlashFxKind.None) ||
+                 (atk.heavy && atk.cues != null && System.Array.Exists(atk.cues, c => c.kind != SlashFxKind.None)));
             hitStopUsed = false;
 
             if (hitSets.Length < atk.hits.Length)
@@ -1132,11 +1134,7 @@ namespace KingLastPiece
                     windowStarted[i] = true;
                     Sfx.Play(w.sfx, FlatPos);
                     if (w.fx != SlashFxKind.None)
-                        Vfx.Slash(w.fx, transform.position + Vector3.up * w.fxHeight, transform.rotation * Quaternion.Euler(0f, w.fxYaw, w.fxRoll),
-                            w.fxScale * reach, w.fxGold ? Vfx.Accent : (Color?)null, w.fxFlip);
-                    if (w.fxCross && w.fx != SlashFxKind.None)
-                        Vfx.Slash(w.fx, transform.position + Vector3.up * w.fxHeight,
-                            transform.rotation * Quaternion.Euler(0f, w.fxYaw, 360f - w.fxRoll),
+                        Vfx.Slash(w.fx, transform.position + Vector3.up * w.fxHeight, transform.rotation * Quaternion.Euler(0f, w.fxYaw, 0f),
                             w.fxScale * reach, w.fxGold ? Vfx.Accent : (Color?)null, w.fxFlip);
                     // Ground range marker (translucent black/white arc) shows the attack's real reach: the same centre and
                     // radius DoHits uses, sweeping over the window's real duration (attack speed plays it faster).

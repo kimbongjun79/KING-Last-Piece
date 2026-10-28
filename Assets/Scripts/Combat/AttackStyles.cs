@@ -114,9 +114,8 @@ namespace KingLastPiece
         public int sparkRing;          // white sparks thrown up all around the strike area when the window opens
         // Authored slash effect (NamuFX) played when the window starts, aligned with the King's facing.
         public SlashFxKind fx;
-        public float fxScale = 1f, fxYaw, fxRoll, fxHeight = 0.9f;
+        public float fxScale = 1f, fxYaw, fxHeight = 0.9f;
         public bool fxFlip;            // mirrored (negative X scale) = the arc sweeps the other way
-        public bool fxCross;           // emit the opposite diagonal on the same hit frame, without a second hit window
         public bool fxGold;            // recolor the prefab to the King's accent (white)
         public bool dust;              // low dust burst around the impact (NamuFX smoke layers)
         public string sfx;             // sound id played when the window starts (Docs/Sound/sounds.json)
@@ -295,7 +294,7 @@ namespace KingLastPiece
                 {
                     name = "Royal Ensemble", koName = "왕의 연무",
                     description = "Ram in from mid range, whip R→L, whip L→R, 360° cyclone, air somersault slam; heavy is one charged diagonal cut.",
-                    lights = new[] { EnsembleSwing(1f), EnsembleSwing(-1f), EnsembleCyclone(), EnsembleMeteor() }, heavy = HeavyCut(0),
+                    lights = new[] { EnsembleSwing(1f), EnsembleSwing(-1f), EnsembleCyclone(), EnsembleMeteor() }, heavy = HeavyCut(1),
                     gapCloser = EnsembleDash, gapCloserMaxRange = 8f,
                 },
             };
@@ -400,49 +399,47 @@ namespace KingLastPiece
             moves = new[] { new MoveSeg(0.12f, 0.34f, Mathf.Clamp(distance, 1.5f, 7.5f)) },
         };
 
-        /// <summary>A single blow with two simultaneous diagonal trails; each trial changes only the leap.</summary>
+        /// <summary>Three refinements of the chosen high leap: the paired slash precedes the single landing hit.</summary>
         public static AttackDef HeavyCut(int variant)
         {
-            float crouch = variant == 1 ? 0.7f : variant == 2 ? 0.78f : 0.62f;
-            float apex = variant == 1 ? 0.86f : variant == 2 ? 0.94f : 0.76f;
-            float strike = variant == 1 ? 1.03f : variant == 2 ? 1.11f : 0.93f;
-            var pose = new PoseTrack().Key(0f, P());
-            if (variant == 1)
-                pose.Key(crouch, P(tilt: -20f, squash: -0.32f), Ease.Out)
-                    .Key(apex, P(tilt: -12f, lift: 2.4f, squash: 0.08f), Ease.Out)
-                    .Key(strike, P(tilt: 65f, lift: 0.38f, squash: 0.04f), Ease.InOut)
-                    .Key(1.1f, P(tilt: 78f, squash: -0.33f), Ease.Out)
-                    .Key(1.5f, P(), Ease.OutBack);
-            else if (variant == 2)
-                pose.Key(crouch, P(tilt: -15f, heading: 90f, spin: -75f, squash: -0.3f), Ease.Out)
-                    .Key(apex, P(tilt: 30f, heading: 90f, spin: 150f, lift: 1.8f), Ease.Out)
-                    .Key(strike, P(tilt: 70f, spin: 360f, lift: 0.38f), Ease.InOut)
-                    .Key(1.18f, P(tilt: 80f, spin: 360f, squash: -0.3f), Ease.Out)
-                    .Key(1.5f, P(spin: 360f), Ease.OutBack);
-            else
-                pose.Key(crouch, P(tilt: -18f, squash: -0.3f), Ease.Out)
-                    .Key(apex, P(tilt: -8f, lift: 1.3f, squash: 0.08f), Ease.Out)
-                    .Key(strike, P(tilt: 62f, lift: 0.3f), Ease.InOut)
-                    .Key(1f, P(tilt: 76f, squash: -0.28f), Ease.Out)
-                    .Key(1.5f, P(), Ease.OutBack);
-            var hit = new HitWindow
-            {
-                start = strike, end = strike + 0.1f, range = 4.3f, arc = 220f,
-                damage = 46f, poise = 65f, hitStop = 0.12f, shake = 0.65f, kick = 1f,
-                impact = true, dust = true, launch = true, sparkRing = 70,
-                fx = SlashFxKind.SlashBVertical, fxScale = 2.3f, fxHeight = 1.2f,
-                // SlashBVertical rises by default. Both 45-degree banks fall on the same frame and form an X.
-                fxRoll = 225f, fxCross = true, fxGold = true,
-                sfx = "ATK_Stomp_Slam",
-            };
+            float crouch = variant == 0 ? 0.68f : variant == 2 ? 0.75f : 0.72f;
+            float apex = variant == 0 ? 0.8f : variant == 2 ? 0.88f : 0.84f;
+            float slashAt = variant == 0 ? 0.92f : variant == 2 ? 1.01f : 0.96f;
+            float land = variant == 0 ? 0.96f : variant == 2 ? 1.05f : 1f;
+            float height = variant == 0 ? 2.15f : variant == 2 ? 2.6f : 2.4f;
+            float compression = variant == 0 ? -0.27f : variant == 2 ? -0.36f : -0.32f;
+            float rebound = variant == 0 ? 0.09f : variant == 2 ? 0.15f : 0.12f;
+            float duration = variant == 0 ? 1.44f : variant == 2 ? 1.56f : 1.5f;
+            var pose = new PoseTrack()
+                .Key(0f, P())
+                .Key(crouch, P(tilt: -20f, squash: -0.32f), Ease.Out)
+                .Key(apex, P(tilt: -12f, lift: height, squash: 0.08f), Ease.Out)
+                .Key(land, P(tilt: variant == 0 ? 70f : variant == 2 ? 80f : 76f, squash: compression), Ease.InOut)
+                .Key(land + 0.12f, P(tilt: 24f, lift: rebound, squash: 0.05f), Ease.Out)
+                .Key(duration, P(), Ease.Out);
             return new AttackDef
             {
-                name = variant == 1 ? "Cross Cut - Diving" : variant == 2 ? "Cross Cut - Twisting" : "Cross Cut - Spring",
-                duration = 1.5f, cancelAt = 1.32f, cost = 48f, heavy = true,
-                sfx = "ATK_Stomp_Charge", lockFacing = true,
-                pose = pose, hits = new[] { hit },
-                // Forward travel starts at takeoff and never stalls at the apex.
-                moves = new[] { new MoveSeg(crouch, strike, 3f, Ease.Linear) },
+                name = variant == 0 ? "Cross Cut - Snappy" : variant == 2 ? "Cross Cut - Weighty" : "Cross Cut - Balanced",
+                duration = duration, cancelAt = variant == 0 ? 1.24f : variant == 2 ? 1.36f : 1.3f,
+                cost = 48f, heavy = true, sfx = "ATK_Stomp_Charge", lockFacing = true,
+                pose = pose,
+                hits = new[]
+                {
+                    new HitWindow
+                    {
+                        start = land, end = land + 0.1f, range = 4.3f, arc = 220f,
+                        damage = 46f, poise = 65f, hitStop = 0.12f, shake = 0.65f, kick = 1f,
+                        impact = true, dust = true, launch = true, sparkRing = 70, sfx = "ATK_Stomp_Slam",
+                    },
+                },
+                // Both authored slashes fire together just before the base lands; no second damage window.
+                cues = new[]
+                {
+                    new FxCue { time = slashAt, kind = SlashFxKind.SlashBVertical, scale = 2.3f, height = 1.2f, roll = 225f, gold = true },
+                    new FxCue { time = slashAt, kind = SlashFxKind.SlashBVertical, scale = 2.3f, height = 1.2f, roll = 135f, gold = true },
+                },
+                // Finish forward travel before the slashes so the effects and landing ripple share the same position.
+                moves = new[] { new MoveSeg(crouch, slashAt, 3f, Ease.Linear) },
             };
         }
 
