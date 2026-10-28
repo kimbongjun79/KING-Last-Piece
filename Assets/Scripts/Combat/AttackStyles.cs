@@ -427,7 +427,7 @@ namespace KingLastPiece
         {
             float crouch = variant == 0 ? 0.68f : variant == 2 ? 0.75f : 0.72f;
             float apex = variant == 0 ? 0.8f : variant == 2 ? 0.88f : 0.84f;
-            float slashAt = variant == 0 ? 0.9f : variant == 2 ? 0.99f : 0.94f;
+            float slashAt = variant == 0 ? 0.88f : variant == 2 ? 0.97f : 0.92f;
             float land = variant == 0 ? 0.96f : variant == 2 ? 1.05f : 1f;
             float height = variant == 0 ? 2.15f : variant == 2 ? 2.6f : 2.4f;
             float compression = variant == 0 ? -0.27f : variant == 2 ? -0.36f : -0.32f;
@@ -456,11 +456,11 @@ namespace KingLastPiece
                         dust = true, launch = true, sparkRing = 70, sfx = "ATK_Stomp_Slam",
                     },
                 },
-                // Both authored slashes fire together just before the base lands; no second damage window.
+                // Both authored slashes fire together before the head lands; no second damage window.
                 cues = new[]
                 {
-                    new FxCue { time = slashAt, kind = SlashFxKind.SlashBVertical, scale = 2.3f, height = 1.6f, roll = 225f, gold = true, lifeScale = 1.2f },
-                    new FxCue { time = slashAt, kind = SlashFxKind.SlashBVertical, scale = 2.3f, height = 1.6f, roll = 135f, gold = true, lifeScale = 1.2f },
+                    new FxCue { time = slashAt, kind = SlashFxKind.SlashBVertical, scale = 2.3f, height = 1.6f, roll = 225f, gold = true, lifeScale = 1.1f },
+                    new FxCue { time = slashAt, kind = SlashFxKind.SlashBVertical, scale = 2.3f, height = 1.6f, roll = 135f, gold = true, lifeScale = 1.1f },
                 },
                 // A fast takeoff eases into the landing; by the early slashes only a few centimetres of travel remain.
                 moves = new[] { new MoveSeg(crouch, land, 3f, Ease.Out) },
