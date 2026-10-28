@@ -146,6 +146,8 @@ namespace KingLastPiece
     {
         public string name;
         public float duration, cancelAt, cost;
+        /// <summary>Until this time after a hit, dodge cannot interrupt the attack; zero keeps ordinary dodge cancellation.</summary>
+        public float dodgeCancelAt;
         public bool heavy;
         /// <summary>Leaping attacks keep the facing they started with (no auto-aim turning while airborne).</summary>
         public bool lockFacing;
@@ -159,6 +161,9 @@ namespace KingLastPiece
 
         public float FirstHit => hits.Length > 0 ? hits[0].start : 0f;
         public float LastHit => hits.Length > 0 ? hits[hits.Length - 1].end : 0f;
+        public bool CanDodgeCancel(float t) =>
+            (hits.Length == 0 || t < FirstHit || t > hits[0].end) &&
+            (t < FirstHit || t >= dodgeCancelAt);
         public float TotalDamage { get { float d = 0f; foreach (var h in hits) d += h.damage; return d; } }
 
         public float Reach
@@ -294,7 +299,7 @@ namespace KingLastPiece
                 {
                     name = "Royal Ensemble", koName = "왕의 연무",
                     description = "Ram in from mid range, whip R→L, whip L→R, 360° cyclone, air somersault slam; heavy is one charged diagonal cut.",
-                    lights = new[] { EnsembleSwing(1f), EnsembleSwing(-1f), EnsembleCyclone(), EnsembleMeteor() }, heavy = HeavyCut(1),
+                    lights = new[] { EnsembleSwing(1f), EnsembleSwing(-1f), EnsembleCyclone(), EnsembleMeteor() }, heavy = HeavyCut(2),
                     gapCloser = EnsembleDash, gapCloserMaxRange = 8f,
                 },
             };
@@ -404,7 +409,7 @@ namespace KingLastPiece
         {
             float crouch = variant == 0 ? 0.68f : variant == 2 ? 0.75f : 0.72f;
             float apex = variant == 0 ? 0.8f : variant == 2 ? 0.88f : 0.84f;
-            float slashAt = variant == 0 ? 0.92f : variant == 2 ? 1.01f : 0.96f;
+            float slashAt = variant == 0 ? 0.88f : variant == 2 ? 0.97f : 0.92f;
             float land = variant == 0 ? 0.96f : variant == 2 ? 1.05f : 1f;
             float height = variant == 0 ? 2.15f : variant == 2 ? 2.6f : 2.4f;
             float compression = variant == 0 ? -0.27f : variant == 2 ? -0.36f : -0.32f;
@@ -421,6 +426,7 @@ namespace KingLastPiece
             {
                 name = variant == 0 ? "Cross Cut - Snappy" : variant == 2 ? "Cross Cut - Weighty" : "Cross Cut - Balanced",
                 duration = duration, cancelAt = variant == 0 ? 1.24f : variant == 2 ? 1.36f : 1.3f,
+                dodgeCancelAt = land + 0.24f,
                 cost = 48f, heavy = true, sfx = "ATK_Stomp_Charge", lockFacing = true,
                 pose = pose,
                 hits = new[]
@@ -435,11 +441,11 @@ namespace KingLastPiece
                 // Both authored slashes fire together just before the base lands; no second damage window.
                 cues = new[]
                 {
-                    new FxCue { time = slashAt, kind = SlashFxKind.SlashBVertical, scale = 2.3f, height = 1.2f, roll = 225f, gold = true },
-                    new FxCue { time = slashAt, kind = SlashFxKind.SlashBVertical, scale = 2.3f, height = 1.2f, roll = 135f, gold = true },
+                    new FxCue { time = slashAt, kind = SlashFxKind.SlashBVertical, scale = 2.3f, height = 1.6f, roll = 225f, gold = true },
+                    new FxCue { time = slashAt, kind = SlashFxKind.SlashBVertical, scale = 2.3f, height = 1.6f, roll = 135f, gold = true },
                 },
-                // Finish forward travel before the slashes so the effects and landing ripple share the same position.
-                moves = new[] { new MoveSeg(crouch, slashAt, 3f, Ease.Linear) },
+                // A fast takeoff eases into the landing; by the early slashes only a few centimetres of travel remain.
+                moves = new[] { new MoveSeg(crouch, land, 3f, Ease.Out) },
             };
         }
 

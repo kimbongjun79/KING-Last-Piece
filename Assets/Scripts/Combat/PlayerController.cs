@@ -1090,9 +1090,8 @@ namespace KingLastPiece
                 else if (!atk.lockFacing && InputDirection().sqrMagnitude <= 0.01f && TryFindAssistDirection(transform.forward, out var best)) FaceTowards(best, 720f);
             }
 
-            // Dodge can cancel the attack at any time except during its first active hit frames.
-            bool inActive = atk.hits.Length > 0 && t >= atk.FirstHit && t <= atk.hits[0].end;
-            if (buffer == Buffered.Dodge && !inActive && TryAct()) return;
+            // The cross-cut keeps its early emergency dodge, but its landing has a brief committed recovery.
+            if (buffer == Buffered.Dodge && atk.CanDodgeCancel(t) && TryAct()) return;
 
             // Root motion from move segments (stronger / weaker with the motion's dynamism).
             float dyn = Motion, reach = Stats.attackRange * atkRangeMul;
