@@ -116,6 +116,7 @@ namespace KingLastPiece
         public SlashFxKind fx;
         public float fxScale = 1f, fxYaw, fxRoll, fxHeight = 0.9f;
         public bool fxFlip;            // mirrored (negative X scale) = the arc sweeps the other way
+        public bool fxCross;           // emit the opposite diagonal on the same hit frame, without a second hit window
         public bool fxGold;            // recolor the prefab to the King's accent (white)
         public bool dust;              // low dust burst around the impact (NamuFX smoke layers)
         public string sfx;             // sound id played when the window starts (Docs/Sound/sounds.json)
@@ -399,28 +400,30 @@ namespace KingLastPiece
             moves = new[] { new MoveSeg(0.12f, 0.34f, Mathf.Clamp(distance, 1.5f, 7.5f)) },
         };
 
-        /// <summary>One charged diagonal cut per trial: right-to-left, left-to-right, or leaping right-to-left.</summary>
+        /// <summary>A single blow with two simultaneous diagonal trails; each trial changes only the leap.</summary>
         public static AttackDef HeavyCut(int variant)
         {
-            float strike = variant == 2 ? 1.07f : 0.95f;
+            float crouch = variant == 1 ? 0.42f : variant == 2 ? 0.5f : 0.36f;
+            float apex = variant == 1 ? 0.7f : variant == 2 ? 0.79f : 0.63f;
+            float strike = variant == 1 ? 0.94f : variant == 2 ? 1.02f : 0.82f;
             var pose = new PoseTrack().Key(0f, P());
             if (variant == 1)
-                pose.Key(0.3f, P(tilt: -12f, heading: -70f, squash: -0.25f), Ease.Out)
-                    .Key(0.7f, P(tilt: 48f, heading: -65f, spin: -55f, lift: 1.05f), Ease.Out)
-                    .Key(0.83f, P(tilt: 50f, heading: -65f, spin: -55f, lift: 1.05f), Ease.Linear)
-                    .Key(1.04f, P(tilt: 82f, heading: 70f, spin: 105f, squash: -0.3f), Ease.In)
+                pose.Key(crouch, P(tilt: -20f, squash: -0.32f), Ease.Out)
+                    .Key(apex, P(tilt: -12f, lift: 2.4f, squash: 0.08f), Ease.Out)
+                    .Key(strike, P(tilt: 65f, lift: 0.38f, squash: 0.04f), Ease.InOut)
+                    .Key(1f, P(tilt: 78f, squash: -0.33f), Ease.Out)
                     .Key(1.5f, P(), Ease.OutBack);
             else if (variant == 2)
-                pose.Key(0.4f, P(tilt: -18f, heading: 65f, squash: -0.32f), Ease.Out)
-                    .Key(0.78f, P(tilt: 44f, heading: 65f, spin: 45f, lift: 2.3f), Ease.Out)
-                    .Key(0.9f, P(tilt: 50f, heading: 65f, spin: 45f, lift: 2.3f), Ease.Linear)
-                    .Key(1.07f, P(tilt: 85f, heading: -70f, spin: -95f, squash: -0.35f), Ease.In)
-                    .Key(1.5f, P(), Ease.OutBack);
+                pose.Key(crouch, P(tilt: -15f, heading: 90f, spin: -75f, squash: -0.3f), Ease.Out)
+                    .Key(apex, P(tilt: 30f, heading: 90f, spin: 150f, lift: 1.8f), Ease.Out)
+                    .Key(strike, P(tilt: 70f, spin: 360f, lift: 0.38f), Ease.InOut)
+                    .Key(1.09f, P(tilt: 80f, spin: 360f, squash: -0.3f), Ease.Out)
+                    .Key(1.5f, P(spin: 360f), Ease.OutBack);
             else
-                pose.Key(0.3f, P(tilt: -12f, heading: 70f, squash: -0.25f), Ease.Out)
-                    .Key(0.7f, P(tilt: 48f, heading: 65f, spin: 55f, lift: 1.05f), Ease.Out)
-                    .Key(0.83f, P(tilt: 50f, heading: 65f, spin: 55f, lift: 1.05f), Ease.Linear)
-                    .Key(1.04f, P(tilt: 82f, heading: -70f, spin: -105f, squash: -0.3f), Ease.In)
+                pose.Key(crouch, P(tilt: -18f, squash: -0.3f), Ease.Out)
+                    .Key(apex, P(tilt: -8f, lift: 1.3f, squash: 0.08f), Ease.Out)
+                    .Key(strike, P(tilt: 62f, lift: 0.3f), Ease.InOut)
+                    .Key(0.89f, P(tilt: 76f, squash: -0.28f), Ease.Out)
                     .Key(1.5f, P(), Ease.OutBack);
             var hit = new HitWindow
             {
@@ -428,17 +431,18 @@ namespace KingLastPiece
                 damage = 46f, poise = 65f, hitStop = 0.12f, shake = 0.65f, kick = 1f,
                 impact = true, dust = true, launch = true, sparkRing = 70,
                 fx = SlashFxKind.SlashBVertical, fxScale = 2.3f, fxHeight = 1.2f,
-                // SlashBVertical rises by default. Turn it downward and bank the slash plane diagonally.
-                fxRoll = variant == 1 ? 135f : 225f, fxGold = true,
+                // SlashBVertical rises by default. Both 45-degree banks fall on the same frame and form an X.
+                fxRoll = 225f, fxCross = true, fxGold = true,
                 sfx = "ATK_Stomp_Slam",
             };
             return new AttackDef
             {
-                name = variant == 1 ? "Diagonal - Left to Right" : variant == 2 ? "Diagonal - Leaping Right to Left" : "Diagonal - Right to Left",
+                name = variant == 1 ? "Cross Cut - Diving" : variant == 2 ? "Cross Cut - Twisting" : "Cross Cut - Spring",
                 duration = 1.5f, cancelAt = 1.26f, cost = 48f, heavy = true,
                 sfx = "ATK_Stomp_Charge", lockFacing = true,
                 pose = pose, hits = new[] { hit },
-                moves = new[] { new MoveSeg(variant == 2 ? 0.78f : 0.7f, strike, 3f, Ease.InOut) },
+                // Forward travel starts at takeoff and never stalls at the apex.
+                moves = new[] { new MoveSeg(crouch, strike, 3f, Ease.Linear) },
             };
         }
 

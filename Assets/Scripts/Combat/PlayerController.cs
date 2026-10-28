@@ -1134,6 +1134,10 @@ namespace KingLastPiece
                     if (w.fx != SlashFxKind.None)
                         Vfx.Slash(w.fx, transform.position + Vector3.up * w.fxHeight, transform.rotation * Quaternion.Euler(0f, w.fxYaw, w.fxRoll),
                             w.fxScale * reach, w.fxGold ? Vfx.Accent : (Color?)null, w.fxFlip);
+                    if (w.fxCross && w.fx != SlashFxKind.None)
+                        Vfx.Slash(w.fx, transform.position + Vector3.up * w.fxHeight,
+                            transform.rotation * Quaternion.Euler(0f, w.fxYaw, 360f - w.fxRoll),
+                            w.fxScale * reach, w.fxGold ? Vfx.Accent : (Color?)null, w.fxFlip);
                     // Ground range marker (translucent black/white arc) shows the attack's real reach: the same centre and
                     // radius DoHits uses, sweeping over the window's real duration (attack speed plays it faster).
                     Vector3 hitCenter = FlatPos + transform.forward * (w.forward * reach);
