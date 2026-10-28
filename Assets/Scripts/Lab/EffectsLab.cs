@@ -3,21 +3,21 @@ using UnityEngine.InputSystem;
 
 namespace KingLastPiece
 {
-    /// <summary>Play-test three double-slash heavy motions against passive targets in the Effects Lab.</summary>
+    /// <summary>Play-test three one-blow heavy cuts against passive targets in the Effects Lab.</summary>
     public class EffectsLab : MonoBehaviour
     {
         static readonly float[] StationX = { -5.5f, 0f, 5.5f };
         static readonly Key[] Keys = { Key.Digit1, Key.Digit2, Key.Digit3 };
-        static readonly string[] Names = { "1. 교차 베기", "2. 반동 올려베기", "3. 회전 양날베기" };
+        static readonly string[] Names = { "1. 측면 일격", "2. 공중 내려베기", "3. 회전 일격" };
         static readonly string[] Details =
         {
-            "좌→우, 우→좌로 크게 교차하는 기본형",
-            "낮게 베고 몸을 튕겨 올리며 반대쪽으로 재차 베기",
-            "몸을 회전해 두 번 연속으로 반대 방향을 가르기",
+            "몸을 옆으로 깊게 젖혀 힘을 모았다가 한 번 크게 베기",
+            "높이 도약해 공중제비 후 수직으로 단 한 번 내려베기",
+            "긴 회전으로 힘을 모아 마지막 순간 한 번 크게 베기",
         };
         static readonly AttackDef[] Trials =
         {
-            AttackStyles.Default.heavy, AttackStyles.DoubleSlash(1), AttackStyles.DoubleSlash(2),
+            AttackStyles.Default.heavy, AttackStyles.HeavyCut(1), AttackStyles.HeavyCut(2),
         };
 
         GameManager game;
@@ -82,12 +82,14 @@ namespace KingLastPiece
                 GUI.Label(r, Names[i] + (selected == i ? "  ◀ 킹" : ""), labelStyle);
                 GUI.color = Color.white;
             }
-            var pr = new Rect(20 * scale, 20 * scale, 560 * scale, 120 * scale);
+            var pr = new Rect(20 * scale, 20 * scale, 600 * scale, 135 * scale);
             GUI.color = new Color(0f, 0f, 0f, 0.6f);
             GUI.DrawTexture(pr, Texture2D.whiteTexture);
             GUI.color = Color.white;
+            var attack = game.Player.CurrentAttack;
+            string active = attack == Trials[selected] ? $"실행 중: {attack.name}" : "우클릭/K로 모션 확인";
             GUI.Label(new Rect(pr.x + 12 * scale, pr.y + 8 * scale, pr.width - 24 * scale, pr.height - 16 * scale),
-                $"양날베기 모션 비교 — 1·2·3: 위치와 모션 선택   우클릭/K: 강공격\n{Names[selected]}: {Details[selected]}\n피해·범위·기력은 동일 / 이펙트는 현재 게임과 동일", panelStyle);
+                $"강공격 한방 모션 비교 — 1·2·3: 위치와 모션 선택\n{Names[selected]}: {Details[selected]}\n{active} / 피해·범위·기력 동일, Board Ripple 공통", panelStyle);
         }
     }
 }

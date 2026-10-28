@@ -114,7 +114,7 @@ namespace KingLastPiece
         public int sparkRing;          // white sparks thrown up all around the strike area when the window opens
         // Authored slash effect (NamuFX) played when the window starts, aligned with the King's facing.
         public SlashFxKind fx;
-        public float fxScale = 1f, fxYaw, fxHeight = 0.9f;
+        public float fxScale = 1f, fxYaw, fxRoll, fxHeight = 0.9f;
         public bool fxFlip;            // mirrored (negative X scale) = the arc sweeps the other way
         public bool fxGold;            // recolor the prefab to the King's accent (white)
         public bool dust;              // low dust burst around the impact (NamuFX smoke layers)
@@ -293,8 +293,8 @@ namespace KingLastPiece
                 new AttackStyle
                 {
                     name = "Royal Ensemble", koName = "왕의 연무",
-                    description = "Ram in from mid range, whip R→L, whip L→R, 360° cyclone, air somersault slam; heavy is a double slash.",
-                    lights = new[] { EnsembleSwing(1f), EnsembleSwing(-1f), EnsembleCyclone(), EnsembleMeteor() }, heavy = DoubleSlash(0),
+                    description = "Ram in from mid range, whip R→L, whip L→R, 360° cyclone, air somersault slam; heavy is one charged cut.",
+                    lights = new[] { EnsembleSwing(1f), EnsembleSwing(-1f), EnsembleCyclone(), EnsembleMeteor() }, heavy = HeavyCut(0),
                     gapCloser = EnsembleDash, gapCloserMaxRange = 8f,
                 },
             };
@@ -399,46 +399,47 @@ namespace KingLastPiece
             moves = new[] { new MoveSeg(0.12f, 0.34f, Mathf.Clamp(distance, 1.5f, 7.5f)) },
         };
 
-        /// <summary>Two opposing sweeps with identical reach, damage and cost across the three motion trials.</summary>
-        public static AttackDef DoubleSlash(int variant)
+        /// <summary>Three wind-ups for one heavy blow. Reach, damage and stamina cost stay comparable.</summary>
+        public static AttackDef HeavyCut(int variant)
         {
-            // 0: crossed whips; 1: low-to-high rebound; 2: turning double cut.
-            float first = variant == 1 ? 0.37f : variant == 2 ? 0.32f : 0.38f;
-            float second = variant == 1 ? 0.78f : variant == 2 ? 0.75f : 0.73f;
+            // One hit window per motion: grounded cleave, airborne falling cut, or spinning release.
+            float strike = variant == 1 ? 1.03f : variant == 2 ? 0.98f : 0.92f;
             var pose = new PoseTrack().Key(0f, P());
             if (variant == 1)
-                pose.Key(0.22f, P(tilt: 38f, heading: 115f, squash: -0.22f), Ease.Out)
-                    .Key(0.44f, P(tilt: 64f, heading: -115f, spin: -85f, lift: 0.3f), Ease.Out)
-                    .Key(0.62f, P(tilt: 28f, heading: -115f, spin: -110f, squash: -0.18f), Ease.In)
-                    .Key(0.85f, P(tilt: 68f, heading: 115f, spin: 95f, lift: 0.65f), Ease.Out);
+                pose.Key(0.4f, P(tilt: -18f, squash: -0.28f), Ease.Out)
+                    .Key(0.72f, P(flip: -145f, lift: 2.6f), Ease.Out)
+                    .Key(0.94f, P(flip: -300f, lift: 1.8f), Ease.In)
+                    .Key(1.03f, P(flip: -360f, squash: -0.32f), Ease.In)
+                    .Key(1.5f, P(flip: -360f), Ease.OutBack);
             else if (variant == 2)
-                pose.Key(0.18f, P(tilt: 36f, heading: 115f, spin: -60f, squash: -0.18f), Ease.Out)
-                    .Key(0.42f, P(tilt: 62f, heading: -120f, spin: 180f, lift: 0.35f), Ease.Linear)
-                    .Key(0.58f, P(tilt: 42f, heading: -115f, spin: 230f, squash: -0.12f), Ease.Out)
-                    .Key(0.84f, P(tilt: 66f, heading: 115f, spin: 450f, lift: 0.3f), Ease.Linear);
+                pose.Key(0.38f, P(tilt: 48f, heading: 90f, spin: -120f, squash: -0.22f), Ease.Out)
+                    .Key(0.72f, P(tilt: 65f, heading: 180f, spin: 440f, lift: 0.45f), Ease.Linear)
+                    .Key(0.88f, P(tilt: 72f, heading: 270f, spin: 720f, lift: 0.5f), Ease.Linear)
+                    .Key(1.05f, P(tilt: 75f, heading: 430f, spin: 1080f, lift: 0.15f), Ease.Linear)
+                    .Key(1.5f, P(spin: 1080f), Ease.OutBack);
             else
-                pose.Key(0.22f, P(tilt: 35f, heading: 120f, spin: 55f, squash: -0.2f), Ease.Out)
-                    .Key(0.47f, P(tilt: 68f, heading: -120f, spin: -90f, lift: 0.25f), Ease.Out)
-                    .Key(0.61f, P(tilt: 28f, heading: -115f, spin: -70f, squash: -0.16f), Ease.In)
-                    .Key(0.83f, P(tilt: 70f, heading: 115f, spin: 90f, lift: 0.2f), Ease.Out);
-            pose.Key(1.3f, P(spin: variant == 2 ? 360f : 0f), Ease.OutBack);
+                pose.Key(0.45f, P(tilt: 48f, heading: 130f, spin: 100f, squash: -0.25f), Ease.Out)
+                    .Key(0.78f, P(tilt: 70f, heading: 135f, spin: 140f, squash: -0.18f), Ease.In)
+                    .Key(1.03f, P(tilt: 76f, heading: -130f, spin: -125f, lift: 0.3f), Ease.Out)
+                    .Key(1.5f, P(), Ease.OutBack);
+            var hit = new HitWindow
+            {
+                start = strike, end = strike + 0.12f, range = 4.3f, arc = 220f,
+                damage = 46f, poise = 65f, hitStop = 0.12f, shake = 0.65f, kick = 1f,
+                impact = true, dust = true, launch = true, sparkRing = 70,
+                sweep = true, sweepFrom = 110f, sweepTo = -110f, slash = variant != 1,
+                fx = variant == 1 ? SlashFxKind.SlashBVertical : SlashFxKind.SlashB,
+                fxScale = 2.3f, fxHeight = 1.2f, fxYaw = variant == 1 ? 0f : 180f,
+                fxRoll = variant == 1 ? 180f : 0f, fxFlip = variant != 1, fxGold = true,
+                sfx = "ATK_Stomp_Slam",
+            };
             return new AttackDef
             {
-                name = "Double Slash", duration = 1.3f, cancelAt = 1.05f, cost = 48f, heavy = true,
-                sfx = "ATK_Stomp_Charge",
-                pose = pose,
-                hits = new[]
-                {
-                    new HitWindow { start = first, end = first + 0.16f, range = 4.3f, arc = 220f, damage = 23f, poise = 32.5f,
-                        hitStop = 0.06f, shake = 0.35f, kick = 0.45f, sweep = true, sweepFrom = 110f, sweepTo = -110f,
-                        slash = true, fx = SlashFxKind.SlashB, fxScale = 2.1f, fxHeight = 1.2f, fxFlip = true, fxYaw = 180f,
-                        fxGold = true, sfx = "ATK_Whip_1" },
-                    new HitWindow { start = second, end = second + 0.16f, range = 4.3f, arc = 220f, damage = 23f, poise = 32.5f,
-                        hitStop = 0.12f, shake = 0.65f, kick = 1f, sweep = true, sweepFrom = -110f, sweepTo = 110f,
-                        slash = true, impact = true, dust = true, launch = true, sparkRing = 35,
-                        fx = SlashFxKind.SlashB, fxScale = 2.1f, fxHeight = 1.2f, fxGold = true, sfx = "ATK_Whip_2" },
-                },
-                moves = new[] { new MoveSeg(0.22f, second + 0.12f, 3f, Ease.InOut) },
+                name = variant == 1 ? "Heavy Cut - Falling" : variant == 2 ? "Heavy Cut - Spin" : "Heavy Cut - Side",
+                duration = 1.5f, cancelAt = 1.25f, cost = 48f, heavy = true,
+                sfx = "ATK_Stomp_Charge", lockFacing = true,
+                pose = pose, hits = new[] { hit },
+                moves = new[] { new MoveSeg(0.65f, strike, 3f, Ease.InOut) },
             };
         }
 

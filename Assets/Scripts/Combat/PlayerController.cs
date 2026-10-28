@@ -1132,7 +1132,7 @@ namespace KingLastPiece
                     windowStarted[i] = true;
                     Sfx.Play(w.sfx, FlatPos);
                     if (w.fx != SlashFxKind.None)
-                        Vfx.Slash(w.fx, transform.position + Vector3.up * w.fxHeight, transform.rotation * Quaternion.Euler(0f, w.fxYaw, 0f),
+                        Vfx.Slash(w.fx, transform.position + Vector3.up * w.fxHeight, transform.rotation * Quaternion.Euler(0f, w.fxYaw, w.fxRoll),
                             w.fxScale * reach, w.fxGold ? Vfx.Accent : (Color?)null, w.fxFlip);
                     // Ground range marker (translucent black/white arc) shows the attack's real reach: the same centre and
                     // radius DoHits uses, sweeping over the window's real duration (attack speed plays it faster).
