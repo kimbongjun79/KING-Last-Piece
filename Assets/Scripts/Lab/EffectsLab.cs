@@ -11,9 +11,9 @@ namespace KingLastPiece
         static readonly string[] Names = { "1. 짧은 도약 X베기", "2. 깊은 도약 X베기", "3. 비틀어 도약 X베기" };
         static readonly string[] Details =
         {
-            "압축 → 짧고 빠르게 튀어 올라 양쪽 대각선 동시 내려베기",
-            "깊게 웅크림 → 높이 뛰어든 뒤 양쪽 대각선 동시 내려베기",
-            "몸을 비틀어 도약 → 회전을 마치며 양쪽 대각선 동시 내려베기",
+            "길게 압축 → 짧고 빠르게 튀어 올라 양쪽 대각선 동시 내려베기",
+            "길게 웅크림 → 높이 빠르게 뛰어든 뒤 양쪽 대각선 동시 내려베기",
+            "길게 힘을 모음 → 몸을 비틀며 빠르게 뛰어들어 양쪽 대각선 동시 내려베기",
         };
         static readonly AttackDef[] Trials =
         {

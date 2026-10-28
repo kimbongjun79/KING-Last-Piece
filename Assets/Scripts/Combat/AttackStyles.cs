@@ -403,27 +403,27 @@ namespace KingLastPiece
         /// <summary>A single blow with two simultaneous diagonal trails; each trial changes only the leap.</summary>
         public static AttackDef HeavyCut(int variant)
         {
-            float crouch = variant == 1 ? 0.42f : variant == 2 ? 0.5f : 0.36f;
-            float apex = variant == 1 ? 0.7f : variant == 2 ? 0.79f : 0.63f;
-            float strike = variant == 1 ? 0.94f : variant == 2 ? 1.02f : 0.82f;
+            float crouch = variant == 1 ? 0.7f : variant == 2 ? 0.78f : 0.62f;
+            float apex = variant == 1 ? 0.86f : variant == 2 ? 0.94f : 0.76f;
+            float strike = variant == 1 ? 1.03f : variant == 2 ? 1.11f : 0.93f;
             var pose = new PoseTrack().Key(0f, P());
             if (variant == 1)
                 pose.Key(crouch, P(tilt: -20f, squash: -0.32f), Ease.Out)
                     .Key(apex, P(tilt: -12f, lift: 2.4f, squash: 0.08f), Ease.Out)
                     .Key(strike, P(tilt: 65f, lift: 0.38f, squash: 0.04f), Ease.InOut)
-                    .Key(1f, P(tilt: 78f, squash: -0.33f), Ease.Out)
+                    .Key(1.1f, P(tilt: 78f, squash: -0.33f), Ease.Out)
                     .Key(1.5f, P(), Ease.OutBack);
             else if (variant == 2)
                 pose.Key(crouch, P(tilt: -15f, heading: 90f, spin: -75f, squash: -0.3f), Ease.Out)
                     .Key(apex, P(tilt: 30f, heading: 90f, spin: 150f, lift: 1.8f), Ease.Out)
                     .Key(strike, P(tilt: 70f, spin: 360f, lift: 0.38f), Ease.InOut)
-                    .Key(1.09f, P(tilt: 80f, spin: 360f, squash: -0.3f), Ease.Out)
+                    .Key(1.18f, P(tilt: 80f, spin: 360f, squash: -0.3f), Ease.Out)
                     .Key(1.5f, P(spin: 360f), Ease.OutBack);
             else
                 pose.Key(crouch, P(tilt: -18f, squash: -0.3f), Ease.Out)
                     .Key(apex, P(tilt: -8f, lift: 1.3f, squash: 0.08f), Ease.Out)
                     .Key(strike, P(tilt: 62f, lift: 0.3f), Ease.InOut)
-                    .Key(0.89f, P(tilt: 76f, squash: -0.28f), Ease.Out)
+                    .Key(1f, P(tilt: 76f, squash: -0.28f), Ease.Out)
                     .Key(1.5f, P(), Ease.OutBack);
             var hit = new HitWindow
             {
@@ -438,7 +438,7 @@ namespace KingLastPiece
             return new AttackDef
             {
                 name = variant == 1 ? "Cross Cut - Diving" : variant == 2 ? "Cross Cut - Twisting" : "Cross Cut - Spring",
-                duration = 1.5f, cancelAt = 1.26f, cost = 48f, heavy = true,
+                duration = 1.5f, cancelAt = 1.32f, cost = 48f, heavy = true,
                 sfx = "ATK_Stomp_Charge", lockFacing = true,
                 pose = pose, hits = new[] { hit },
                 // Forward travel starts at takeoff and never stalls at the apex.
