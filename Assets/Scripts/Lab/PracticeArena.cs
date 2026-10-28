@@ -39,8 +39,11 @@ namespace KingLastPiece
         readonly float[] respawnTimers = new float[DummySlots.Length];
         GameManager game;
         bool automated;
+        Coroutine bossCounterPreview;
+        public int BossCounterPreviewIndex { get; private set; } = -1;
 
         static readonly Key[] DigitKeys = { Key.Digit1, Key.Digit2, Key.Digit3, Key.Digit4, Key.Digit5, Key.Digit6, Key.Digit7, Key.Digit8, Key.Digit9 };
+        static readonly Key[] BossCounterKeys = { Key.F1, Key.F2, Key.F3, Key.F4 };
 
         void Awake()
         {
@@ -160,6 +163,32 @@ namespace KingLastPiece
             Megatron.DebugPattern(ChessMegatron.AllPatterns[megatronPattern]);
         }
 
+        /// <summary>F1–F4: isolate one ranged counter against a stationary boss without requiring a timed near miss.</summary>
+        void PreviewBossRangedCounter(int variant)
+        {
+            if (bossCounterPreview != null) StopCoroutine(bossCounterPreview);
+            BossCounterPreviewIndex = variant;
+            bossCounterPreview = StartCoroutine(PreviewBossRangedCounterRoutine(variant));
+        }
+
+        IEnumerator PreviewBossRangedCounterRoutine(int variant)
+        {
+            SpawnMegatron();
+            var boss = Megatron;
+            boss.DebugHold = true;
+            var player = game.Player;
+            player.BossRangedCounterVariant = variant;
+            player.ResetForWave(boss.FlatPos - Vector3.forward * (boss.Radius + 4f), 0f);
+            game.Rig.Snap();
+            for (int frame = 0; frame < 180 && boss != null && !boss.CanBeGrabbed; frame++) yield return null;
+            if (boss != null && boss.CanBeGrabbed)
+            {
+                player.DebugPerfectDodge(boss);
+                player.Press(PlayerController.Buffered.Light);
+            }
+            bossCounterPreview = null;
+        }
+
         /// <summary>E: empowered tier of the pieces spawned with 1–5 (0 normal, 1–2 dark).</summary>
         public int SpawnTier { get; private set; }
 
@@ -188,6 +217,8 @@ namespace KingLastPiece
                 if (kb.digit6Key.wasPressedThisFrame) SpawnMegatron();
                 if (kb.digit7Key.wasPressedThisFrame) NextMegatronPattern();
                 if (kb.digit8Key.wasPressedThisFrame && Megatron != null) Megatron.DebugPhase2();
+                for (int i = 0; i < BossCounterKeys.Length; i++)
+                    if (kb[BossCounterKeys[i]].wasPressedThisFrame) PreviewBossRangedCounter(i);
                 if (kb.xKey.wasPressedThisFrame) ClearPieces();
                 if (kb.cKey.wasPressedThisFrame) ResetLab();
                 if (kb.hKey.wasPressedThisFrame) game.HitStopEnabled = !game.HitStopEnabled;

@@ -214,18 +214,34 @@ namespace KingLastPiece
     /// </summary>
     public class SwordWaveFx : MonoBehaviour
     {
-        const float Speed = 20f, HalfWidth = 1.3f, SlashEvery = 0.11f, SlashScale = 1.5f;
+        const float Speed = 20f, BossCounterSpeed = 13f, HalfWidth = 1.3f, SlashEvery = 0.11f, SlashScale = 1.5f;
         static Mesh crescent;
 
         PlayerController owner;
+        EnemyBase counterTarget;
         Vector3 dir;
         float reach, size = 1f, travelled, sparkTimer, slashTimer = SlashEvery;
-        bool namu;
+        bool namu, bossCounterWave;
         Material coreMat, glowMat;
         readonly HashSet<EnemyBase> struck = new HashSet<EnemyBase>();
 
         /// <param name="size">Scales the wave (its width and slashes) — the attack range.</param>
-        public static void Spawn(PlayerController owner, Vector3 from, Vector3 dir, float reach, float size = 1f)
+        public static void Spawn(PlayerController owner, Vector3 from, Vector3 dir, float reach, float size = 1f) =>
+            Create(owner, from, dir, reach, size);
+
+        /// <summary>A single homing sword wave for a boss counter; only the dodged boss can be struck.</summary>
+        public static void SpawnBossCounter(PlayerController owner, EnemyBase target, Vector3 from)
+        {
+            if (owner == null || target == null || target.IsDead) return;
+            Vector3 dir = target.FlatPos - from;
+            if (dir.sqrMagnitude < 0.01f) return;
+            var wave = Create(owner, from, dir, GameManager.BoardHalf * 2.7f, 1.25f);
+            wave.counterTarget = target;
+            wave.bossCounterWave = true;
+            wave.name = "Boss Counter Wave";
+        }
+
+        static SwordWaveFx Create(PlayerController owner, Vector3 from, Vector3 dir, float reach, float size)
         {
             var go = new GameObject("Sword Wave");
             go.transform.position = new Vector3(from.x, 0.9f, from.z);
@@ -237,6 +253,7 @@ namespace KingLastPiece
             w.reach = reach;
             w.size = size;
             w.Build();
+            return w;
         }
 
         void Build()
@@ -278,7 +295,17 @@ namespace KingLastPiece
         void Update()
         {
             if (owner == null) { Destroy(gameObject); return; }
-            float step = Speed * Time.deltaTime;
+            if (bossCounterWave)
+            {
+                if (counterTarget == null || counterTarget.IsDead || !counterTarget.Targetable) { Destroy(gameObject); return; }
+                Vector3 toward = counterTarget.FlatPos - new Vector3(transform.position.x, 0f, transform.position.z);
+                if (toward.sqrMagnitude > 0.01f)
+                {
+                    dir = toward.normalized;
+                    transform.rotation = Quaternion.LookRotation(dir);
+                }
+            }
+            float step = (bossCounterWave ? BossCounterSpeed : Speed) * Time.deltaTime;
             travelled += step;
             transform.position += dir * step;
             float p = Mathf.Clamp01(travelled / reach);
@@ -306,15 +333,27 @@ namespace KingLastPiece
 
             float width = HalfWidth * size * Mathf.Lerp(0.8f, 1.2f, p);
             Vector3 flat = new Vector3(transform.position.x, 0f, transform.position.z);
-            foreach (var e in GameManager.Instance.Enemies.ToArray())
+            if (bossCounterWave)
             {
-                if (e == null || e.IsDead || !e.Targetable || struck.Contains(e)) continue;
-                Vector3 to = e.FlatPos - flat;
-                float ahead = Vector3.Dot(to, dir);
-                if (ahead < -0.6f - e.Radius || ahead > 0.6f + e.Radius) continue;
-                if (Mathf.Abs(Vector3.Dot(to, Vector3.Cross(Vector3.up, dir))) > width + e.Radius) continue;
-                struck.Add(e);
-                owner.SwordWaveStrike(e, transform.position);
+                if ((counterTarget.FlatPos - flat).magnitude <= counterTarget.Radius + 0.6f)
+                {
+                    owner.BossCounterStrike(counterTarget, transform.position);
+                    Destroy(gameObject);
+                    return;
+                }
+            }
+            else
+            {
+                foreach (var e in GameManager.Instance.Enemies.ToArray())
+                {
+                    if (e == null || e.IsDead || !e.Targetable || struck.Contains(e)) continue;
+                    Vector3 to = e.FlatPos - flat;
+                    float ahead = Vector3.Dot(to, dir);
+                    if (ahead < -0.6f - e.Radius || ahead > 0.6f + e.Radius) continue;
+                    if (Mathf.Abs(Vector3.Dot(to, Vector3.Cross(Vector3.up, dir))) > width + e.Radius) continue;
+                    struck.Add(e);
+                    owner.SwordWaveStrike(e, transform.position);
+                }
             }
             if (travelled >= reach) Destroy(gameObject);
         }

@@ -57,6 +57,8 @@ namespace KingLastPiece
         public AttackStyle Style { get; set; } = AttackStyles.Default;
         /// <summary>Effects Lab only: a heavy motion trial, without changing the shared attack style.</summary>
         public AttackDef HeavyMotionTrial { get; set; }
+        /// <summary>Practice Arena's ranged boss-counter motion choice (0–3); gameplay defaults to the first.</summary>
+        public int BossRangedCounterVariant { get; set; }
         public bool IsInvulnerable =>
             (state == State.Dodge && stateTime >= IFrameStart && stateTime <= IFrameEnd) || state == State.Counter || stalemateTimer > 0f ||
             perfectGuard > 0f;
@@ -68,6 +70,7 @@ namespace KingLastPiece
         public int ThrowCount { get; private set; }
         /// <summary>A perfect dodge happened and the dodged piece can still be grabbed (shown as a prompt).</summary>
         public bool CounterReady => Game != null && Game.SlowMoActive && justTarget != null && justTarget.CanBeGrabbed;
+        public bool CounterTargetsBoss => justTarget != null && justTarget.IsBoss;
         public bool IsCountering => state == State.Counter;
         public bool IsSprinting { get; private set; }
         public Vector3 LastDodgeDirection { get; private set; }
@@ -1410,27 +1413,36 @@ namespace KingLastPiece
 
         // ---------------------------------------------------------------- royal throw (counter)
 
-        // Against the queen (the boss) there is no throw: a short leap at her and one strong blow. Invincible throughout,
-        // like every counter.
+        // Bosses cannot be grabbed: a close perfect-dodge counter keeps its leap, while a distant one sends a sword wave.
         const float LeapCounterRise = 0.3f, LeapCounterEnd = 0.62f, LeapCounterDamage = 55f, StaggerLeapCounter = 60f;
-        bool leapCounter, leapStruck;
+        const float BossRangedCounterGap = 2.5f;
+        public static bool BossCounterIsRanged(float distance, float bossRadius, float kingRadius) =>
+            distance > bossRadius + kingRadius + BossRangedCounterGap;
+        bool bossCounter, bossRangedCounter, bossWaveReleased, leapStruck;
+        BossCounterMotion rangedCounterMotion;
 
         void StartCounter()
         {
             buffer = Buffered.None;
             counterTarget = justTarget;
             justTarget = null;
-            leapCounter = counterTarget.IsBoss;
-            if (leapCounter)
+            bossCounter = counterTarget.IsBoss;
+            if (bossCounter)
             {
                 leapStruck = false;
+                bossWaveReleased = false;
                 LockTarget = counterTarget;
                 Vector3 toQ = counterTarget.FlatPos - FlatPos;
                 if (toQ.sqrMagnitude < 0.01f) toQ = transform.forward;
+                bossRangedCounter = BossCounterIsRanged(toQ.magnitude, counterTarget.Radius, Radius);
+                rangedCounterMotion = bossRangedCounter
+                    ? AttackStyles.RangedCounters[Mathf.Clamp(BossRangedCounterVariant, 0, AttackStyles.RangedCounters.Length - 1)]
+                    : null;
                 counterFrom = FlatPos;
-                counterTo = counterTarget.FlatPos - toQ.normalized * (counterTarget.Radius + Radius + 0.35f);
+                if (!bossRangedCounter)
+                    counterTo = counterTarget.FlatPos - toQ.normalized * (counterTarget.Radius + Radius + 0.35f);
                 transform.rotation = Quaternion.LookRotation(toQ);
-                Sfx.Play("PL_Dodge", FlatPos);
+                Sfx.Play(bossRangedCounter ? "ATK_Stomp_Charge" : "PL_Dodge", FlatPos);
                 Enter(State.Counter);
                 return;
             }
@@ -1451,6 +1463,58 @@ namespace KingLastPiece
             Sfx.Play("THR_Grab", counterTarget.FlatPos);
             transform.rotation = Quaternion.LookRotation(to);
             Enter(State.Counter);
+        }
+
+        /// <summary>Cast one sword wave from the selected body motion; keep the King in place at long range.</summary>
+        void UpdateBossRangedCounter()
+        {
+            if (counterTarget == null || counterTarget.IsDead || !counterTarget.Targetable)
+            {
+                Game.EndSlowMo();
+                LockTarget = counterTarget = null;
+                bossCounter = bossRangedCounter = false;
+                rangedCounterMotion = null;
+                ApplyPose(default);
+                Enter(State.Normal);
+                return;
+            }
+
+            float t = stateTime;
+            Vector3 toward = counterTarget.FlatPos - FlatPos;
+            if (toward.sqrMagnitude > 0.01f) FaceTowards(toward, 900f);
+            ApplyPose(rangedCounterMotion.pose.Eval(t));
+            crownTrail.emitting = false;
+            if (!bossWaveReleased && t >= rangedCounterMotion.release)
+            {
+                bossWaveReleased = true;
+                Game.EndSlowMo();
+                var slash = transform.rotation * Quaternion.Euler(0f, 0f, rangedCounterMotion.slashRoll);
+                Vfx.Slash(rangedCounterMotion.slash, crownTrail.transform.position, slash, 1.7f, Vfx.Accent);
+                SwordWaveFx.SpawnBossCounter(this, counterTarget, FlatPos + transform.forward * 0.7f);
+                Sfx.Play("THR_Release", FlatPos);
+                Game.Rig.Kick(0.65f);
+            }
+            if (t < rangedCounterMotion.duration) return;
+            LockTarget = counterTarget = null;
+            bossCounter = bossRangedCounter = false;
+            rangedCounterMotion = null;
+            ApplyPose(default);
+            Enter(State.Normal);
+        }
+
+        /// <summary>The ranged counter's single wave struck the dodged boss, not any bystanders.</summary>
+        public void BossCounterStrike(EnemyBase boss, Vector3 at)
+        {
+            if (boss == null || boss.IsDead) return;
+            bool crit = RollCrit(out float mult);
+            float damage = LeapCounterDamage * DamageMult * mult;
+            if (!boss.TakeHit(damage, StaggerLeapCounter * StaggerScale(crit), transform.position)) return;
+            Game.ReportDamage(boss, damage, crit);
+            Vector3 from = (boss.FlatPos - FlatPos).normalized;
+            Vfx.Hit(boss.Visual.position + Vector3.up * 1.4f - from * (boss.Radius * 0.3f), from, true, boss.Visual);
+            Sfx.Play("HIT_Boss", boss.transform.position + Vector3.up);
+            Game.HitStop(0.1f);
+            Game.Rig.Shake(0.4f);
         }
 
         /// <summary>The leap at the queen: rise and come down just in front of her, strike on landing, recover.</summary>
@@ -1495,7 +1559,7 @@ namespace KingLastPiece
             if (t >= LeapCounterEnd)
             {
                 counterTarget = null;
-                leapCounter = false;
+                bossCounter = false;
                 ApplyPose(default);
                 Enter(State.Normal);
             }
@@ -1504,7 +1568,12 @@ namespace KingLastPiece
         void UpdateCounter(float dt)
         {
             float t = stateTime;
-            if (leapCounter) { UpdateLeapCounter(); return; }
+            if (bossCounter)
+            {
+                if (bossRangedCounter) UpdateBossRangedCounter();
+                else UpdateLeapCounter();
+                return;
+            }
             if (counterTarget == null || (counterTarget.IsDead && !counterReleased))
             {
                 Game.EndSlowMo();

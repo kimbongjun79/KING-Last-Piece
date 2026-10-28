@@ -559,6 +559,8 @@ namespace KingLastPiece
                 "1-5   폰 / 나이트 / 비숍 / 룩 / 퀸 소환",
                 "6     체스메가트론 (보스)     8  2페이즈",
                 $"7     보스 다음 패턴: {arena.MegatronPatternName}",
+                arena.BossCounterPreviewIndex < 0 ? "F1-F4 보스 원거리 반격 4안 시연"
+                    : $"F1-F4 원거리 반격: {AttackStyles.RangedCounters[arena.BossCounterPreviewIndex].koName}",
                 "X     기물 제거          C   연습장 초기화",
                 $"G     무적: {(arena.Invincible ? "켜짐" : "꺼짐")}",
                 $"I     무한 기력: {(arena.InfiniteStamina ? "켜짐" : "꺼짐")}",
@@ -597,7 +599,8 @@ namespace KingLastPiece
             if (p.CounterReady)
             {
                 float blink = 0.6f + 0.4f * Mathf.Sin(Time.unscaledTime * 14f);
-                Text(new Rect(0, Screen.height * 0.28f + 46 * scale, Screen.width, 36 * scale), "좌클릭 — 로열 스로", small,
+                Text(new Rect(0, Screen.height * 0.28f + 46 * scale, Screen.width, 36 * scale),
+                    p.CounterTargetsBoss ? "좌클릭 — 보스 반격" : "좌클릭 — 로열 스로", small,
                     new Color(1f, 0.9f, 0.6f, a * blink));
             }
         }

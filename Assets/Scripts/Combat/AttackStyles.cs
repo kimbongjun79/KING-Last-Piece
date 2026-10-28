@@ -262,6 +262,15 @@ namespace KingLastPiece
         }
     }
 
+    /// <summary>A single ranged boss counter: body silhouette, one release cue, and one sword wave.</summary>
+    public sealed class BossCounterMotion
+    {
+        public string name, koName;
+        public float release, duration, slashRoll;
+        public SlashFxKind slash;
+        public PoseTrack pose;
+    }
+
     /// <summary>The candidate body-attack styles evaluated in the Attack Lab.</summary>
     public static class AttackStyles
     {
@@ -273,6 +282,7 @@ namespace KingLastPiece
 
         public static readonly AttackStyle[] All = Build();
         public static AttackStyle Default => All[DefaultIndex];
+        public static readonly BossCounterMotion[] RangedCounters = BuildRangedCounters();
 
         static AttackStyle[] Build()
         {
@@ -611,6 +621,53 @@ namespace KingLastPiece
                 .Key(1.2f, P(), Ease.OutBack),
             hits = new[] { new HitWindow { start = 0.56f, end = 0.9f, shape = HitShape.Circle, forward = 1.0f, range = 1.2f, damage = 34f, poise = 50f, hitStop = 0.09f, shake = 0.3f } },
             moves = new[] { new MoveSeg(0.55f, 0.9f, 6.0f, Ease.Linear) },
+        };
+        static BossCounterMotion[] BuildRangedCounters() => new[]
+        {
+            // A broad horizontal whip, almost without leaving the floor.
+            new BossCounterMotion
+            {
+                name = "Royal Whip", koName = "횡베기 채찍", release = 0.30f, duration = 0.82f, slash = SlashFxKind.SlashB,
+                pose = new PoseTrack().Key(0f, P())
+                    .Key(0.17f, P(tilt: -34f, heading: 90f, squash: -0.14f), Ease.Out)
+                    .Key(0.30f, P(tilt: 72f, heading: -90f, spin: 85f, lift: 0.15f), Ease.In)
+                    .Key(0.52f, P(tilt: 26f, heading: -70f, spin: 90f), Ease.Out)
+                    .Key(0.82f, P(), Ease.Out),
+            },
+            // Compress, launch high, then chop down to cast the wave.
+            new BossCounterMotion
+            {
+                name = "Crown Guillotine", koName = "도약 수직베기", release = 0.48f, duration = 0.98f,
+                slash = SlashFxKind.SlashBVertical, slashRoll = 180f,
+                pose = new PoseTrack().Key(0f, P())
+                    .Key(0.19f, P(tilt: -26f, squash: -0.22f), Ease.Out)
+                    .Key(0.33f, P(tilt: -46f, lift: 1.3f), Ease.Out)
+                    .Key(0.48f, P(tilt: 86f, lift: 0.18f, squash: -0.16f), Ease.In)
+                    .Key(0.66f, P(tilt: 48f, squash: -0.1f), Ease.Out)
+                    .Key(0.98f, P(), Ease.Out),
+            },
+            // Two full turns build a circular trail, but still release only one forward wave.
+            new BossCounterMotion
+            {
+                name = "Spiral Crown", koName = "나선 회전베기", release = 0.58f, duration = 1.05f, slash = SlashFxKind.AoeA,
+                pose = new PoseTrack().Key(0f, P())
+                    .Key(0.18f, P(tilt: 18f, spin: 90f, lift: 0.12f), Ease.In)
+                    .Key(0.42f, P(tilt: 27f, spin: 430f, lift: 0.35f), Ease.Linear)
+                    .Key(0.58f, P(tilt: 54f, spin: 720f, lift: 0.22f), Ease.In)
+                    .Key(0.76f, P(tilt: 18f, spin: 740f), Ease.Out)
+                    .Key(1.05f, P(spin: 720f), Ease.Out),
+            },
+            // Fold backwards, then reverse the whole body into a diagonal release.
+            new BossCounterMotion
+            {
+                name = "Reverse Verdict", koName = "역회전 대각베기", release = 0.38f, duration = 0.90f,
+                slash = SlashFxKind.SlashBVertical, slashRoll = 225f,
+                pose = new PoseTrack().Key(0f, P())
+                    .Key(0.23f, P(tilt: -65f, squash: -0.2f), Ease.Out)
+                    .Key(0.38f, P(tilt: 76f, spin: -180f, lift: 0.17f), Ease.In)
+                    .Key(0.60f, P(tilt: 35f, spin: -280f), Ease.Out)
+                    .Key(0.90f, P(spin: -360f), Ease.Out),
+            },
         };
     }
 }
