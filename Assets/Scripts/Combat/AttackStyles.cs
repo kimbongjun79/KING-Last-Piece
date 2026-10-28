@@ -705,8 +705,8 @@ namespace KingLastPiece
                 slash = SlashFxKind.SlashB, slashRoll = 0f, slashScale = 2.2f,
                 pose = new PoseTrack().Key(0f, P())
                     .Key(0.30f, P(tilt: -40f, heading: -70f, squash: -0.25f), Ease.Out)
-                    .Key(0.42f, P(tilt: 70f, heading: 80f), Ease.In)
-                    .Key(0.62f, P(tilt: 40f, heading: 60f), Ease.Out)
+                    .Key(0.42f, P(tilt: 70f), Ease.In)
+                    .Key(0.62f, P(tilt: 40f), Ease.Out)
                     .Key(0.95f, P(), Ease.Out),
             },
             new BossCloseCounterMotion

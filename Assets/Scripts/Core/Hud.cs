@@ -560,8 +560,7 @@ namespace KingLastPiece
                 "6     체스메가트론 (보스)     8  2페이즈",
                 $"7     보스 다음 패턴: {arena.MegatronPatternName}",
                 $"F1-F4 원거리 반격: {AttackStyles.RangedCounters[arena.BossRangedPreviewIndex].koName} (기본 2안)",
-                arena.BossClosePreviewIndex < 0 ? "F5-F8 보스 근거리 반격 4안 시연"
-                    : $"F5-F8 근거리 반격: {AttackStyles.CloseCounters[arena.BossClosePreviewIndex].koName}",
+                $"F5-F8 근거리 반격: {AttackStyles.CloseCounters[Mathf.Max(0, arena.BossClosePreviewIndex)].koName} (기본 1안)",
                 "X     기물 제거          C   연습장 초기화",
                 $"G     무적: {(arena.Invincible ? "켜짐" : "꺼짐")}",
                 $"I     무한 기력: {(arena.InfiniteStamina ? "켜짐" : "꺼짐")}",
