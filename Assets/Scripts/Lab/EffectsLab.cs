@@ -8,12 +8,12 @@ namespace KingLastPiece
     {
         static readonly float[] StationX = { -5.5f, 0f, 5.5f };
         static readonly Key[] Keys = { Key.Digit1, Key.Digit2, Key.Digit3 };
-        static readonly string[] Names = { "1. 측면 일격", "2. 공중 내려베기", "3. 회전 일격" };
+        static readonly string[] Names = { "1. 우상단 → 좌하단", "2. 좌상단 → 우하단", "3. 도약 우상단 → 좌하단" };
         static readonly string[] Details =
         {
-            "몸을 옆으로 깊게 젖혀 힘을 모았다가 한 번 크게 베기",
-            "높이 도약해 공중제비 후 수직으로 단 한 번 내려베기",
-            "긴 회전으로 힘을 모아 마지막 순간 한 번 크게 베기",
+            "오른쪽 위에서 몸을 모아 왼쪽 아래로 대각 한방",
+            "왼쪽 위에서 몸을 모아 오른쪽 아래로 대각 한방",
+            "오른쪽 위로 뛰어오른 후 왼쪽 아래로 대각 한방",
         };
         static readonly AttackDef[] Trials =
         {
@@ -89,7 +89,7 @@ namespace KingLastPiece
             var attack = game.Player.CurrentAttack;
             string active = attack == Trials[selected] ? $"실행 중: {attack.name}" : "우클릭/K로 모션 확인";
             GUI.Label(new Rect(pr.x + 12 * scale, pr.y + 8 * scale, pr.width - 24 * scale, pr.height - 16 * scale),
-                $"강공격 한방 모션 비교 — 1·2·3: 위치와 모션 선택\n{Names[selected]}: {Details[selected]}\n{active} / 피해·범위·기력 동일, Board Ripple 공통", panelStyle);
+                $"대각 내려베기 3안 — 1·2·3: 모션 선택   우클릭/K: 강공격\n{Names[selected]}: {Details[selected]}\n{active} / 모두 단일 타격·피해 46, Board Ripple 공통", panelStyle);
         }
     }
 }

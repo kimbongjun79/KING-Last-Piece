@@ -293,7 +293,7 @@ namespace KingLastPiece
                 new AttackStyle
                 {
                     name = "Royal Ensemble", koName = "왕의 연무",
-                    description = "Ram in from mid range, whip R→L, whip L→R, 360° cyclone, air somersault slam; heavy is one charged cut.",
+                    description = "Ram in from mid range, whip R→L, whip L→R, 360° cyclone, air somersault slam; heavy is one charged diagonal cut.",
                     lights = new[] { EnsembleSwing(1f), EnsembleSwing(-1f), EnsembleCyclone(), EnsembleMeteor() }, heavy = HeavyCut(0),
                     gapCloser = EnsembleDash, gapCloserMaxRange = 8f,
                 },
@@ -399,47 +399,46 @@ namespace KingLastPiece
             moves = new[] { new MoveSeg(0.12f, 0.34f, Mathf.Clamp(distance, 1.5f, 7.5f)) },
         };
 
-        /// <summary>Three wind-ups for one heavy blow. Reach, damage and stamina cost stay comparable.</summary>
+        /// <summary>One charged diagonal cut per trial: right-to-left, left-to-right, or leaping right-to-left.</summary>
         public static AttackDef HeavyCut(int variant)
         {
-            // One hit window per motion: grounded cleave, airborne falling cut, or spinning release.
-            float strike = variant == 1 ? 1.03f : variant == 2 ? 0.98f : 0.92f;
+            float strike = variant == 2 ? 1.07f : 0.95f;
             var pose = new PoseTrack().Key(0f, P());
             if (variant == 1)
-                pose.Key(0.4f, P(tilt: -18f, squash: -0.28f), Ease.Out)
-                    .Key(0.72f, P(flip: -145f, lift: 2.6f), Ease.Out)
-                    .Key(0.94f, P(flip: -300f, lift: 1.8f), Ease.In)
-                    .Key(1.03f, P(flip: -360f, squash: -0.32f), Ease.In)
-                    .Key(1.5f, P(flip: -360f), Ease.OutBack);
+                pose.Key(0.3f, P(tilt: -12f, heading: -70f, squash: -0.25f), Ease.Out)
+                    .Key(0.7f, P(tilt: 48f, heading: -65f, spin: -55f, lift: 1.05f), Ease.Out)
+                    .Key(0.83f, P(tilt: 50f, heading: -65f, spin: -55f, lift: 1.05f), Ease.Linear)
+                    .Key(1.04f, P(tilt: 82f, heading: 70f, spin: 105f, squash: -0.3f), Ease.In)
+                    .Key(1.5f, P(), Ease.OutBack);
             else if (variant == 2)
-                pose.Key(0.38f, P(tilt: 48f, heading: 90f, spin: -120f, squash: -0.22f), Ease.Out)
-                    .Key(0.72f, P(tilt: 65f, heading: 180f, spin: 440f, lift: 0.45f), Ease.Linear)
-                    .Key(0.88f, P(tilt: 72f, heading: 270f, spin: 720f, lift: 0.5f), Ease.Linear)
-                    .Key(1.05f, P(tilt: 75f, heading: 430f, spin: 1080f, lift: 0.15f), Ease.Linear)
-                    .Key(1.5f, P(spin: 1080f), Ease.OutBack);
+                pose.Key(0.4f, P(tilt: -18f, heading: 65f, squash: -0.32f), Ease.Out)
+                    .Key(0.78f, P(tilt: 44f, heading: 65f, spin: 45f, lift: 2.3f), Ease.Out)
+                    .Key(0.9f, P(tilt: 50f, heading: 65f, spin: 45f, lift: 2.3f), Ease.Linear)
+                    .Key(1.07f, P(tilt: 85f, heading: -70f, spin: -95f, squash: -0.35f), Ease.In)
+                    .Key(1.5f, P(), Ease.OutBack);
             else
-                pose.Key(0.45f, P(tilt: 48f, heading: 130f, spin: 100f, squash: -0.25f), Ease.Out)
-                    .Key(0.78f, P(tilt: 70f, heading: 135f, spin: 140f, squash: -0.18f), Ease.In)
-                    .Key(1.03f, P(tilt: 76f, heading: -130f, spin: -125f, lift: 0.3f), Ease.Out)
+                pose.Key(0.3f, P(tilt: -12f, heading: 70f, squash: -0.25f), Ease.Out)
+                    .Key(0.7f, P(tilt: 48f, heading: 65f, spin: 55f, lift: 1.05f), Ease.Out)
+                    .Key(0.83f, P(tilt: 50f, heading: 65f, spin: 55f, lift: 1.05f), Ease.Linear)
+                    .Key(1.04f, P(tilt: 82f, heading: -70f, spin: -105f, squash: -0.3f), Ease.In)
                     .Key(1.5f, P(), Ease.OutBack);
             var hit = new HitWindow
             {
-                start = strike, end = strike + 0.12f, range = 4.3f, arc = 220f,
+                start = strike, end = strike + 0.1f, range = 4.3f, arc = 220f,
                 damage = 46f, poise = 65f, hitStop = 0.12f, shake = 0.65f, kick = 1f,
                 impact = true, dust = true, launch = true, sparkRing = 70,
-                sweep = true, sweepFrom = 110f, sweepTo = -110f, slash = variant != 1,
-                fx = variant == 1 ? SlashFxKind.SlashBVertical : SlashFxKind.SlashB,
-                fxScale = 2.3f, fxHeight = 1.2f, fxYaw = variant == 1 ? 0f : 180f,
-                fxRoll = variant == 1 ? 180f : 0f, fxFlip = variant != 1, fxGold = true,
+                fx = SlashFxKind.SlashBVertical, fxScale = 2.3f, fxHeight = 1.2f,
+                // SlashBVertical rises by default. Turn it downward and bank the slash plane diagonally.
+                fxRoll = variant == 1 ? 135f : 225f, fxGold = true,
                 sfx = "ATK_Stomp_Slam",
             };
             return new AttackDef
             {
-                name = variant == 1 ? "Heavy Cut - Falling" : variant == 2 ? "Heavy Cut - Spin" : "Heavy Cut - Side",
-                duration = 1.5f, cancelAt = 1.25f, cost = 48f, heavy = true,
+                name = variant == 1 ? "Diagonal - Left to Right" : variant == 2 ? "Diagonal - Leaping Right to Left" : "Diagonal - Right to Left",
+                duration = 1.5f, cancelAt = 1.26f, cost = 48f, heavy = true,
                 sfx = "ATK_Stomp_Charge", lockFacing = true,
                 pose = pose, hits = new[] { hit },
-                moves = new[] { new MoveSeg(0.65f, strike, 3f, Ease.InOut) },
+                moves = new[] { new MoveSeg(variant == 2 ? 0.78f : 0.7f, strike, 3f, Ease.InOut) },
             };
         }
 
