@@ -11,9 +11,9 @@ namespace KingLastPiece
         static readonly string[] Names = { "1. 탄력형", "2. 균형형", "3. 무게형 (게임 기본)" };
         static readonly string[] Details =
         {
-            "준비 0.68 · 높이 2.15 · X 0.88 · 착지 0.96 · 회피 1.20",
-            "준비 0.72 · 높이 2.40 · X 0.92 · 착지 1.00 · 회피 1.24",
-            "준비 0.75 · 높이 2.60 · X 0.97 · 착지 1.05 · 회피 1.29",
+            "준비 0.68 · 높이 2.15 · X 0.90 · 머리 착지 0.96 · 복귀 1.32",
+            "준비 0.72 · 높이 2.40 · X 0.94 · 머리 착지 1.00 · 복귀 1.36",
+            "준비 0.75 · 높이 2.60 · X 0.99 · 머리 착지 1.05 · 복귀 1.41",
         };
         static readonly AttackDef[] Trials =
         {
@@ -89,7 +89,7 @@ namespace KingLastPiece
             var attack = game.Player.CurrentAttack;
             string active = attack == Trials[selected] ? $"실행 중: {attack.name}" : "우클릭/K로 모션 확인";
             GUI.Label(new Rect(pr.x + 12 * scale, pr.y + 8 * scale, pr.width - 24 * scale, pr.height - 16 * scale),
-                $"무게형 임시 채택 · 착지 X베기 — 1·2·3: 모션 선택   우클릭/K: 강공격\n{Names[selected]}: {Details[selected]}\n{active} / 베기 2줄 동시·착지 타격 1회·착지 후 잠깐 회피 불가", panelStyle);
+                $"무게형 임시 채택 · 전방 X베기 — 1·2·3: 모션 선택   우클릭/K: 강공격\n{Names[selected]}: {Details[selected]}\n{active} / 머리 충격파·전방 90° 타격 1회·착지 후 0.36초 후딜", panelStyle);
         }
     }
 }

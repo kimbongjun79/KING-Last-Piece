@@ -1107,7 +1107,14 @@ namespace KingLastPiece
                 }
             }
 
-            ApplyPose(Dynamic(atk.pose.Eval(t), dyn));
+            BodyPose authoredPose = atk.pose.Eval(t), pose = Dynamic(authoredPose, dyn);
+            // A head-first landing needs the same contact angle and squash at every dynamism level.
+            if (atk.hits.Length > 0 && atk.hits[0].impactAtHead)
+            {
+                pose.tilt = authoredPose.tilt;
+                pose.squash = authoredPose.squash;
+            }
+            ApplyPose(pose);
 
             // Authored effects, the ground range arc, dust and impacts all scale with the attack range.
             if (atk.cues != null)
@@ -1116,7 +1123,8 @@ namespace KingLastPiece
                     {
                         Sfx.Play(cue.sfx, FlatPos);
                         Vfx.Slash(cue.kind, transform.position + Vector3.up * cue.height, transform.rotation * Quaternion.Euler(0f, cue.yaw, cue.roll),
-                            cue.scale * reach, cue.gold ? Vfx.Accent : (Color?)null, cue.mirror);
+                            cue.scale * reach, cue.gold ? Vfx.Accent : (Color?)null, cue.mirror,
+                            cue.lifeScale > 0f ? cue.lifeScale : 1f);
                     }
 
             bool trail = t >= atk.FirstHit - 0.07f && t <= atk.LastHit + 0.03f;
@@ -1131,27 +1139,30 @@ namespace KingLastPiece
                 if (!windowStarted[i])
                 {
                     windowStarted[i] = true;
-                    Sfx.Play(w.sfx, FlatPos);
+                    Vector3 hitCenter = FlatPos + transform.forward * (w.forward * reach);
+                    Vector3 impactCenter = w.impactAtHead ? crownTrail.transform.position : hitCenter;
+                    impactCenter.y = 0f;
+                    float impactRadius = (w.impactRadius > 0f ? w.impactRadius : w.range) * reach;
+                    Sfx.Play(w.sfx, impactCenter);
                     if (w.fx != SlashFxKind.None)
                         Vfx.Slash(w.fx, transform.position + Vector3.up * w.fxHeight, transform.rotation * Quaternion.Euler(0f, w.fxYaw, 0f),
                             w.fxScale * reach, w.fxGold ? Vfx.Accent : (Color?)null, w.fxFlip);
                     // Ground range marker (translucent black/white arc) shows the attack's real reach: the same centre and
                     // radius DoHits uses, sweeping over the window's real duration (attack speed plays it faster).
-                    Vector3 hitCenter = FlatPos + transform.forward * (w.forward * reach);
                     if (w.slash)
                         SlashFx.Spawn(hitCenter, transform.forward, w.range * reach * 0.82f,
                             w.sweepFrom, w.sweepTo, (w.end - w.start) / Mathf.Max(0.1f, Stats.attackSpeed), new Color(1f, 0.82f, 0.45f));
                     if (w.kick > 0f) Game.Rig.Kick(w.kick * dyn);
-                    if (w.dust) Vfx.Dust(hitCenter, w.range * reach);
+                    if (w.dust) Vfx.Dust(impactCenter, impactRadius);
                     // White sparks thrown up all around the strike area.
                     for (int k = 0; k < w.sparkRing; k++)
                     {
-                        Vector3 around = Quaternion.Euler(0f, Random.value * 360f, 0f) * Vector3.forward * (w.range * reach * Random.Range(0.2f, 0.95f));
-                        Effects.Sparks(hitCenter + around + Vector3.up * 0.2f, Vfx.Accent, 1, 6f);
+                        Vector3 around = Quaternion.Euler(0f, Random.value * 360f, 0f) * Vector3.forward * (impactRadius * Random.Range(0.2f, 0.95f));
+                        Effects.Sparks(impactCenter + around + Vector3.up * 0.2f, Vfx.Accent, 1, 6f);
                     }
                     if (w.impact)
                     {
-                        Vfx.GroundImpact(hitCenter, w.range * reach, atk.heavy ? 1.4f : 1f);
+                        Vfx.GroundImpact(impactCenter, impactRadius, atk.heavy ? 1.4f : 1f);
                         Game.Rig.Shake(w.shake * dyn);
                     }
                     // Sword Wave (special item): each attack's last window sends the blade light flying.
@@ -1193,18 +1204,7 @@ namespace KingLastPiece
             foreach (var e in scratch)
             {
                 if (e == null || e.IsDead || already.Contains(e)) continue;
-                Vector3 to = e.FlatPos - center;
-                float d = to.magnitude;
-                if (d > range + e.Radius) continue;
-                if (w.shape == HitShape.Arc && d > 0.4f && Vector3.Angle(transform.forward, to) > w.arc * 0.5f) continue;
-                if (w.shape == HitShape.Arc && w.sweep && d > 0.4f)
-                {
-                    // Only what the body has already swept through gets hit.
-                    float ang = Vector3.SignedAngle(transform.forward, to, Vector3.up);
-                    float cur = Mathf.Lerp(w.sweepFrom, w.sweepTo, progress);
-                    float lo = Mathf.Min(w.sweepFrom, cur) - 15f, hi = Mathf.Max(w.sweepFrom, cur) + 15f;
-                    if (ang < lo || ang > hi) continue;
-                }
+                if (!w.Covers(FlatPos, center, transform.forward, e.FlatPos, e.Radius, range, progress)) continue;
                 already.Add(e);
                 bool crit = RollCrit(out float mult);
                 // Execution (special item): a heavy on a stunned piece deals double.

@@ -105,6 +105,9 @@ namespace KingLastPiece
         public float damage = 12f, poise = 12f;
         public float hitStop = 0.05f, shake = 0.12f;
         public bool impact;            // ground impact: shockwave + shake even on whiff
+        public bool impactAtHead;       // project the King's tilted crown contact onto the board
+        public float impactRadius;      // visual ripple/dust radius; zero uses the hit range
+        public bool frontOnly;          // reject pieces behind the King, including those inside the close-range arc exception
         public bool sweep;             // Arc only: hits land progressively from sweepFrom to sweepTo (degrees, + = right)
         public float sweepFrom, sweepTo;
         public bool slash;             // draw a ground crescent along the sweep (shows the real reach)
@@ -119,6 +122,20 @@ namespace KingLastPiece
         public bool fxGold;            // recolor the prefab to the King's accent (white)
         public bool dust;              // low dust burst around the impact (NamuFX smoke layers)
         public string sfx;             // sound id played when the window starts (Docs/Sound/sounds.json)
+
+        public bool Covers(Vector3 origin, Vector3 center, Vector3 facing, Vector3 target, float targetRadius, float reach, float progress)
+        {
+            Vector3 to = target - center;
+            float d = to.magnitude;
+            if (d > reach + targetRadius || (frontOnly && Vector3.Dot(facing, target - origin) <= 0f)) return false;
+            if (shape != HitShape.Arc || d <= 0.4f) return true;
+            if (Vector3.Angle(facing, to) > arc * 0.5f) return false;
+            if (!sweep) return true;
+            float ang = Vector3.SignedAngle(facing, to, Vector3.up);
+            float cur = Mathf.Lerp(sweepFrom, sweepTo, progress);
+            float lo = Mathf.Min(sweepFrom, cur) - 15f, hi = Mathf.Max(sweepFrom, cur) + 15f;
+            return ang >= lo && ang <= hi;
+        }
     }
 
     /// <summary>An authored effect played at a fixed time into an attack, aligned with the King's facing.</summary>
@@ -129,6 +146,7 @@ namespace KingLastPiece
         public float scale, height, yaw;
         public float roll;         // about the facing axis: 180 turns a bottom-to-top sweep into top-to-bottom
         public bool gold, mirror;
+        public float lifeScale;     // zero uses the prefab's authored particle lifetime
         public string sfx;         // sound id played at this time (kind may be None for a sound-only cue)
     }
 
@@ -409,40 +427,40 @@ namespace KingLastPiece
         {
             float crouch = variant == 0 ? 0.68f : variant == 2 ? 0.75f : 0.72f;
             float apex = variant == 0 ? 0.8f : variant == 2 ? 0.88f : 0.84f;
-            float slashAt = variant == 0 ? 0.88f : variant == 2 ? 0.97f : 0.92f;
+            float slashAt = variant == 0 ? 0.9f : variant == 2 ? 0.99f : 0.94f;
             float land = variant == 0 ? 0.96f : variant == 2 ? 1.05f : 1f;
             float height = variant == 0 ? 2.15f : variant == 2 ? 2.6f : 2.4f;
             float compression = variant == 0 ? -0.27f : variant == 2 ? -0.36f : -0.32f;
             float rebound = variant == 0 ? 0.09f : variant == 2 ? 0.15f : 0.12f;
-            float duration = variant == 0 ? 1.44f : variant == 2 ? 1.56f : 1.5f;
+            float duration = land + 0.36f;
             var pose = new PoseTrack()
                 .Key(0f, P())
                 .Key(crouch, P(tilt: -20f, squash: -0.32f), Ease.Out)
                 .Key(apex, P(tilt: -12f, lift: height, squash: 0.08f), Ease.Out)
-                .Key(land, P(tilt: variant == 0 ? 70f : variant == 2 ? 80f : 76f, squash: compression), Ease.InOut)
-                .Key(land + 0.12f, P(tilt: 24f, lift: rebound, squash: 0.05f), Ease.Out)
-                .Key(duration, P(), Ease.Out);
+                .Key(land, P(tilt: 105f, squash: compression), Ease.InOut)
+                .Key(land + 0.12f, P(tilt: 72f, lift: rebound, squash: 0.05f), Ease.Out)
+                .Key(duration, P(), Ease.InOut);
             return new AttackDef
             {
                 name = variant == 0 ? "Cross Cut - Snappy" : variant == 2 ? "Cross Cut - Weighty" : "Cross Cut - Balanced",
-                duration = duration, cancelAt = variant == 0 ? 1.24f : variant == 2 ? 1.36f : 1.3f,
-                dodgeCancelAt = land + 0.24f,
+                duration = duration, cancelAt = duration, dodgeCancelAt = duration,
                 cost = 48f, heavy = true, sfx = "ATK_Stomp_Charge", lockFacing = true,
                 pose = pose,
                 hits = new[]
                 {
                     new HitWindow
                     {
-                        start = land, end = land + 0.1f, range = 4.3f, arc = 220f,
+                        start = land, end = land + 0.1f, range = 3.5f, arc = 90f, frontOnly = true,
                         damage = 46f, poise = 65f, hitStop = 0.12f, shake = 0.65f, kick = 1f,
-                        impact = true, dust = true, launch = true, sparkRing = 70, sfx = "ATK_Stomp_Slam",
+                        impact = true, impactAtHead = true, impactRadius = 2.5f,
+                        dust = true, launch = true, sparkRing = 70, sfx = "ATK_Stomp_Slam",
                     },
                 },
                 // Both authored slashes fire together just before the base lands; no second damage window.
                 cues = new[]
                 {
-                    new FxCue { time = slashAt, kind = SlashFxKind.SlashBVertical, scale = 2.3f, height = 1.6f, roll = 225f, gold = true },
-                    new FxCue { time = slashAt, kind = SlashFxKind.SlashBVertical, scale = 2.3f, height = 1.6f, roll = 135f, gold = true },
+                    new FxCue { time = slashAt, kind = SlashFxKind.SlashBVertical, scale = 2.3f, height = 1.6f, roll = 225f, gold = true, lifeScale = 1.2f },
+                    new FxCue { time = slashAt, kind = SlashFxKind.SlashBVertical, scale = 2.3f, height = 1.6f, roll = 135f, gold = true, lifeScale = 1.2f },
                 },
                 // A fast takeoff eases into the landing; by the early slashes only a few centimetres of travel remain.
                 moves = new[] { new MoveSeg(crouch, land, 3f, Ease.Out) },

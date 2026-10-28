@@ -84,8 +84,9 @@ namespace KingLastPiece
         }
 
         /// <param name="mirror">Mirror across the facing's left/right axis: the arc sweeps the other way.</param>
-        public static bool Slash(SlashFxKind kind, Vector3 pos, Quaternion rot, float scale, Color? tint = null, bool mirror = false) =>
-            Slash(kind, pos, rot, scale, tint, null, mirror);
+        /// <param name="lifeScale">Extend the lifetime of the visible slash particles without slowing their sweep.</param>
+        public static bool Slash(SlashFxKind kind, Vector3 pos, Quaternion rot, float scale, Color? tint = null, bool mirror = false, float lifeScale = 1f) =>
+            Slash(kind, pos, rot, scale, tint, null, mirror, 1f, false, lifeScale);
 
         /// <summary>A slash that rides along with <paramref name="follow"/> (its particles move with it).</summary>
         public static bool SlashFollowing(SlashFxKind kind, Vector3 pos, Quaternion rot, float scale, Color? tint, Transform follow, bool mirror = false)
@@ -97,7 +98,7 @@ namespace KingLastPiece
 
         /// <param name="keep">When set, only particle systems whose (lower-case) name passes keep emitting.</param>
         static bool Slash(SlashFxKind kind, Vector3 pos, Quaternion rot, float scale, Color? tint, System.Predicate<string> keep,
-                          bool mirror = false, float dustLife = 1f, bool burst = false)
+                          bool mirror = false, float dustLife = 1f, bool burst = false, float lifeScale = 1f)
         {
             Vector3 facingRight = rot * Vector3.right;
             var lib = FxLibrary.Instance;
@@ -162,6 +163,7 @@ namespace KingLastPiece
                 // Burst layers (flare, sparks) sit ~1.4 up in the slash prefab; pull them onto the hit point itself.
                 if (burst) ps.transform.localPosition = Vector3.zero;
                 bool dust = n.Contains("dust") || n.Contains("smoke");
+                if (!dust && lifeScale > 1f) main.startLifetimeMultiplier *= lifeScale;
                 if (dust)
                 {
                     Recolor(ps, DustColor, dustLife > 1f ? 1f : (float?)null);  // neutral dust, never "enemy red"
