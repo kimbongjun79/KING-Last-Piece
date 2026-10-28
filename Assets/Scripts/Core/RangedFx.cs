@@ -221,7 +221,7 @@ namespace KingLastPiece
         EnemyBase counterTarget;
         Vector3 dir;
         float reach, size = 1f, travelled, sparkTimer, slashTimer = SlashEvery;
-        bool namu, bossCounterWave, closeCounterScatter;
+        bool namu, bossCounterWave;
         Material coreMat, glowMat;
         readonly HashSet<EnemyBase> struck = new HashSet<EnemyBase>();
 
@@ -239,17 +239,6 @@ namespace KingLastPiece
             wave.counterTarget = target;
             wave.bossCounterWave = true;
             wave.name = "Boss Counter Wave";
-        }
-
-        /// <summary>Scatter a wave away from the boss as the King orbits it; the boss takes only the final counter blow.</summary>
-        public static void SpawnCloseCounter(PlayerController owner, EnemyBase boss, Vector3 from, Vector3 dir)
-        {
-            if (owner == null || boss == null || dir.sqrMagnitude < 0.01f) return;
-            var wave = Create(owner, from, dir, GameManager.BoardHalf * 1.4f, 0.85f);
-            wave.counterTarget = boss;
-            wave.transform.position = new Vector3(from.x, Mathf.Max(0.9f, from.y), from.z);
-            wave.closeCounterScatter = true;
-            wave.name = "Close Counter Scatter";
         }
 
         static SwordWaveFx Create(PlayerController owner, Vector3 from, Vector3 dir, float reach, float size)
@@ -352,18 +341,6 @@ namespace KingLastPiece
                     owner.BossCounterStrike(counterTarget, transform.position);
                     Destroy(gameObject);
                     return;
-                }
-            }
-            else if (closeCounterScatter)
-            {
-                var enemies = GameManager.Instance.Enemies;
-                for (int i = enemies.Count - 1; i >= 0; i--)
-                {
-                    var e = enemies[i];
-                    if (e == null || e == counterTarget || e.IsDead || !e.Targetable || struck.Contains(e)) continue;
-                    if (!Crosses(e, flat, right, width)) continue;
-                    struck.Add(e);
-                    owner.BossCloseScatterStrike(e, transform.position);
                 }
             }
             else

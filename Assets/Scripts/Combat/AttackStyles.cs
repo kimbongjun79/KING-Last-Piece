@@ -271,35 +271,29 @@ namespace KingLastPiece
         public PoseTrack pose;
     }
 
-    public enum BossCloseOrbit { Sweep, Spiral, Reversal, Dive }
+    /// <summary>Where a close boss counter carries the King before its single blow.</summary>
+    public enum BossClosePath { Hold, Flank, Blink, Vault }
 
-    /// <summary>A boss counter travelling around its body to the side opposite its snapshotted attack facing.</summary>
+    /// <summary>A close boss counter: one approach, one slash, one hit on the boss.</summary>
     public sealed class BossCloseCounterMotion
     {
         public string name, koName;
-        public float orbitStart, orbitEnd, duration;
-        public int extraTurns;
-        public BossCloseOrbit orbit;
+        public BossClosePath path;
+        public Ease moveEase;
+        public float moveEnd, strike, duration, slashRoll, slashScale;
         public SlashFxKind slash;
-        public float[] waveTimes;
         public PoseTrack pose;
 
-        /// <summary>Offset from the moving boss. The starting angle is measured from the attack's opposite side.</summary>
-        public Vector3 OrbitOffset(Vector3 back, float startAngle, float radius, float progress)
+        /// <summary>Offset from the boss. Angles are measured from the side opposite the dodged attack;
+        /// every path except <see cref="BossClosePath.Hold"/> takes the short way round to that side.</summary>
+        public Vector3 Offset(Vector3 back, float startAngle, float startDistance, float radius, float progress)
         {
-            float u = Mathf.Clamp01(progress);
-            float direction = startAngle < 0f ? -1f : 1f;
-            float toBack = (direction > 0f ? 360f : -360f) - startAngle;
-            float turn = orbit == BossCloseOrbit.Spiral || orbit == BossCloseOrbit.Reversal
-                ? u : PoseTrack.Curve(orbit == BossCloseOrbit.Dive ? Ease.Out : Ease.InOut, u);
-            float angle = startAngle + (toBack + direction * extraTurns * 360f) * turn;
-            float wobble = orbit == BossCloseOrbit.Reversal ? Mathf.Sin(u * Mathf.PI * 2f) : 0f;
-            if (orbit == BossCloseOrbit.Reversal) angle += direction * 150f * wobble;
-            float r = orbit == BossCloseOrbit.Reversal ? radius * (1f - 0.23f * wobble * wobble)
-                : orbit == BossCloseOrbit.Dive ? radius * (1f - 0.18f * Mathf.Sin(u * Mathf.PI)) : radius;
+            float c = PoseTrack.Curve(moveEase, Mathf.Clamp01(progress));
+            float angle = path == BossClosePath.Hold ? startAngle : startAngle * (1f - c);
+            float r = Mathf.Lerp(startDistance, radius, c);
             float a = angle * Mathf.Deg2Rad;
-            float c = Mathf.Cos(a), s = Mathf.Sin(a);
-            return new Vector3((back.x * c + back.z * s) * r, 0f, (back.z * c - back.x * s) * r);
+            float cos = Mathf.Cos(a), sin = Mathf.Sin(a);
+            return new Vector3((back.x * cos + back.z * sin) * r, 0f, (back.z * cos - back.x * sin) * r);
         }
     }
 
@@ -706,44 +700,50 @@ namespace KingLastPiece
         {
             new BossCloseCounterMotion
             {
-                name = "Crescent Ride", koName = "반월 저공 선회", orbit = BossCloseOrbit.Sweep,
-                orbitStart = 0.12f, orbitEnd = 0.94f, duration = 1.16f, extraTurns = 1,
-                slash = SlashFxKind.SlashB, waveTimes = new[] { 0.31f, 0.54f, 0.77f },
-                pose = new PoseTrack().Key(0f, P()).Key(0.12f, P(tilt: 24f, squash: -0.12f), Ease.Out)
-                    .Key(0.50f, P(tilt: 35f, heading: 90f, spin: 240f, lift: 0.25f), Ease.Linear)
-                    .Key(0.94f, P(tilt: 65f, spin: 540f), Ease.In)
-                    .Key(1.16f, P(spin: 720f), Ease.Out),
+                name = "Iai Draw", koName = "정면 발도 일섬", path = BossClosePath.Hold, moveEase = Ease.Out,
+                moveEnd = 0.30f, strike = 0.42f, duration = 0.95f,
+                slash = SlashFxKind.SlashB, slashRoll = 0f, slashScale = 2.2f,
+                pose = new PoseTrack().Key(0f, P())
+                    .Key(0.30f, P(tilt: -40f, heading: -70f, squash: -0.25f), Ease.Out)
+                    .Key(0.42f, P(tilt: 70f, heading: 80f), Ease.In)
+                    .Key(0.62f, P(tilt: 40f, heading: 60f), Ease.Out)
+                    .Key(0.95f, P(), Ease.Out),
             },
             new BossCloseCounterMotion
             {
-                name = "Climbing Spiral", koName = "고공 나선 등반", orbit = BossCloseOrbit.Spiral,
-                orbitStart = 0.15f, orbitEnd = 1.18f, duration = 1.42f, extraTurns = 2,
-                slash = SlashFxKind.AoeA, waveTimes = new[] { 0.37f, 0.60f, 0.82f, 1.05f },
-                pose = new PoseTrack().Key(0f, P()).Key(0.15f, P(tilt: 20f, lift: 0.2f), Ease.Out)
-                    .Key(0.69f, P(tilt: 32f, spin: 480f, lift: 1.7f), Ease.InOut)
-                    .Key(1.18f, P(tilt: 64f, spin: 900f, lift: 0.15f), Ease.In)
-                    .Key(1.42f, P(spin: 1080f), Ease.Out),
+                name = "Flank Cut", koName = "배후 선회 일섬", path = BossClosePath.Flank, moveEase = Ease.InOut,
+                moveEnd = 0.42f, strike = 0.50f, duration = 1.00f,
+                slash = SlashFxKind.SlashA, slashRoll = 0f, slashScale = 2.0f,
+                pose = new PoseTrack().Key(0f, P())
+                    .Key(0.42f, P(tilt: -30f, spin: -90f, lift: 0.2f), Ease.InOut)
+                    .Key(0.50f, P(tilt: 75f, spin: 180f), Ease.In)
+                    .Key(0.70f, P(tilt: 35f, spin: 300f), Ease.Out)
+                    .Key(1.00f, P(spin: 360f), Ease.Out),
             },
             new BossCloseCounterMotion
             {
-                name = "Reversing Eight", koName = "팔자 역주행", orbit = BossCloseOrbit.Reversal,
-                orbitStart = 0.13f, orbitEnd = 1.02f, duration = 1.28f, extraTurns = 1,
-                slash = SlashFxKind.Ink, waveTimes = new[] { 0.30f, 0.48f, 0.73f, 0.92f },
-                pose = new PoseTrack().Key(0f, P()).Key(0.13f, P(tilt: -24f, squash: -0.12f), Ease.Out)
-                    .Key(0.46f, P(tilt: 40f, heading: -90f, spin: -210f, lift: 0.45f), Ease.Linear)
-                    .Key(0.72f, P(tilt: -36f, heading: 90f, spin: 90f, lift: 0.45f), Ease.InOut)
-                    .Key(1.02f, P(tilt: 62f, spin: 360f), Ease.In)
-                    .Key(1.28f, P(spin: 360f), Ease.Out),
+                name = "Blink Thrust", koName = "순보 배후 찌르기", path = BossClosePath.Blink, moveEase = Ease.Out,
+                moveEnd = 0.12f, strike = 0.36f, duration = 0.85f,
+                slash = SlashFxKind.SlashD, slashRoll = 0f, slashScale = 2.0f,
+                pose = new PoseTrack().Key(0f, P())
+                    .Key(0.12f, P(tilt: -15f, squash: 0.15f), Ease.Out)
+                    .Key(0.28f, P(tilt: -35f, squash: -0.25f), Ease.Out)
+                    .Key(0.36f, P(tilt: 85f, lift: 0.1f), Ease.In)
+                    .Key(0.55f, P(tilt: 50f), Ease.Out)
+                    .Key(0.85f, P(), Ease.Out),
             },
             new BossCloseCounterMotion
             {
-                name = "Meteor Orbit", koName = "급강하 고속 선회", orbit = BossCloseOrbit.Dive,
-                orbitStart = 0.08f, orbitEnd = 0.79f, duration = 1.03f, extraTurns = 3,
-                slash = SlashFxKind.SlashBVertical, waveTimes = new[] { 0.18f, 0.31f, 0.44f, 0.57f, 0.71f },
-                pose = new PoseTrack().Key(0f, P()).Key(0.08f, P(tilt: -32f, lift: 0.45f), Ease.Out)
-                    .Key(0.33f, P(tilt: 35f, flip: 170f, lift: 1.25f), Ease.In)
-                    .Key(0.79f, P(tilt: 100f, flip: 360f, squash: -0.22f), Ease.In)
-                    .Key(1.03f, P(flip: 360f), Ease.Out),
+                name = "Vault Chop", koName = "도약 배후 내려찍기", path = BossClosePath.Vault, moveEase = Ease.InOut,
+                moveEnd = 0.50f, strike = 0.54f, duration = 1.05f,
+                slash = SlashFxKind.SlashBVertical, slashRoll = 0f, slashScale = 2.3f,
+                pose = new PoseTrack().Key(0f, P())
+                    .Key(0.12f, P(tilt: -20f, squash: -0.25f), Ease.Out)
+                    .Key(0.32f, P(tilt: 20f, flip: 180f, lift: 2.2f), Ease.Out)
+                    .Key(0.50f, P(tilt: 40f, flip: 360f, lift: 0.3f), Ease.In)
+                    .Key(0.54f, P(tilt: 95f, flip: 360f, squash: -0.2f), Ease.In)
+                    .Key(0.75f, P(tilt: 40f, flip: 360f), Ease.Out)
+                    .Key(1.05f, P(flip: 360f), Ease.Out),
             },
         };
     }
